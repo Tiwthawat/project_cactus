@@ -1,51 +1,88 @@
-import React from 'react'
-
+//login/page.tsx
+'use client';
+import * as React from 'react';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Link from '@mui/material/Link';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import Container from '@mui/material/Container';
 
 
 export default function Login() {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    console.log({
+      email: data.get('email'),
+      password: data.get('password'),
+    });
+  };
+
   return (
-    <>
-      <div className="container d-flex justify-content-center align-items-center vh-100">
-        <div className="bg-slate-100 col-xl-10 col-xxl-8 px-4 py-5">
-          <div className="row align-items-center g-lg-5 py-5">
-            <div className="col-md-10 mx-auto col-lg-5">
-              <center>
-                <h3 className="text-black">บัญชีของฉัน</h3>
-                <center>
-                  <a href="/login">
-                    <button type="button" className="btn btn-outline-dark">
-                      เข้าสู่ระบบ
-                    </button>
-                  </a>
-                  <>  </>
-                  <a href="/register">
-                    <button type="button" className="btn btn-outline-dark">
-                      ลงทะเบียน
-                    </button>{" "}
-                  </a>
-                </center>
-                <br />
-              </center>
-              <form className='flex-col items-center'>
-                <div className="mb-3 ml-80 text-black ">
-                  <label htmlFor="exampleInputEmail1" className="form-label">Email address</label>
-                  <input type="email" className="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" />
-                  <div id="emailHelp" className="form-text">We'll never share your email with anyone else.</div>
-                </div>
-                <div className="mb-3 ml-80  text-black ">
-                  <label htmlFor="exampleInputPassword1" className="form-label">Password</label>
-                  <input type="password" className="form-control" id="exampleInputPassword1" />
-                </div>
-                <div className="mb-3  ml-80  form-check">
-                  <input type="checkbox" className="form-check-input" id="exampleCheck1" />
-                  <label className="form-check-label text-black" htmlFor="exampleCheck1">Check me out</label>
-                </div>
-                <button type="submit" className="btn  ml-80 text-black  btn-primary">Submit</button>
-              </form>
-            </div>
-          </div>
+
+
+    <div className="min-h-screen bg-white flex flex-col justify-center items-center">
+     
+      <Container component="main" maxWidth="xs">
+        <div className="border items-center border-gray-300 rounded p-4">
+
+          <Typography component="h1" variant="h5" className="text-black  pt-5 text-center">
+            Sign in
+          </Typography>
+          <form onSubmit={handleSubmit} className="mt-1">
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email Address"
+              name="email"
+              autoComplete="email"
+              autoFocus
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Password"
+              type="password"
+              id="password"
+              autoComplete="current-password"
+            />
+            <FormControlLabel
+              control={<Checkbox value="remember" color="primary" />}
+              label="Remember me"
+              labelPlacement="end" // ใช้ labelPlacement เพื่อกำหนดสไตล์ของข้อความภายใน FormControlLabel
+              style={{ color: 'black' }} // กำหนดสไตล์ของ FormControlLabel ให้ทั้งหมดเป็นสีดำ
+            />
+
+            <Button
+              variant="contained"
+              className="w-full submit mt-3 mb-2 bg-green-500 hover:bg-green-600"
+            >
+              Sign In
+            </Button>
+            <Grid container>
+              <Grid item xs>
+                <Link href="#" variant="body2">
+                  Forgot password?
+                </Link>
+              </Grid>
+              <Grid item>
+                <Link href="/register" variant="body2">
+                  {"Don't have an account? Sign Up"}
+                </Link>
+              </Grid>
+            </Grid>
+          </form>
         </div>
-      </div>
-    </>
+      </Container>
+
+    </div>
+
   );
 }

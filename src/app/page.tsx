@@ -1,43 +1,28 @@
-// Home.tsx
+// page.tsx
+'use client';
 import React from "react";
-import AuctionItem from "./cactusitems";
-import itemscac, { CactusItem } from "./itemcac";
 
+import CactusItems from "./cactusitems";
+import Navbar from "./component/Navbar";
+import Navigation from "./component/Navigation";
+import Footer from "./component/footer";
 
-export default function Home() {
+export default function Page() {
   return (
+    
     <main className="flex flex-col h-screen items-center bg-white">
-      <div className="ml-5 w-full p-3 h-full text-black text-3xl flex-col overflow-hidden">
-        <div className="h-full overflow-scroll-y "> <h2>สินค้าที่ขายดี</h2>
-        
-          <section className="w-full flex flex-wrap mx-auto text-center">
-           
-            {itemscac.map((item: CactusItem) => (
-              <AuctionItem
-                key={item.Idauction}
-                Idauction={item.Idauction}
-                imageSrc={item.imageSrc}
-                name={item.name}
-                pricenow={item.pricenow}
-                Time={item.Time} link={""}                
-              />
-            ))}<h2>แคคตัสสวยงาม
-            </h2>
-          </section><section className="w-full flex flex-wrap mx-auto text-center">
-            
-            {itemscac.map((item: CactusItem) => (
-              <AuctionItem
-                key={item.Idauction}
-                Idauction={item.Idauction}
-                imageSrc={item.imageSrc}
-                name={item.name}
-                pricenow={item.pricenow}
-                Time={item.Time} link={""}                
-              />
-            ))}
-          </section>
-        </div>
+      
+      <div className="w-full text-black text-3xl flex-col overflow-x-hidden">
+        <h2 className=" pl-10 pt-2 pb-3 bg-lime-200">สินค้าที่ขายดี</h2>
+        <CactusItems />
+        <section className="w-full flex flex-wrap mx-auto ">
+        <h2 className=" pl-10 pt-2 w-full   pb-3 bg-lime-200">แคคตัสสวยงาม</h2>
+          <CactusItems />
+        </section>
+        <section className="w-full bg-black flex flex-wrap mx-auto text-center">
+          {/* เพิ่มเนื้อหาในส่วนนี้ */}<Footer/>
+        </section>
       </div>
     </main>
   );
-};
+}
