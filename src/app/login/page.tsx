@@ -1,88 +1,86 @@
-//login/page.tsx
 'use client';
-import * as React from 'react';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
-import Grid from '@mui/material/Grid';
-import Typography from '@mui/material/Typography';
-import Container from '@mui/material/Container';
 
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import Navbar from '../component/Navbar';
+import Navigation from '../component/Navigation';
 
 export default function Login() {
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    console.log({
-      email: data.get('email'),
-      password: data.get('password'),
-    });
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch('http://localhost:3000/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Cusername: email, Cpassword: password }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`❌ เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
+        return;
+      }
+
+      const data = await res.json();
+      localStorage.setItem('token', data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      window.dispatchEvent(new Event('login-success'));
+
+      router.push('/me');
+    } catch (error) {
+      console.error('🔥 เกิดข้อผิดพลาด:', error);
+      alert('เกิดข้อผิดพลาด');
+    }
   };
 
   return (
+    <>
+      <Navbar />
+      <Navigation />
+      <div className="min-h-screen pt-48 bg-white flex flex-col justify-start items-center">
+        <div className="w-full max-w-xs bg-white border border-gray-300 rounded-lg shadow-md p-6">
+          <h1 className="text-xl font-bold text-center mb-6 text-green-600">เข้าสู่ระบบ</h1>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">ชื่อผู้ใช้ (Username)</label>
+              <input
+                id="email"
+                name="email"
+                type="text"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 block bg-white w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+              />
+            </div>
 
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">รหัสผ่าน</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 bg-white block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+              />
+            </div>
 
-    <div className="min-h-screen bg-white flex flex-col justify-center items-center">
-     
-      <Container component="main" maxWidth="xs">
-        <div className="border items-center border-gray-300 rounded p-4">
-
-          <Typography component="h1" variant="h5" className="text-black  pt-5 text-center">
-            Sign in
-          </Typography>
-          <form onSubmit={handleSubmit} className="mt-1">
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-            />
-            <FormControlLabel
-              control={<Checkbox value="remember" color="primary" />}
-              label="Remember me"
-              labelPlacement="end" // ใช้ labelPlacement เพื่อกำหนดสไตล์ของข้อความภายใน FormControlLabel
-              style={{ color: 'black' }} // กำหนดสไตล์ของ FormControlLabel ให้ทั้งหมดเป็นสีดำ
-            />
-
-            <Button
-              variant="contained"
-              className="w-full submit mt-3 mb-2 bg-green-500 hover:bg-green-600"
+            <button
+              type="submit"
+              className="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition duration-200"
             >
-              Sign In
-            </Button>
-            <Grid container>
-              <Grid item xs>
-                <Link href="#" variant="body2">
-                  Forgot password?
-                </Link>
-              </Grid>
-              <Grid item>
-                <Link href="/register" variant="body2">
-                  {"Don't have an account? Sign Up"}
-                </Link>
-              </Grid>
-            </Grid>
+              เข้าสู่ระบบ
+            </button>
           </form>
         </div>
-      </Container>
-
-    </div>
-
+      </div>
+    </>
   );
 }
