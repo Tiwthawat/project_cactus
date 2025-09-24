@@ -10,6 +10,7 @@ export default function AdminNavbar() {
       <Link href="/admin/products">สินค้า</Link>
       <Link href="/admin/orders">ออเดอร์</Link>
       <Link href="/admin/auctions">ประมูล</Link>
+      <Link href="/admin/auction-products">สินค้าประมูล</Link>
       <Link href="/admin/users">ผู้ใช้</Link>
       <Link href="/admin/stats">สถิติ</Link>
     </nav>

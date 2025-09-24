@@ -8,6 +8,7 @@ const links = [
   { label: "สินค้า", href: "/admin/products" },
   { label: "ออเดอร์", href: "/admin/orders" },
   { label: "ประมูล", href: "/admin/auctions" },
+  { label: "สินค้าประมูล", href: "/admin/auction-products" },
   { label: "ผู้ใช้", href: "/admin/users" },
   { label: "สถิติ", href: "/admin/stats" },
   { label: "ดูรีวิวจากลูกค้า", href: "/admin/reviews" },

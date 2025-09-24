@@ -14,7 +14,7 @@ const Navigation = () => {
                     <option value="3">ดิน</option>
                 </select>
 
-                <a href="/auction" className="text-white" >
+                <a href="/auctionguide" className="text-white" >
                     ขั้นตอนการประมูล
                 </a>
                 <a href="/FAQ" className="text-white" >
