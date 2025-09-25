@@ -76,6 +76,7 @@ export default function AdminProducts() {
   <thead>
     <tr className="bg-orange-100 text-black">
       <th className="p-2 border border-gray-200">ลำดับ</th>
+      <th className="p-2 border text-center">รหัสสินค้า</th>
       <th className="p-2 border border-gray-200">รูป</th>
       <th className="p-2 border border-gray-200">ชื่อสินค้า</th>
       <th className="p-2 border border-gray-200">ประเภท</th>
@@ -91,9 +92,11 @@ export default function AdminProducts() {
   <tbody>
     {products.map((p, index) => {
       const firstPic = p.Ppicture.split(',')[0];
+      const code = `pro:${String(p.Pid).padStart(4, '0')}`;
       return (
         <tr key={p.Pid} className="odd:bg-white even:bg-gray-50 hover:bg-orange-50">
           <td className="p-2 border border-gray-200 text-center">{index + 1}</td>
+          <td className="p-2 border text-center font-mono text-sm">{code}</td>
           <td className="p-2 border border-gray-200 text-center">
             <img src={`http://localhost:3000${firstPic}`} className="h-12 mx-auto rounded" alt={p.Pname} />
           </td>

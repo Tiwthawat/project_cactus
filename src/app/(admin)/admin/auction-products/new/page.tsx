@@ -236,12 +236,12 @@ export default function AddAuctionProductPage() {
         </div>
         
 
-        {/* สถานะ — ตรึงเป็น auction */}
+        {/* สถานะ — ตรึงเป็น ready */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">สถานะ</label>
           <input
             type="text"
-            value="auction"
+            value="ready"
             disabled
             className="w-full rounded-md bg-gray-100 text-gray-700 border-gray-300"
           />

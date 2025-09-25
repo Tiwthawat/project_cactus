@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-type Status = 'all' | 'auction' | 'inactive';
+type Status = 'all' | 'ready' | 'auction';
 
 interface Row {
   PROid: number;
@@ -110,17 +110,22 @@ export default function AdminAuctionProductsPage() {
           >
             ทั้งหมด
           </button>
+
+
+          {/* พร้อมเปิดรอบ = ready */}
           <button
-            className={`px-3 py-1 rounded ${status === 'auction' ? 'bg-green-600 text-white' : 'hover:bg-gray-100'}`}
+            className={`px-3 py-1 rounded ${status === 'ready' ? 'bg-green-600 text-white' : 'hover:bg-gray-100'}`}
+            onClick={() => setStatus('ready')}
+          >
+            พร้อมเปิดรอบ
+          </button>
+
+          {/* กำลังประมูล = auction */}
+          <button
+            className={`px-3 py-1 rounded ${status === 'auction' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
             onClick={() => setStatus('auction')}
           >
-            พร้อมประมูล
-          </button>
-          <button
-            className={`px-3 py-1 rounded ${status === 'inactive' ? 'bg-gray-600 text-white' : 'hover:bg-gray-100'}`}
-            onClick={() => setStatus('inactive')}
-          >
-            ปิดใช้งาน
+            กำลังประมูล
           </button>
         </div>
 
@@ -143,6 +148,7 @@ export default function AdminAuctionProductsPage() {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-2 border">รูป</th>
+              <th className="p-2 border w-[110px] text-center">รหัส</th> {/* ใหม่ */}
               <th className="p-2 border">สินค้า</th>
               <th className="p-2 border text-right">ราคา</th>
               <th className="p-2 border text-center">สถานะ</th>
@@ -153,13 +159,15 @@ export default function AdminAuctionProductsPage() {
             {filtered.map((p) => {
               const first = p.PROpicture?.split(',')[0] ?? '';
               const img = first ? `${API}${first.startsWith('/') ? '' : '/'}${first}` : '';
+              const code = `Aca:${String(p.PROid).padStart(4, '0')}`; // รูปแบบรหัส
               return (
                 <tr key={p.PROid} className="odd:bg-white even:bg-gray-50">
                   <td className="p-2 border text-center">
                     <Link href={`/admin/auction-products/${p.PROid}`}>
                       {img ? <img src={img} alt={p.PROname} className="h-12 inline-block rounded" /> : <span>—</span>}
                     </Link>
-                  </td>
+                  </td><td className="p-2 border text-center font-mono text-sm">{code}</td>
+                  
                   <td className="p-2 border">
                     <Link href={`/admin/auction-products/${p.PROid}`} className="text-blue-600 hover:underline">
                       {p.PROname}
@@ -175,12 +183,16 @@ export default function AdminAuctionProductsPage() {
                   <td className="p-2 border text-right">{fmtBaht(p.PROprice)} ฿</td>
                   <td className="p-2 border text-center">
                     <span
-                      className={`px-2 py-1 rounded text-white ${
-                        p.PROstatus === 'auction' ? 'bg-green-500' : 'bg-gray-500'
-                      }`}
-                    >
-                      {p.PROstatus}
-                    </span>
+    className={`px-2 py-1 rounded text-white ${
+      p.PROstatus === 'ready'
+        ? 'bg-green-600'  // เขียว = พร้อมเปิดรอบ
+        : p.PROstatus === 'auction'
+        ? 'bg-blue-600'   // น้ำเงิน = กำลังประมูล
+        : 'bg-gray-500'   // ค่าอื่น ๆ = เทา
+    }`}
+  >
+    {p.PROstatus}
+  </span>
                   </td>
                   <td className="p-2 border text-center space-x-2">
                     {p.active_aid ? (

@@ -42,6 +42,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState(false);
   const [review, setReview] = useState<Review | null>(null);
+  const makeCode = (prefix: string, id: number) =>
+  `${prefix}:${String(id).padStart(4, '0')}`;
 
 useEffect(() => {
   if (!id) return;
@@ -68,7 +70,7 @@ useEffect(() => {
     }
     return '/no-image.png'; // fallback
   };
-
+  
 
 
   const updateStatus = async (newStatus: string) => {
@@ -88,6 +90,8 @@ useEffect(() => {
 
 
 
+
+
   return (<div className="p-6 text-black max-w-6xl mx-auto">
   <button
     onClick={() => window.history.back()}
@@ -98,8 +102,16 @@ useEffect(() => {
 
   <div className="flex flex-col lg:flex-row gap-6">
     {/* ⬅️ ฝั่งซ้าย: รายละเอียดคำสั่งซื้อ */}
+    
     <div className="w-full lg:w-1/2">
-      <h1 className="text-2xl font-bold mb-4">รายละเอียดคำสั่งซื้อ #{order.Oid}</h1>
+      <h1 className="text-2xl font-bold mb-1">
+  รายละเอียดคำสั่งซื้อ
+  <span className="ml-2 font-mono text-blue-700">
+    {makeCode('ord', order.Oid)}
+  </span>
+</h1>
+<p className="text-sm text-gray-600 mb-4">เลขที่ระบบ: #{order.Oid}</p>
+
       <p className="mb-2">ลูกค้า: {order.Cname}</p>
       <p className="mb-2">
         วันที่สั่งซื้อ: {new Date(order.Odate).toLocaleString('th-TH', {
@@ -200,97 +212,3 @@ useEffect(() => {
     
   );
 }
-{/* <div className="p-6 text-black max-w-4xl mx-auto">
-      <button
-        onClick={() => window.history.back()}
-        className="text-blue-600 hover:underline mb-4 block"
-      >
-        ← กลับหน้ารายการคำสั่งซื้อ
-      </button>
-
-      <h1 className="text-2xl font-bold mb-4">รายละเอียดคำสั่งซื้อ #{order.Oid}</h1>
-      <p className="mb-2">ลูกค้า: {order.Cname}</p>
-      <p className="mb-2">
-        วันที่สั่งซื้อ: {new Date(order.Odate).toLocaleString('th-TH', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        })}
-      </p>
-
-      <select
-        className={`border px-2 py-1 rounded text-sm font-medium mb-4 ${order.Ostatus === 'pending' ? 'bg-gray-200 text-gray-800' :
-          order.Ostatus === 'waiting' ? 'bg-yellow-100 text-yellow-800' :
-            order.Ostatus === 'paid' ? 'bg-green-100 text-green-800' :
-              order.Ostatus === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                order.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                  order.Ostatus === 'cancelled' ? 'bg-red-100 text-red-800' :
-                    order.Ostatus === 'refunded' ? 'bg-indigo-100 text-indigo-800' :
-                      order.Ostatus === 'failed' ? 'bg-rose-100 text-rose-800' : ''
-          }`}
-        value={order.Ostatus}
-        onChange={(e) => updateStatus(e.target.value)}
-        disabled={updating}
-      >
-        {Object.entries(statusMap).map(([key, label]) => (
-          <option key={key} value={key}>{label}</option>
-        ))}
-      </select>
-
-      <p className="mb-4">ยอดรวม: {order.Oprice} บาท</p>
-
-      {order.Oslip?.startsWith('/slips/') && (
-        <div className="mb-4">
-          <p className="font-medium">สลิปการโอน:</p>
-          <img
-            src={`http://localhost:3000${order.Oslip}`}
-            alt="slip"
-            className="w-80 border rounded shadow mt-2"
-          />
-        </div>
-      )}
-
-
-      <h2 className="text-xl font-semibold mb-2">รายการสินค้า:</h2>
-      <table className="min-w-full bg-white border border-gray-300">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="p-2 border">รูป</th>
-            <th className="p-2 border">ชื่อสินค้า</th>
-            <th className="p-2 border">จำนวน</th>
-            <th className="p-2 border">ราคา</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.length === 0 ? (
-            <tr>
-              <td colSpan={4} className="text-center text-gray-500 p-4">
-                ไม่มีรายการสินค้าในคำสั่งซื้อนี้
-              </td>
-            </tr>
-          ) : (
-            order.items.map((item, index) => {
-              const pictures = item.Ppicture ? item.Ppicture.split(',') : [];
-              return (
-                <tr key={index}>
-                  <td className="p-2 border text-center">
-                    <img
-                      src={getValidImage(pictures)}
-                      alt={item.Pname}
-                      className="w-16 h-16 object-cover"
-                    />
-                  </td>
-                  <td className="p-2 border text-center">{item.Pname}</td>
-                  <td className="p-2 border text-center">{item.Oquantity}</td>
-                  <td className="p-2 border text-center">{item.Oprice} บาท</td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-
-      </table>
-    </div> */}

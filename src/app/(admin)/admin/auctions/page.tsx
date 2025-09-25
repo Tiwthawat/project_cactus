@@ -214,6 +214,7 @@ useEffect(() => {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-2 border">#</th>
+               <th className="p-2 border">รหัสประมูล</th> 
               <th className="p-2 border">รูป</th>
               <th className="p-2 border">สินค้า</th>
               <th className="p-2 border text-right">ราคาเริ่มต้น</th>
@@ -229,10 +230,12 @@ useEffect(() => {
               const img = first ? `${API}${first.startsWith('/') ? '' : '/'}${first}` : '';
               const endStr = a.end_time ? new Date(a.end_time).toLocaleString('th-TH') : '-';
               const remain = remainLabelAndClass(a.end_time, a.status);
+              const code = `Auc:${String(a.Aid).padStart(4, '0')}`;
 
               return (
                 <tr key={a.Aid} className="odd:bg-white even:bg-gray-50">
                   <td className="p-2 border text-center">{idx + 1}</td>
+                  <td className="p-2 border text-center font-mono text-sm">{code}</td>
                   <td className="p-2 border text-center">{img ? <img src={img} alt={a.PROname} className="h-12 mx-auto rounded" /> : '—'}</td>
                   <td className="p-2 border">
                     <Link href={`/admin/auctions/${a.Aid}`} className="text-blue-600 hover:underline">{a.PROname}</Link>

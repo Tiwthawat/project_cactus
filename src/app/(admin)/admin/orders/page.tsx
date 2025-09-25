@@ -84,69 +84,83 @@ export default function orders() {
             </tr>
           </thead>
 
+          
+
           <tbody>
-            {filteredOrders.map((o) => (
-              <tr key={o.Oid} className="text-black">
-                <td className="p-2 border text-center">{o.Oid}</td>
-                <td className="p-2 border">{o.Cname}</td>
-                <td className="p-2 border text-right">{o.Oprice} บาท</td>
-                <td className="p-2 border text-center">
-                  <Link href={`/admin/orders/${o.Oid}`}>
-                    <button className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
-                      ดูรายละเอียด
-                    </button>
-                  </Link>
-                </td>
+   {filteredOrders.map((o: Order) => {
+    const oid = o.Oid;
+    const code = `ord:${String(oid).padStart(4, '0')}`;
 
-                <td className="p-2 border text-center">
+    return (
+      <tr key={oid} className="text-black">
+        {/* รหัสออเดอร์ */}
+        <td className="p-2 border text-center font-mono text-sm">{code}</td>
 
-                  <span
-                    className={`px-2 py-1 rounded text-sm font-medium
-    ${o.Ostatus === 'pending' ? 'bg-gray-200 text-gray-800' : ''}
-    ${o.Ostatus === 'waiting' ? 'bg-yellow-100 text-yellow-800' : ''}
-    ${o.Ostatus === 'paid' ? 'bg-green-100 text-green-800' : ''}
-    ${o.Ostatus === 'shipped' ? 'bg-blue-100 text-blue-800' : ''}
-    ${o.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-800' : ''}
-    ${o.Ostatus === 'cancelled' ? 'bg-red-100 text-red-800' : ''}
-    ${o.Ostatus === 'refunded' ? 'bg-indigo-100 text-indigo-800' : ''}
-    ${o.Ostatus === 'failed' ? 'bg-rose-100 text-rose-800' : ''}
-  `}
-                  >
-                    {o.Ostatus}
-                  </span>
+        {/* ลูกค้า */}
+        <td className="p-2 border">{o.Cname}</td>
 
-                </td>
-                <td className="p-2 border text-center">
-                  <select
-                    className={`
-    px-2 py-1 rounded border text-sm font-medium
-    ${o.Ostatus === 'pending' ? 'bg-gray-200 text-gray-800' : ''}
-    ${o.Ostatus === 'waiting' ? 'bg-yellow-100 text-yellow-800' : ''}
-    ${o.Ostatus === 'paid' ? 'bg-green-100 text-green-800' : ''}
-    ${o.Ostatus === 'shipped' ? 'bg-blue-100 text-blue-800' : ''}
-    ${o.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-800' : ''}
-    ${o.Ostatus === 'cancelled' ? 'bg-red-100 text-red-800' : ''}
-    ${o.Ostatus === 'refunded' ? 'bg-indigo-100 text-indigo-800' : ''}
-    ${o.Ostatus === 'failed' ? 'bg-rose-100 text-rose-800' : ''}
-  `}
-                    value={o.Ostatus}
-                    onChange={(e) => updateStatus(o.Oid, e.target.value)}
-                  >
-                    <option value="pending">pending</option>
-                    <option value="waiting">waiting</option>
-                    <option value="paid">paid</option>
-                    <option value="shipped">shipped</option>
-                    <option value="delivered">delivered</option>
-                    <option value="cancelled">cancelled</option>
-                    <option value="refunded">refunded</option>
-                    <option value="failed">failed</option>
-                  </select>
+        {/* ยอดรวม */}
+        <td className="p-2 border text-right">{o.Oprice} บาท</td>
 
-                </td>
+        {/* สถานะ */}
+        <td className="p-2 border text-center">
+          <span
+            className={`px-2 py-1 rounded text-sm font-medium
+              ${o.Ostatus === 'pending' ? 'bg-gray-200 text-gray-800' : ''}
+              ${o.Ostatus === 'waiting' ? 'bg-yellow-100 text-yellow-800' : ''}
+              ${o.Ostatus === 'paid' ? 'bg-green-100 text-green-800' : ''}
+              ${o.Ostatus === 'shipped' ? 'bg-blue-100 text-blue-800' : ''}
+              ${o.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-800' : ''}
+              ${o.Ostatus === 'cancelled' ? 'bg-red-100 text-red-800' : ''}
+              ${o.Ostatus === 'refunded' ? 'bg-indigo-100 text-indigo-800' : ''}
+              ${o.Ostatus === 'failed' ? 'bg-rose-100 text-rose-800' : ''}
+            `}
+          >
+            {o.Ostatus}
+          </span>
+        </td>
 
-              </tr>
-            ))}
-          </tbody>
+        {/* เปลี่ยนสถานะ */}
+        <td className="p-2 border text-center">
+          <select
+            className={`
+              px-2 py-1 rounded border text-sm font-medium
+              ${o.Ostatus === 'pending' ? 'bg-gray-200 text-gray-800' : ''}
+              ${o.Ostatus === 'waiting' ? 'bg-yellow-100 text-yellow-800' : ''}
+              ${o.Ostatus === 'paid' ? 'bg-green-100 text-green-800' : ''}
+              ${o.Ostatus === 'shipped' ? 'bg-blue-100 text-blue-800' : ''}
+              ${o.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-800' : ''}
+              ${o.Ostatus === 'cancelled' ? 'bg-red-100 text-red-800' : ''}
+              ${o.Ostatus === 'refunded' ? 'bg-indigo-100 text-indigo-800' : ''}
+              ${o.Ostatus === 'failed' ? 'bg-rose-100 text-rose-800' : ''}
+            `}
+            value={o.Ostatus}
+            onChange={(e) => updateStatus(oid, e.target.value)}
+          >
+            <option value="pending">pending</option>
+            <option value="waiting">waiting</option>
+            <option value="paid">paid</option>
+            <option value="shipped">shipped</option>
+            <option value="delivered">delivered</option>
+            <option value="cancelled">cancelled</option>
+            <option value="refunded">refunded</option>
+            <option value="failed">failed</option>
+          </select>
+        </td>
+
+        {/* ปุ่มดูรายละเอียด */}
+        <td className="p-2 border text-center">
+          <Link href={`/admin/orders/${oid}`}>
+            <button className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+              ดูรายละเอียด
+            </button>
+          </Link>
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
+
         </table>
       </div>
     </div>

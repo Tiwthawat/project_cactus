@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 
 interface Order {
   Oid: number
@@ -15,6 +16,8 @@ export default function OrdersOfUserPage() {
   const { id } = useParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const makeCode = (prefix: string, id: number) =>
+  `${prefix}:${String(id).padStart(4, '0')}`;
 
   useEffect(() => {
     fetch(`http://localhost:3000/orders/customer/${id}`)
@@ -63,22 +66,31 @@ export default function OrdersOfUserPage() {
           {filteredOrders.length > 0 ? (
             filteredOrders.map(order => (
               <tr key={order.Oid}>
-                <td className="border text-black p-2">{order.Oid}</td>
+                                <td className="border text-black p-2 font-mono text-sm">
+                  <Link
+                    href={`/admin/orders/${order.Oid}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {makeCode('ord', order.Oid)}
+                  </Link>
+                </td>
+
                 <td className="border text-black p-2">
                   {new Date(order.Odate).toLocaleDateString('th-TH', {
                     year: 'numeric', month: 'short', day: 'numeric'
                   })}
                 </td>
-                <td className={`border p-2 font-semibold text-center rounded ${order.Ostatus === 'paid'
-                  ? 'bg-green-100 text-green-700'
-                  : order.Ostatus === 'waiting'
+                <td className={`border p-2 font-semibold text-center rounded ${
+                  order.Ostatus === 'paid'
+                    ? 'bg-green-100 text-green-700'
+                    : order.Ostatus === 'waiting'
                     ? 'bg-yellow-100 text-yellow-700'
                     : order.Ostatus === 'pending'
-                      ? 'bg-gray-100 text-gray-700'
-                      : order.Ostatus === 'cancelled'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-white text-black'
-                  }`}>
+                    ? 'bg-gray-100 text-gray-700'
+                    : order.Ostatus === 'cancelled'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-white text-black'
+                }`}>
                   {order.Ostatus}
                 </td>
                 <td className="border text-black p-2">

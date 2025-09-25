@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+type UserStatus = 'user' | 'banned';
 
 interface Customer {
   Cid: number;
   Cname: string;
   Cphone: string;
-  Cstatus: string;
+  Cstatus: UserStatus;
   orderCount: number;
 }
 
@@ -62,6 +63,8 @@ const handleViewOrders = (id: number) => {
   );
 
 
+  
+
 
   return (
     <div className="p-6 text-black">
@@ -73,14 +76,15 @@ const handleViewOrders = (id: number) => {
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
       /><select
-        className="border bg-white rounded px-2 py-1 ml-4"
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value)}
-      >
-        <option value="all">ทั้งหมด</option>
-        <option value="user">user</option>
-        <option value="banned">banned</option>
-      </select>
+  className="border bg-white rounded px-2 py-1 ml-4"
+  value={statusFilter}
+  onChange={(e) => setStatusFilter(e.target.value)}
+>
+  <option value="all">ทั้งหมด</option>
+  <option value="user">user</option>
+  <option value="banned">banned</option>
+</select>
+
 
       <table className="w-full border bg-white">
         <thead>
@@ -99,8 +103,14 @@ const handleViewOrders = (id: number) => {
         </thead>
         <tbody>
           {filteredUsers.map(user => (
+            
+            
             <tr key={user.Cid}>
-              <td className="border p-2 text-center">{user.Cid}</td>
+              <td className="border p-2 text-center font-mono text-sm">
+  <a href={`/admin/users/${user.Cid}/orders`} className="text-blue-600 hover:underline">
+    {`usr:${String(user.Cid).padStart(4, '0')}`}
+  </a>
+</td>
 
               <td className="border p-2">{user.Cname}</td>
               <td className="border p-2 text-center">
@@ -123,12 +133,13 @@ const handleViewOrders = (id: number) => {
               <td className="border p-2 text-center">
                 <div className="flex justify-between items-center w-full">
                   <div className="mx-auto">
-                    <button
-                      className={`px-3 py-1 rounded text-white ${user.Cstatus === 'banned' ? 'bg-blue-500' : 'bg-red-500'}`}
-                      onClick={() => toggleBan(user.Cid, user.Cstatus)}
-                    >
-                      {user.Cstatus === 'banned' ? 'ปลดแบน' : 'แบน'}
-                    </button>
+                   <button
+  className={`px-3 py-1 rounded text-white ${user.Cstatus === 'banned' ? 'bg-blue-500' : 'bg-red-500'}`}
+  onClick={() => toggleBan(user.Cid, user.Cstatus)}
+>
+  {user.Cstatus === 'banned' ? 'ปลดแบน' : 'แบน'}
+</button>
+
                   </div>
 
                   <div className="ml-auto">
@@ -150,20 +161,21 @@ const handleViewOrders = (id: number) => {
     </div>
   );
 
-  async function toggleBan(id: number, status: string) {
-    const newStatus = status === 'banned' ? 'active' : 'banned';
+  async function toggleBan(id: number, status: UserStatus) {
+  const newStatus: UserStatus = status === 'banned' ? 'user' : 'banned';
 
-    const res = await fetch(`http://localhost:3000/customers/${id}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Cstatus: newStatus })
-    });
+  const res = await fetch(`http://localhost:3000/customers/${id}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ Cstatus: newStatus }),
+  });
 
-    if (res.ok) {
-      setUsers(prev => prev.map(u => u.Cid === id ? { ...u, Cstatus: newStatus } : u));
-    } else {
-      alert('เปลี่ยนสถานะไม่สำเร็จ');
-    }
+  if (res.ok) {
+    setUsers(prev => prev.map(u => u.Cid === id ? { ...u, Cstatus: newStatus } : u));
+  } else {
+    alert('เปลี่ยนสถานะไม่สำเร็จ');
   }
+}
+
 }
 
