@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 type Status = 'open' | 'closed';
 
-
 interface Auction {
   Aid: number;
   start_price: number | string;
@@ -51,19 +50,35 @@ export default function AuctionDetailPage() {
   const [posting, setPosting] = useState(false);
   const [amount, setAmount] = useState<number | ''>(''); // ฟิลด์บิด
 
+  // mock-auth (แผน A): Cid เอาจาก localStorage.user
+  const [cid, setCid] = useState<number | null>(null);
+
   // gallery
   const pics = toPics(data?.PROpicture);
   const [mainImage, setMainImage] = useState<string>('');
   const mainImgFull = mainImage || pics[0] || '';
-  const [now, setNow] = useState(() => Date.now());
 
+  // clock สำหรับนับถอยหลังแบบวิ่งทุกวินาที
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!data) return;
-    if (new Date(data.end_time).getTime() <= Date.now()) return; // หมดเวลาแล้ว ไม่ต้องวิ่ง
+    if (new Date(data.end_time).getTime() <= Date.now()) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [data?.end_time]);
 
+  // โหลด Cid จาก localStorage (แผน A)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?.Cid) setCid(Number(u.Cid));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // โหลดรายละเอียด + poll ทุก 3 วิ
   useEffect(() => {
@@ -71,7 +86,8 @@ export default function AuctionDetailPage() {
     const load = async () => {
       try {
         const res = await fetch(`${API}/auction/${id}`, {
-          credentials: 'include',
+          // แผน A ไม่ต้องใช้คุกกี้
+          // credentials: 'omit',
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: Auction = await res.json();
@@ -104,8 +120,7 @@ export default function AuctionDetailPage() {
   const step = Math.max(1, Number(data?.min_increment ?? 1));
   const requiredMin = cur + step;
 
-
-  // นับถอยหลัง (วิ่งทุกวินาที)
+  // นับถอยหลัง (อัปเดตทุกวินาทีด้วย state now)
   const left = useMemo(() => {
     if (!data) return '';
     const ms = Math.max(0, new Date(data.end_time).getTime() - now);
@@ -116,20 +131,24 @@ export default function AuctionDetailPage() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   }, [data?.end_time, now]);
 
-
   const closedByTime = data
     ? new Date(data.end_time).getTime() <= Date.now()
     : false;
   const closed = data?.status === 'closed' || closedByTime;
 
-  // ส่งบิด
+  // ส่งบิด (แผน A: ส่ง Cid ใน body)
   const submitBid = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!data || amount === '') return;
 
+    if (!cid) {
+      setErr('กรุณาเข้าสู่ระบบก่อนบิด');
+      return;
+    }
+
     const min = cur + step;
     if (Number(amount) < min) {
-      setErr(`ต้องบิดอย่างน้อย ${min.toLocaleString()} บาท`);
+      setErr(`ต้องบิดอย่างน้อย ${min.toLocaleString('th-TH')} บาท`);
       return;
     }
 
@@ -139,8 +158,9 @@ export default function AuctionDetailPage() {
       const res = await fetch(`${API}/auctions/${data.Aid}/bid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ amount }),
+        // แผน A ไม่ใช้ cookie/token
+        // credentials: 'omit',
+        body: JSON.stringify({ amount, Cid: cid }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.ok === false) {
@@ -206,8 +226,9 @@ export default function AuctionDetailPage() {
                 <img
                   key={i}
                   src={full}
-                  className={`w-20 h-20 object-cover rounded cursor-pointer border hover:border-red-500 ${mainImgFull === full ? 'ring-2 ring-red-500' : ''
-                    }`}
+                  className={`w-20 h-20 object-cover rounded cursor-pointer border hover:border-red-500 ${
+                    mainImgFull === full ? 'ring-2 ring-red-500' : ''
+                  }`}
                   onClick={() => setMainImage(full)}
                   alt={`thumb-${i}`}
                 />
@@ -222,18 +243,14 @@ export default function AuctionDetailPage() {
           <div className="bg-yellow-100 border border-yellow-300 p-4 rounded shadow">
             <p className="text-sm font-medium text-red-600">📌 โปรดอ่าน</p>
             <ul className="text-sm text-gray-700 list-disc ml-4 mt-1">
-              <li>
-                ผู้ประมูลต้องตรวจรายละเอียดและภาพสินค้าให้ชัดเจนก่อนตัดสินใจ
-              </li>
+              <li>ผู้ประมูลต้องตรวจรายละเอียดและภาพสินค้าให้ชัดเจนก่อนตัดสินใจ</li>
               <li>เมื่อชนะการประมูลแล้ว ไม่สามารถยกเลิกได้</li>
             </ul>
           </div>
 
           {/* ข้อมูลร้านค้า */}
           <div className="bg-pink-100 p-4 rounded border border-pink-300 shadow">
-            <p className="font-medium text-gray-800 border-b pb-1 mb-2">
-              ข้อมูลร้านค้า
-            </p>
+            <p className="font-medium text-gray-800 border-b pb-1 mb-2">ข้อมูลร้านค้า</p>
             <div className="flex items-center gap-2">
               <span>👥</span>
               <p>{data.seller_name ?? 'ไม่ระบุ'}</p>
@@ -260,46 +277,47 @@ export default function AuctionDetailPage() {
               </span>
             </div>
 
+            <form onSubmit={submitBid} noValidate className="space-y-2">
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-gray-700">
+                  ต้องบิดขั้นต่ำ: ≥{' '}
+                  <span className="font-bold text-red-600">{step} บาท</span>
+                </p>
 
-           <form onSubmit={submitBid} noValidate className="space-y-2">
-  <div className="flex flex-col gap-2">
-    
-     
-      <p className="text-sm text-gray-700">
-  ต้องบิดขั้นต่ำ: ≥ <span className="font-bold text-red-600">{step} บาท</span>
-</p>
-    
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={requiredMin}
+                    step={step}
+                    required
+                    value={amount}
+                    onChange={(e) => setAmount(Math.floor(Number(e.target.value)))}
+                    disabled={posting || closed}
+                    className="w-full px-3 py-2 rounded border
+                      bg-white text-black placeholder-gray-400
+                      focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500
+                      disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={posting || closed}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded whitespace-nowrap"
+                  >
+                    {posting ? 'กำลังบิด…' : 'ประมูลตอนนี้'}
+                  </button>
+                </div>
+              </div>
 
-    <div className="flex gap-2">
-      <input
-        type="number"
-        min={requiredMin}
-        step={step}
-        required
-        value={amount}
-        onChange={(e) => setAmount(Math.floor(Number(e.target.value)))}
-        disabled={posting || closed}
-        className="w-full px-3 py-2 rounded border
-          bg-white text-black placeholder-gray-400
-          focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500
-          disabled:opacity-50"
-      />
-      <button
-        type="submit"
-        disabled={posting || closed}
-        className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded whitespace-nowrap"
-      >
-        {posting ? 'กำลังบิด…' : 'ประมูลตอนนี้'}
-      </button>
-    </div>
-  </div>
-
-  {err && <p className="text-red-600 text-sm">{err}</p>}
-</form>
-
+              {err && <p className="text-red-600 text-sm">{err}</p>}
+              {!cid && (
+                <p className="text-amber-700 text-xs">
+                  (ยังไม่พบ Cid ในเครื่อง — โปรดเข้าสู่ระบบก่อน)
+                </p>
+              )}
+            </form>
 
             <div className="text-sm text-gray-700">
-              ขั้นต่ำต้องมากกว่า {requiredMin.toLocaleString('th-TH')} บาท
+              ขั้นต่ำต้อง ≥ {requiredMin.toLocaleString('th-TH')} บาท
             </div>
 
             <p className="text-xs text-gray-700">
