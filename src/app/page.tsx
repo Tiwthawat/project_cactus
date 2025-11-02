@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import CactusItems from './cactusitems';
+import CactusItems from './component/cactusitems';
 import { useRouter } from 'next/navigation';
 import Navigation from './component/Navigation';
 import Navbar from './component/Navbar';
+import AuctionItems from './component/AuctionItems';
+
+
+
 
 const HomePage = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -44,6 +48,13 @@ const HomePage = () => {
       <Navigation />
 
       <main className="pt-36 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
+
+        <section>
+  <h2 className="text-2xl font-semibold mb-4">🔥 กำลังประมูล</h2>
+  <AuctionItems />
+</section>
+
+  
         <section>
           <h2 className="text-2xl font-semibold mb-4">🆕 สินค้ามาใหม่</h2>
           <CactusItems type="latest" />

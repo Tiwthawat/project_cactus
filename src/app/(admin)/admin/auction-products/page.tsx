@@ -6,14 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-type Status = 'all' | 'ready' | 'auction';
+type Status = 'all' | 'ready' | 'auction' | 'sold' | 'unsold';
 
 interface Row {
   PROid: number;
   PROname: string;
   PROpicture: string;
   PROprice: number;
-  PROstatus: 'auction' | 'inactive' | string;
+  PROstatus: 'ready' | 'auction' | 'sold' | 'unsold' | string;
   active_aid: number | null;
   active_end_time: string | null;
   active_current_price: number | null;
@@ -111,8 +111,6 @@ export default function AdminAuctionProductsPage() {
             ทั้งหมด
           </button>
 
-
-          {/* พร้อมเปิดรอบ = ready */}
           <button
             className={`px-3 py-1 rounded ${status === 'ready' ? 'bg-green-600 text-white' : 'hover:bg-gray-100'}`}
             onClick={() => setStatus('ready')}
@@ -120,12 +118,25 @@ export default function AdminAuctionProductsPage() {
             พร้อมเปิดรอบ
           </button>
 
-          {/* กำลังประมูล = auction */}
           <button
             className={`px-3 py-1 rounded ${status === 'auction' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
             onClick={() => setStatus('auction')}
           >
             กำลังประมูล
+          </button>
+
+          <button
+            className={`px-3 py-1 rounded ${status === 'sold' ? 'bg-purple-600 text-white' : 'hover:bg-gray-100'}`}
+            onClick={() => setStatus('sold')}
+          >
+            ขายแล้ว
+          </button>
+
+          <button
+            className={`px-3 py-1 rounded ${status === 'unsold' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`}
+            onClick={() => setStatus('unsold')}
+          >
+            ไม่ถูกขาย
           </button>
         </div>
 
@@ -148,7 +159,7 @@ export default function AdminAuctionProductsPage() {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-2 border">รูป</th>
-              <th className="p-2 border w-[110px] text-center">รหัส</th> {/* ใหม่ */}
+              <th className="p-2 border w-[110px] text-center">รหัส</th>
               <th className="p-2 border">สินค้า</th>
               <th className="p-2 border text-right">ราคา</th>
               <th className="p-2 border text-center">สถานะ</th>
@@ -159,61 +170,86 @@ export default function AdminAuctionProductsPage() {
             {filtered.map((p) => {
               const first = p.PROpicture?.split(',')[0] ?? '';
               const img = first ? `${API}${first.startsWith('/') ? '' : '/'}${first}` : '';
-              const code = `Aca:${String(p.PROid).padStart(4, '0')}`; // รูปแบบรหัส
+              const code = `Aca:${String(p.PROid).padStart(4, '0')}`;
               return (
                 <tr key={p.PROid} className="odd:bg-white even:bg-gray-50">
                   <td className="p-2 border text-center">
                     <Link href={`/admin/auction-products/${p.PROid}`}>
                       {img ? <img src={img} alt={p.PROname} className="h-12 inline-block rounded" /> : <span>—</span>}
                     </Link>
-                  </td><td className="p-2 border text-center font-mono text-sm">{code}</td>
-                  
+                  </td>
+                  <td className="p-2 border text-center font-mono text-sm">{code}</td>
+
                   <td className="p-2 border">
                     <Link href={`/admin/auction-products/${p.PROid}`} className="text-blue-600 hover:underline">
                       {p.PROname}
                     </Link>
                     {p.active_aid ? (
                       <div className="text-xs text-green-600">
-                        กำลังประมูล • ปิด {p.active_end_time ? new Date(p.active_end_time).toLocaleString('th-TH') : '-'}
+                        กำลังประมูล • ปิด{' '}
+                        {p.active_end_time ? new Date(p.active_end_time).toLocaleString('th-TH') : '-'}
                       </div>
                     ) : (
                       <div className="text-xs text-gray-400">ยังไม่มีรอบเปิด</div>
                     )}
                   </td>
+
                   <td className="p-2 border text-right">{fmtBaht(p.PROprice)} ฿</td>
+
                   <td className="p-2 border text-center">
-                    <span
-    className={`px-2 py-1 rounded text-white ${
-      p.PROstatus === 'ready'
-        ? 'bg-green-600'  // เขียว = พร้อมเปิดรอบ
-        : p.PROstatus === 'auction'
-        ? 'bg-blue-600'   // น้ำเงิน = กำลังประมูล
-        : 'bg-gray-500'   // ค่าอื่น ๆ = เทา
-    }`}
-  >
-    {p.PROstatus}
-  </span>
-                  </td>
-                  <td className="p-2 border text-center space-x-2">
-                    {p.active_aid ? (
-                      <Link href={`/admin/auctions/${p.active_aid}`} className="bg-blue-600 text-white px-2 py-1 rounded">
-                        ดูรอบ
-                      </Link>
-                    ) : (
-                      <Link
-                        href={`/admin/auctions/new?proid=${p.PROid}`}
-                        className="bg-orange-600 text-white px-2 py-1 rounded"
-                      >
-                        เปิดรอบ
-                      </Link>
+                    {p.PROstatus === 'ready' && (
+                      <span className="px-2 py-1 rounded text-white bg-green-600"> พร้อมเปิดรอบ</span>
                     )}
-                    <button
-                      onClick={() => delProduct(p.PROid)}
-                      className="bg-red-600 text-white px-2 py-1 rounded"
-                    >
-                      ลบ
-                    </button>
+                    {p.PROstatus === 'auction' && (
+                      <span className="px-2 py-1 rounded text-white bg-blue-600"> กำลังประมูล</span>
+                    )}
+                    {p.PROstatus === 'sold' && (
+                      <span className="px-2 py-1 rounded text-white bg-purple-600"> ขายแล้ว</span>
+                    )}
+                    {p.PROstatus === 'unsold' && (
+                      <span className="px-2 py-1 rounded text-white bg-red-600"> ไม่ถูกขาย</span>
+                    )}
+                    {!['ready', 'auction', 'sold', 'unsold'].includes(p.PROstatus) && (
+                      <span className="px-2 py-1 rounded text-white bg-gray-500">{p.PROstatus}</span>
+                    )}
                   </td>
+
+                  <td className="p-2 border text-center space-x-2">
+  {/* ถ้ามีรอบที่กำลังประมูลอยู่ ให้กด "ดูรอบ" ได้ */}
+  {p.active_aid ? (
+    <Link
+      href={`/admin/auctions/${p.active_aid}`}
+      className="bg-blue-600 text-white px-2 py-1 rounded"
+    >
+      ดูรอบ
+    </Link>
+  ) : (
+    // ถ้าไม่มี active_aid:
+    <>
+      {/* แสดงปุ่ม "เปิดรอบ" เฉพาะสถานะ ready เท่านั้น */}
+      {p.PROstatus === 'ready' ? (
+        <Link
+          href={`/admin/auctions/new?proid=${p.PROid}`}
+          className="bg-orange-600 text-white px-2 py-1 rounded"
+        >
+          เปิดรอบ
+        </Link>
+      ) : (
+        // สถานะอื่น (auction/sold/unsold/…) ไม่ให้เปิดรอบ
+        <span className="text-gray-400 text-sm align-middle">—</span>
+      )}
+    </>
+  )}
+
+  {/* ปุ่มลบ ยังแสดงได้ตามเดิม */}
+  <button
+    onClick={() => delProduct(p.PROid)}
+    className="bg-red-600 text-white px-2 py-1 rounded ml-2"
+  >
+    ลบ
+  </button>
+</td>
+
                 </tr>
               );
             })}
