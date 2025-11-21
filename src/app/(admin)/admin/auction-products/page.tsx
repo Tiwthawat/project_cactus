@@ -6,14 +6,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-type Status = 'all' | 'ready' | 'auction' | 'sold' | 'unsold';
+/** ใช้สถานะทั้งหมดตามจริง */
+type Status = 'all' | 'ready' | 'auction' | 'paid' | 'unsold';
 
 interface Row {
   PROid: number;
   PROname: string;
   PROpicture: string;
   PROprice: number;
-  PROstatus: 'ready' | 'auction' | 'sold' | 'unsold' | string;
+  PROstatus: string;
   active_aid: number | null;
   active_end_time: string | null;
   active_current_price: number | null;
@@ -23,67 +24,80 @@ export default function AdminAuctionProductsPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // init from URL
   const [status, setStatus] = useState<Status>((sp.get('status') as Status) || 'all');
-  const [q, setQ] = useState<string>(sp.get('q') ?? '');
+  const [q, setQ] = useState(sp.get('q') ?? '');
 
   const [items, setItems] = useState<Row[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
-  // ---- keep URL in sync with debounce (300ms) ----
   const timerRef = useRef<number | null>(null);
+
+  /** sync URL */
   useEffect(() => {
     const params = new URLSearchParams();
     if (status !== 'all') params.set('status', status);
     if (q.trim()) params.set('q', q.trim());
 
-    if (timerRef.current) window.clearTimeout(timerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       const qs = params.toString();
       router.replace(qs ? `/admin/auction-products?${qs}` : '/admin/auction-products', { scroll: false });
     }, 300);
 
     return () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [status, q, router]);
 
-  // ---- fetch data whenever search params change ----
+  /** load data */
   const fetchData = async (s: Status, query: string) => {
     try {
       setLoading(true);
       const p = new URLSearchParams();
       p.set('status', s);
       if (query.trim()) p.set('q', query.trim());
+
       const res = await fetch(`${API}/auction-products?${p.toString()}`, { cache: 'no-store' });
       const data: Row[] = await res.json();
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error('fetch failed', e);
+      console.error(e);
       setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // react if URL changed externally (e.g. browser nav)
+  /** re-fetch when URL changes */
   useEffect(() => {
     const s = (sp.get('status') as Status) || 'all';
     const query = sp.get('q') ?? '';
     setStatus(s);
     setQ(query);
     fetchData(s, query);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp]);
 
-  const filtered = useMemo(() => items, [items]); // (server already filters)
+  /** ฟิลเตอร์จริง (logic อยู่ฝั่ง frontend) */
+  const filtered = useMemo(() => {
+    return items.filter((p) => {
+      if (status === 'all') return true;
+      if (status === 'ready') return p.PROstatus === 'ready';
+      if (status === 'auction') return p.PROstatus === 'auction';
+
+      /** “ชำระแล้ว” → paid / shipping / delivered */
+      if (status === 'paid')
+        return ['paid', 'shipping', 'delivered'].includes(p.PROstatus);
+
+      if (status === 'unsold') return p.PROstatus === 'unsold';
+      return true;
+    });
+  }, [items, status]);
 
   const delProduct = async (id: number) => {
     if (!confirm('ลบสินค้านี้?')) return;
     const res = await fetch(`${API}/auction-products/${id}`, { method: 'DELETE' });
-    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(body?.error || 'ลบไม่สำเร็จ');
+      alert('ลบไม่สำเร็จ');
       return;
     }
     fetchData(status, q);
@@ -94,6 +108,7 @@ export default function AdminAuctionProductsPage() {
 
   return (
     <div className="p-6 text-black">
+
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">สินค้าสำหรับประมูล</h1>
         <Link href="/admin/auction-products/new" className="bg-green-600 text-white px-4 py-2 rounded">
@@ -101,43 +116,19 @@ export default function AdminAuctionProductsPage() {
         </Link>
       </div>
 
-      {/* ฟิลเตอร์ + ค้นหา */}
+      {/* ฟิลเตอร์ */}
       <div className="flex flex-wrap gap-2 mb-4">
+
         <div className="flex gap-1 bg-white rounded p-1 border">
-          <button
-            className={`px-3 py-1 rounded ${status === 'all' ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}`}
-            onClick={() => setStatus('all')}
-          >
-            ทั้งหมด
-          </button>
+          <button className={`px-3 py-1 rounded ${status === 'all' ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}`} onClick={() => setStatus('all')}>ทั้งหมด</button>
 
-          <button
-            className={`px-3 py-1 rounded ${status === 'ready' ? 'bg-green-600 text-white' : 'hover:bg-gray-100'}`}
-            onClick={() => setStatus('ready')}
-          >
-            พร้อมเปิดรอบ
-          </button>
+          <button className={`px-3 py-1 rounded ${status === 'ready' ? 'bg-green-600 text-white' : 'hover:bg-gray-100'}`} onClick={() => setStatus('ready')}>พร้อมเปิดรอบ</button>
 
-          <button
-            className={`px-3 py-1 rounded ${status === 'auction' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
-            onClick={() => setStatus('auction')}
-          >
-            กำลังประมูล
-          </button>
+          <button className={`px-3 py-1 rounded ${status === 'auction' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`} onClick={() => setStatus('auction')}>กำลังประมูล</button>
 
-          <button
-            className={`px-3 py-1 rounded ${status === 'sold' ? 'bg-purple-600 text-white' : 'hover:bg-gray-100'}`}
-            onClick={() => setStatus('sold')}
-          >
-            ขายแล้ว
-          </button>
+          <button className={`px-3 py-1 rounded ${status === 'paid' ? 'bg-purple-600 text-white' : 'hover:bg-gray-100'}`} onClick={() => setStatus('paid')}>ชำระแล้ว</button>
 
-          <button
-            className={`px-3 py-1 rounded ${status === 'unsold' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`}
-            onClick={() => setStatus('unsold')}
-          >
-            ไม่ถูกขาย
-          </button>
+          <button className={`px-3 py-1 rounded ${status === 'unsold' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`} onClick={() => setStatus('unsold')}>ไม่ถูกขาย</button>
         </div>
 
         <div className="flex-1 min-w-[240px]">
@@ -150,10 +141,11 @@ export default function AdminAuctionProductsPage() {
         </div>
       </div>
 
+      {/* ตารางหลัก */}
       {loading ? (
         <div className="bg-white p-4 rounded border">กำลังโหลด...</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white p-4 rounded border">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>
+        <div className="bg-white p-4 rounded border">ไม่พบข้อมูล</div>
       ) : (
         <table className="w-full bg-white border">
           <thead>
@@ -166,28 +158,32 @@ export default function AdminAuctionProductsPage() {
               <th className="p-2 border text-center">จัดการ</th>
             </tr>
           </thead>
+
           <tbody>
             {filtered.map((p) => {
-              const first = p.PROpicture?.split(',')[0] ?? '';
-              const img = first ? `${API}${first.startsWith('/') ? '' : '/'}${first}` : '';
+              const img = p.PROpicture?.split(',')[0] ?? '';
+              const fullImg = img ? `${API}${img.startsWith('/') ? '' : '/'}${img}` : '';
               const code = `Aca:${String(p.PROid).padStart(4, '0')}`;
+
               return (
                 <tr key={p.PROid} className="odd:bg-white even:bg-gray-50">
+
                   <td className="p-2 border text-center">
-                    <Link href={`/admin/auction-products/${p.PROid}`}>
-                      {img ? <img src={img} alt={p.PROname} className="h-12 inline-block rounded" /> : <span>—</span>}
-                    </Link>
+                    
+                      {fullImg ? <img src={fullImg} className="h-12 rounded inline-block" /> : '—'}
+                   
                   </td>
+
                   <td className="p-2 border text-center font-mono text-sm">{code}</td>
 
                   <td className="p-2 border">
-                    <Link href={`/admin/auction-products/${p.PROid}`} className="text-blue-600 hover:underline">
+                    
                       {p.PROname}
-                    </Link>
+              
+
                     {p.active_aid ? (
                       <div className="text-xs text-green-600">
-                        กำลังประมูล • ปิด{' '}
-                        {p.active_end_time ? new Date(p.active_end_time).toLocaleString('th-TH') : '-'}
+                        กำลังประมูล • ปิด {p.active_end_time ? new Date(p.active_end_time).toLocaleString('th-TH') : '-'}
                       </div>
                     ) : (
                       <div className="text-xs text-gray-400">ยังไม่มีรอบเปิด</div>
@@ -197,58 +193,40 @@ export default function AdminAuctionProductsPage() {
                   <td className="p-2 border text-right">{fmtBaht(p.PROprice)} ฿</td>
 
                   <td className="p-2 border text-center">
-                    {p.PROstatus === 'ready' && (
-                      <span className="px-2 py-1 rounded text-white bg-green-600"> พร้อมเปิดรอบ</span>
+                    {p.PROstatus === 'ready' && <span className="px-2 py-1 rounded text-white bg-green-600">พร้อมเปิดรอบ</span>}
+                    {p.PROstatus === 'auction' && <span className="px-2 py-1 rounded text-white bg-blue-600">กำลังประมูล</span>}
+                    {['paid', 'shipping', 'delivered'].includes(p.PROstatus) && (
+                      <span className="px-2 py-1 rounded text-white bg-purple-600">ชำระแล้ว</span>
                     )}
-                    {p.PROstatus === 'auction' && (
-                      <span className="px-2 py-1 rounded text-white bg-blue-600"> กำลังประมูล</span>
-                    )}
-                    {p.PROstatus === 'sold' && (
-                      <span className="px-2 py-1 rounded text-white bg-purple-600"> ขายแล้ว</span>
-                    )}
-                    {p.PROstatus === 'unsold' && (
-                      <span className="px-2 py-1 rounded text-white bg-red-600"> ไม่ถูกขาย</span>
-                    )}
-                    {!['ready', 'auction', 'sold', 'unsold'].includes(p.PROstatus) && (
-                      <span className="px-2 py-1 rounded text-white bg-gray-500">{p.PROstatus}</span>
-                    )}
+                    {p.PROstatus === 'unsold' && <span className="px-2 py-1 rounded text-white bg-red-600">ไม่ถูกขาย</span>}
                   </td>
 
                   <td className="p-2 border text-center space-x-2">
-  {/* ถ้ามีรอบที่กำลังประมูลอยู่ ให้กด "ดูรอบ" ได้ */}
-  {p.active_aid ? (
-    <Link
-      href={`/admin/auctions/${p.active_aid}`}
-      className="bg-blue-600 text-white px-2 py-1 rounded"
-    >
-      ดูรอบ
-    </Link>
-  ) : (
-    // ถ้าไม่มี active_aid:
-    <>
-      {/* แสดงปุ่ม "เปิดรอบ" เฉพาะสถานะ ready เท่านั้น */}
-      {p.PROstatus === 'ready' ? (
-        <Link
-          href={`/admin/auctions/new?proid=${p.PROid}`}
-          className="bg-orange-600 text-white px-2 py-1 rounded"
-        >
-          เปิดรอบ
-        </Link>
-      ) : (
-        // สถานะอื่น (auction/sold/unsold/…) ไม่ให้เปิดรอบ
-        <span className="text-gray-400 text-sm align-middle">—</span>
-      )}
-    </>
-  )}
 
-  {/* ปุ่มลบ ยังแสดงได้ตามเดิม */}
-  <button
-    onClick={() => delProduct(p.PROid)}
-    className="bg-red-600 text-white px-2 py-1 rounded ml-2"
-  >
-    ลบ
-  </button>
-</td>
+                    {p.active_aid ? (
+                      <Link href={`/admin/auctions/${p.active_aid}`} className="bg-blue-600 text-white px-2 py-1 rounded">
+                        ดูรอบ
+                      </Link>
+                    ) : (
+                      <>
+                        {p.PROstatus === 'ready' ? (
+                          <Link
+                            href={`/admin/auctions/new?proid=${p.PROid}`}
+                            className="bg-orange-600 text-white px-2 py-1 rounded"
+                          >
+                            เปิดรอบ
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </>
+                    )}
+
+                    <button onClick={() => delProduct(p.PROid)} className="bg-red-600 text-white px-2 py-1 rounded">
+                      ลบ
+                    </button>
+
+                  </td>
 
                 </tr>
               );
@@ -256,6 +234,7 @@ export default function AdminAuctionProductsPage() {
           </tbody>
         </table>
       )}
+
     </div>
   );
 }

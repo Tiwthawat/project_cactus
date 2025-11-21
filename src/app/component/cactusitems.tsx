@@ -113,6 +113,7 @@ const CactusItems = ({ type, typeid }: Props) => {
     }
 
     localStorage.setItem("cart", JSON.stringify(cart));
+    alert("เพิ่มลงตะกร้าแล้ว");
   };
 
   return (

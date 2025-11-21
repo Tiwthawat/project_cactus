@@ -23,7 +23,8 @@ export interface Auction {
   latest_bidder_name?: string | null;
   latest_bid_amount?: number | null;
   final_price?: number | null;
-  winnerName?: string;
+  winnerName?: string| null;
+
   
 }
 

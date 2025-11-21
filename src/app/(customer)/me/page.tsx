@@ -22,7 +22,7 @@ interface UserInfo {
   Cstatus: string;
   Cdate: string;
   Cbirth: string;
- Cprofile: string | null;
+  Cprofile: string | null;
 }
 
 
@@ -78,7 +78,7 @@ export default function MePage() {
           Cdate: raw.Cdate,
           Cbirth: raw.Cbirth,
           Cprofile: raw.Cprofile
-          
+
         });
 
 
@@ -99,45 +99,45 @@ export default function MePage() {
       <div className="max-w-4xl mx-auto grid gap-8 grid-cols-1 md:grid-cols-2">
         {/* ข้อมูลส่วนตัว */}
         <div className="bg-white rounded-xl shadow p-6">
-  <div className="flex justify-between items-center mb-3">
-    <h2 className="text-lg text-gray-800 font-semibold border-b pb-2">ข้อมูลผู้ใช้ </h2>
-    <button
-      className="text-blue-600 hover:underline text-sm"
-      onClick={() => setShowModal(true)}
-    >
-      ✏️ แก้ไข
-    </button>
-  </div>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg text-gray-800 font-semibold border-b pb-2">ข้อมูลผู้ใช้ </h2>
+            <button
+              className="text-blue-600 hover:underline text-sm"
+              onClick={() => setShowModal(true)}
+            >
+              ✏️ แก้ไข
+            </button>
+          </div>
 
-  {/* ✅ รูปโปรไฟล์ */}
-  <div className="flex items-center justify-center mb-4">
-    <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-gray-300">
-      <img
-  src={user.Cprofile ? `http://localhost:3000/profiles/${user.Cprofile}` : '/default-profile.png'}
-  alt="โปรไฟล์"
-  className="w-full h-full object-cover"
-/>
+          {/* ✅ รูปโปรไฟล์ */}
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-gray-300">
+              <img
+                src={user.Cprofile ? `http://localhost:3000/profiles/${user.Cprofile}` : '/default-profile.png'}
+                alt="โปรไฟล์"
+                className="w-full h-full object-cover"
+              />
 
-    </div>
-  </div>
-  
+            </div>
+          </div>
 
-  <div className="space-y-2 text-sm text-gray-800">
-    <div><strong>รหัสผู้ใช้:</strong> {user.Cid}</div>
-    <div><strong>ชื่อ-นามสกุล:</strong> {user.Cname}</div>
-    <div><strong>ที่อยู่:</strong> {user.Caddress} ต.{user.Csubdistrict} อ.{user.Cdistrict} จ.{user.Cprovince} {user.Czipcode}</div>
-    <div><strong>ชื่อผู้ใช้:</strong> {user.Cusername}</div>
-    <div><strong>รหัสผ่าน:</strong> {user.Cpassword}</div>
-    <div><strong>เบอร์โทร:</strong> {user.Cphone}</div>
-    <div><strong>สถานะบัญชี:</strong> {user.Cstatus}</div>
-    <div><strong>วันที่ลงทะเบียน:</strong> {formatThaiDate(user.Cdate)}</div>
-    <div><strong>วันเกิด:</strong> {formatThaiDate(user.Cbirth)}</div>
-  </div><br />
 
-  <button onClick={() => setShowPasswordModal(true)} className="text-blue-600 hover:underline">
-    เปลี่ยนรหัสผ่าน
-  </button>
-</div>
+          <div className="space-y-2 text-sm text-gray-800">
+            <div><strong>รหัสผู้ใช้:</strong> {user.Cid}</div>
+            <div><strong>ชื่อ-นามสกุล:</strong> {user.Cname}</div>
+            <div><strong>ที่อยู่:</strong> {user.Caddress} ต.{user.Csubdistrict} อ.{user.Cdistrict} จ.{user.Cprovince} {user.Czipcode}</div>
+            <div><strong>ชื่อผู้ใช้:</strong> {user.Cusername}</div>
+            <div><strong>รหัสผ่าน:</strong> {user.Cpassword}</div>
+            <div><strong>เบอร์โทร:</strong> {user.Cphone}</div>
+            <div><strong>สถานะบัญชี:</strong> {user.Cstatus}</div>
+            <div><strong>วันที่ลงทะเบียน:</strong> {formatThaiDate(user.Cdate)}</div>
+            <div><strong>วันเกิด:</strong> {formatThaiDate(user.Cbirth)}</div>
+          </div><br />
+
+          <button onClick={() => setShowPasswordModal(true)} className="text-blue-600 hover:underline">
+            เปลี่ยนรหัสผ่าน
+          </button>
+        </div>
 
 
         {/* เมนูเพิ่มเติม */}
@@ -146,14 +146,23 @@ export default function MePage() {
           <ul className="space-y-1 text-sm text-gray-800 list-disc list-inside">
             <Link href="/favorites" className="text-blue-600">🤍 รายการโปรด</Link>
 
-            <li>รายการประมูลสินค้า</li>
+            
+            <li>
+              <Link href="/me/my-bidding" className="text-blue-600 hover:underline">
+                รายการประมูลสินค้า
+              </Link>
+            </li>
             <li>
               <Link href="/me/orders" className="text-blue-600 hover:underline">
                 ดูประวัติคำสั่งซื้อ
               </Link>
             </li>
 
-            <li>สินค้าที่ชนะแล้ว</li>
+            <li>
+              <Link href="/me/auction-wins" className="text-blue-600 hover:underline">
+                สินค้าที่ชนะแล้ว
+              </Link>
+            </li>
             <li>รายการยกเลิกสินค้า</li>
             <li>ประวัติการแจ้งการชำระเงิน</li>
           </ul>

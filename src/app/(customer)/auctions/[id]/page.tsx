@@ -48,7 +48,9 @@ export default function AuctionDetailPage() {
 
   const [winnerName, setWinnerName] = useState<string>("");
   const [leader, setLeader] = useState<Leader | null>(null);
-  
+  const isWinner = data?.winner_id && cid && data.winner_id === cid;
+
+
 
 
 
@@ -77,7 +79,7 @@ export default function AuctionDetailPage() {
 
 
 
-  
+
   useEffect(() => {
     if (!data) return;
     if (new Date(data.end_time).getTime() <= Date.now()) return;
@@ -139,24 +141,24 @@ export default function AuctionDetailPage() {
   const requiredMin = cur + step;
 
   // นับถอยหลัง (อัปเดตทุกวินาทีด้วย state now)
-const left = useMemo(() => {
-  if (!data) return '';
-  const ms = Math.max(0, new Date(data.end_time).getTime() - now);
-  const s = Math.floor(ms / 1000);
+  const left = useMemo(() => {
+    if (!data) return '';
+    const ms = Math.max(0, new Date(data.end_time).getTime() - now);
+    const s = Math.floor(ms / 1000);
 
-  const d = Math.floor(s / 86400);                // วัน
-  const h = Math.floor((s % 86400) / 3600);       // ชั่วโมงที่เหลือ
-  const m = Math.floor((s % 3600) / 60);          // นาที
-  const ss = s % 60;                              // วินาที
+    const d = Math.floor(s / 86400);                // วัน
+    const h = Math.floor((s % 86400) / 3600);       // ชั่วโมงที่เหลือ
+    const m = Math.floor((s % 3600) / 60);          // นาที
+    const ss = s % 60;                              // วินาที
 
-  if (d > 0) {
-    // ถ้ามีวัน โชว์เป็น "X วัน HH:MM:SS"
-    return `${d} วัน ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-  } else {
-    // ถ้าวัน = 0 โชว์แค่ HH:MM:SS
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-  }
-}, [data?.end_time, now]);
+    if (d > 0) {
+      // ถ้ามีวัน โชว์เป็น "X วัน HH:MM:SS"
+      return `${d} วัน ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    } else {
+      // ถ้าวัน = 0 โชว์แค่ HH:MM:SS
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+  }, [data?.end_time, now]);
 
 
   const closedByTime = data
@@ -231,6 +233,20 @@ const left = useMemo(() => {
         {/* ✅ ฝั่งซ้าย */}
         <div className="w-full lg:w-1/2">
           <h1 className="text-2xl font-bold mb-4">{product.Pname}</h1>
+
+          {closed && isWinner && (
+            <div className="bg-green-100 border border-green-500 text-green-700 px-4 py-3 rounded mb-4 font-semibold shadow">
+              🎉 คุณเป็นผู้ชนะการประมูลรายการนี้!
+            </div>
+          )}
+
+          {closed && !isWinner && data?.winner_id && (
+            <div className="bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded mb-4 font-semibold shadow">
+              ⚠ ผู้ชนะประมูลคือ: {data.winnerName ?? "ไม่ทราบชื่อ"}
+            </div>
+          )}
+
+
           <AuctionGallery
             pics={pics}
             mainImage={mainImage}
@@ -257,7 +273,7 @@ const left = useMemo(() => {
           err={err}
           leader={leader}
           isMeLeader={!!(leader && cid && leader.user_id === cid)}
-          winnerName={data.winnerName ?? ""} 
+          winnerName={data.winnerName ?? ""}
         />
       </div>
 

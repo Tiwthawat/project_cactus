@@ -19,6 +19,7 @@ interface Order {
   Odate: string;
   Oprice: number | string;
   Ostatus: string;
+  Opayment: string; 
 }
 
 export default function MyOrdersPage() {
@@ -119,42 +120,53 @@ const filteredOrders = statusFilter === 'all'
           <p>
             สถานะ:{' '}
             <span
-              className={
-                order.Ostatus === 'paid'
-                  ? 'text-green-600 font-semibold'
-                  : order.Ostatus === 'waiting'
-                    ? 'text-yellow-600'
-                    : order.Ostatus === 'cancelled'
-                      ? 'text-red-500 font-semibold'
-                      : 'text-gray-600'
-              }
-            >
-              {order.Ostatus}
-            </span>
+  className={
+    order.Ostatus === 'paid'
+      ? 'text-green-600 font-semibold'
+      : order.Ostatus === 'waiting'
+        ? 'text-yellow-600'
+        : order.Ostatus === 'shipped'
+          ? 'text-blue-600 font-semibold'
+          : order.Ostatus === 'cancelled'
+            ? 'text-red-500 font-semibold'
+            : 'text-gray-600'
+  }
+>
+  {order.Ostatus === 'shipped' ? 'กำลังจัดส่ง' : order.Ostatus}
+</span>
+
           </p>
           <Link href={`/me/orders/${order.Oid}`}>
             <button className="mt-2 bg-gray-800 text-white px-4 py-1 rounded hover:bg-gray-900">
               ดูรายละเอียด
             </button>
           </Link>
-          {order.Ostatus === 'pending' && (
-            <button
-              onClick={() => handleCancel(order.Oid)}
-              className="mt-2 bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 ml-2"
-            >
-              ยกเลิกคำสั่งซื้อ
-            </button>
-          )}
+          {/* ปุ่มของ bank transfer */}
+{order.Opayment === "bank" && order.Ostatus === "pending" && (
+  <>
+    <button
+      onClick={() => handleCancel(order.Oid)}
+      className="mt-2 bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 ml-2"
+    >
+      ยกเลิกคำสั่งซื้อ
+    </button>
 
-          {order.Ostatus === 'pending' && (
-            <Link href={`/payment/${order.Oid}`}>
-              <button className="mt-2 bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700">
-                แจ้งชำระเงิน
-              </button>
-            </Link>
+    <Link href={`/payment/${order.Oid}`}>
+      <button className="mt-2 bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 ml-2">
+        แจ้งชำระเงิน
+      </button>
+    </Link>
+  </>
+)}
 
 
-          )}
+{/* ปุ่มของ COD → ไม่แสดงปุ่มแจ้งชำระเงิน และไม่น่าให้ยกเลิก */}
+{order.Opayment === "cod" && order.Ostatus === "pending" && (
+  <p className="mt-2 text-sm text-gray-500">
+    รอการจัดส่ง (ชำระปลายทาง)
+  </p>
+)}
+
         </div>
       ))}
     </div></>

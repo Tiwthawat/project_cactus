@@ -32,14 +32,19 @@ function toImgSrc(pictures: string): string | null {
 // 🕒 helper format เวลา
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "ปิดแล้ว";
+
   const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${h.toString().padStart(2, "0")}:${m
-    .toString()
-    .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+
+  const d = days > 0 ? `${days} วัน ` : "";
+
+  return `${d} ${hours}:${mins}:${secs}นาที: วินาที`;
 }
+
 
 export default function AuctionCard({ auction }: { auction: Auction }) {
   const imgSrc = toImgSrc(auction.PROpicture);
@@ -94,7 +99,7 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
 
       {/* 🕒 เวลาที่เหลือ */}
       <p className="text-sm font-semibold text-blue-600">
-        เวลาที่เหลือ: {remaining}
+        เวลาที่เหลือ: ***{remaining}
       </p>
 
       <div className="mt-3 text-center bg-red-500 hover:bg-red-300 text-white px-4 py-2 rounded">

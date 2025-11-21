@@ -19,6 +19,42 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [mainImage, setMainImage] = useState<string>("");
 
+  const addToCart = () => {
+    if (!product) return;
+
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+    const existingIndex = cart.findIndex((item: any) => item.Pid === product.Pid);
+
+    if (existingIndex !== -1) {
+      cart[existingIndex].quantity += 1;
+    } else {
+      cart.push({
+        Pid: product.Pid,
+        Pname: product.Pname,
+        Pprice: Number(product.Pprice),
+        Ppicture: product.Ppicture.split(",")[0].trim(),
+        quantity: 1,
+      });
+    }
+
+    localStorage.setItem("cart", JSON.stringify(cart));
+    alert("เพิ่มลงตะกร้าแล้ว");
+  };
+
+
+  const handleBuyNow = () => {
+    if (!product) return;
+
+    localStorage.setItem(
+      "buynow",
+      JSON.stringify({ pid: product.Pid, qty: 1 })
+    );
+
+    window.location.href = "/checkout?type=buynow";
+  };
+
+
 
 
   useEffect(() => {
@@ -102,13 +138,20 @@ export default function ProductDetail() {
             <h2 className="text-[28px] font-extrabold text-black">
               ซื้อทันทีในราคา <span className="text-red-600 text-[36px] font-extrabold">{product.Pprice} บาท</span>
             </h2>
-            <button className="bg-orange-400 text-white px-6 py-2 rounded hover:bg-orange-500 text-base">
+            <button
+              onClick={addToCart}
+              className="bg-orange-400 text-white px-6 py-2 rounded hover:bg-orange-500 text-base w-full"
+            >
               🛒 เพิ่มใส่ตะกร้า
             </button>
 
-            <button className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm w-full">
+            <button
+              onClick={handleBuyNow}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm w-full"
+            >
               ซื้อเลย
             </button>
+
 
             <p className="text-xs text-gray-700">รหัสสินค้า: cac:{product.Pid.toString().padStart(4, "0")}</p>
             <p className="text-xs text-gray-700">สถานะ: {product.Pstatus}</p>
@@ -126,8 +169,8 @@ export default function ProductDetail() {
       <div>
         <h2 className="font-semibold text-xl mb-2">รายละเอียดสินค้า</h2>
         <div className="whitespace-pre-line p-3 border bg-slate-50 rounded text-sm text-gray-800">
-  {product.Pdetail}
-</div>
+          {product.Pdetail}
+        </div>
 
       </div>
     </div>

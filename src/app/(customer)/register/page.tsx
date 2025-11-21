@@ -147,7 +147,7 @@ export default function Register() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { name: "Cusername", placeholder: "* อีเมลล์" },
+            { name: "Cusername", placeholder: "* username" },
             { name: "Cname", placeholder: "* ชื่อจริง - นามสกุล" },
             { name: "Cpassword", type: "password", placeholder: "* รหัสผ่าน" },
             { name: "confirmPassword", type: "password", placeholder: "* ยืนยันรหัสผ่าน" },

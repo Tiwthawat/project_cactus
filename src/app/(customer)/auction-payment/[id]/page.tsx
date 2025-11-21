@@ -1,6 +1,9 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
 interface Transfer {
   Tid: number;
@@ -11,32 +14,49 @@ interface Transfer {
   Tqr: string;
 }
 
-interface Order {
-  Oid: number;
-  Oprice: number;
+interface AuctionPayInfo {
+  Aid: number;
+  PROid: number;
+  PROname: string;
+  PROprice: number;
+  current_price: number;
+  PROstatus: string;
+  winner_id: number | null;
 }
 
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
-
-export default function PaymentPage() {
-  const { id } = useParams();
+export default function AuctionPaymentPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [order, setOrder] = useState<Order | null>(null);
+  const [auction, setAuction] = useState<AuctionPayInfo | null>(null);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [selectedTid, setSelectedTid] = useState<number | null>(null);
   const [slip, setSlip] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // โหลดข้อมูลรอบประมูล + บัญชีโอน
   useEffect(() => {
-    // โหลดคำสั่งซื้อ
-    fetch(`${API}/orders/${id}`)
-      .then((res) => res.json())
-      .then((data: Order) => setOrder(data))
-      .catch(() => setOrder(null));
+    if (!id) return;
 
-    // โหลดบัญชีโอน
+    // ข้อมูลประมูล
+    fetch(`${API}/auction/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const info: AuctionPayInfo = {
+          Aid: data.Aid,
+          PROid: data.PROid,
+          PROname: data.PROname,
+          PROprice: data.PROprice,
+          current_price: data.current_price,
+          PROstatus: data.PROstatus,
+          winner_id: data.winner_id,
+        };
+        setAuction(info);
+      })
+      .catch(() => setAuction(null));
+
+    // บัญชีโอน
     fetch(`${API}/transfer`)
       .then((res) => res.json())
       .then((data: Transfer[]) => setTransfers(data))
@@ -60,20 +80,19 @@ export default function PaymentPage() {
   };
 
   const handleSubmit = async () => {
-    if (!slip || !selectedTid || !order) {
+    if (!slip || !selectedTid || !auction) {
       alert('กรุณาเลือกช่องทางโอนและแนบสลิป');
       return;
     }
 
+    // ✅ ฝั่ง backend แนะนำให้ใช้ Cid จาก token แทน ไม่ต้องส่ง user_id จากฟร้อน
     const formData = new FormData();
-    formData.append('Oid', String(id));
-    formData.append('Payprice', String(order.Oprice));
     formData.append('slip', slip);
     formData.append('Tid', String(selectedTid));
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/payment`, {
+      const res = await fetch(`${API}/auction/${auction.Aid}/pay`, {
         method: 'POST',
         body: formData,
       });
@@ -81,9 +100,9 @@ export default function PaymentPage() {
       const data = await res.json();
       if (res.ok) {
         alert('แจ้งชำระเงินสำเร็จ!');
-        router.push('/me/orders');
+        router.push('/me/auctions'); // หรือหน้าอื่นที่ตะเองใช้โชว์ประวัติ
       } else {
-        alert(data.message || 'เกิดข้อผิดพลาด');
+        alert(data.error || data.message || 'เกิดข้อผิดพลาด');
       }
     } catch {
       alert('เชื่อมต่อ server ไม่ได้');
@@ -92,10 +111,10 @@ export default function PaymentPage() {
     }
   };
 
-  if (!order) {
+  if (!auction) {
     return (
       <p className="text-center bg-white p-10">
-        กำลังโหลดข้อมูลคำสั่งซื้อ...
+        กำลังโหลดข้อมูลรายการประมูล...
       </p>
     );
   }
@@ -103,17 +122,21 @@ export default function PaymentPage() {
   return (
     <div className="min-h-screen bg-white text-black">
       <div className="max-w-3xl pt-44 mx-auto p-6 bg-white text-black">
-        <h1 className="text-2xl font-bold mb-6">แจ้งชำระเงิน</h1>
+        <h1 className="text-2xl font-bold mb-6">ชำระเงินสินค้าประมูล</h1>
 
         <div className="mb-4">
           <p>
-            เลขคำสั่งซื้อ:{' '}
-            <span className="font-semibold">#{order.Oid}</span>
+            รหัสรอบประมูล:{' '}
+            <span className="font-semibold">#{auction.Aid}</span>
           </p>
-          <p>
+          <p className="mt-1">
+            สินค้า:{' '}
+            <span className="font-semibold">{auction.PROname}</span>
+          </p>
+          <p className="mt-1">
             ยอดที่ต้องชำระ:{' '}
             <span className="text-red-600 font-bold">
-              {order.Oprice} บาท
+              {auction.current_price.toLocaleString('th-TH')} บาท
             </span>
           </p>
         </div>
@@ -176,7 +199,7 @@ export default function PaymentPage() {
             disabled={loading || !slip || !selectedTid}
             className="bg-green-600 text-white px-8 py-2 text-lg rounded hover:bg-green-700 disabled:opacity-50"
           >
-            {loading ? 'กำลังส่งข้อมูล...' : 'แจ้งชำระเงิน'}
+            {loading ? 'กำลังส่งข้อมูล...' : 'แจ้งชำระเงินสำหรับสินค้าประมูล'}
           </button>
         </div>
       </div>
