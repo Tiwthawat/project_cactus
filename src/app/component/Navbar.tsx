@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TbBellRingingFilled } from 'react-icons/tb';
 import Link from 'next/link';
-import { FaShoppingCart } from 'react-icons/fa';
+import { FaHeart, FaShoppingCart } from 'react-icons/fa';
+import { usePathname } from 'next/navigation';
 
 const Navbar = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -71,53 +72,130 @@ const Navbar = () => {
     router.push('/');
   };
 
+  const pathname = usePathname();
+
+  const isActive = (path: any) => {
+    if (path === '/products') {
+      return pathname.startsWith('/products');
+    }
+    return pathname === path;
+  };
+
+  const activeClass = "!bg-green-100 !text-green-600 font-semibold";
+  const inactiveClass = "hover:!bg-green-50 hover:!text-green-600 active:!bg-green-100 focus:!bg-green-100 focus:!text-green-600";
+
   return (
-    <nav className="fixed top-0 left-0 w-full z-50 navbar flex-row justify-between bg-green-500 items-center h-20 shadow-md">
-
-      <div className="ml-16 rounded-full overflow-hidden">
-        <a href="/" className="rounded-full">
-          <picture className="flex">
-            <img src="/favicon.png" alt="Logo" className="w-20 h-20  rounded-full object-cover border-4 border-white shadow-lg" />
-          </picture>
-        </a>
-      </div>
-
-      <div className="flex items-center p-2 bg-white rounded-xl shadow-sm">
-        <input className="bg-gray-100 w-80 h-8 text-gray-900 ring-0" type="text" placeholder="ค้นหา..." />
-        <div className="bg-green-400 ml-3 py-3 px-5 text-gray-900 font-semibold rounded-lg hover:shadow-lg transition cursor-pointer">
-          <span>Search</span>
+    <div className="navbar bg-white shadow-sm fixed top-0 left-0 w-full z-50 text-sm">
+      <div className="navbar-start">
+        <div className="dropdown">
+          <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                d="M4 6h16M4 12h8m-8 6h16" />
+            </svg>
+          </div>
+          <ul
+            tabIndex={0}
+            className="menu menu-sm dropdown-content bg-white rounded-box mt-3 w-52 p-2 shadow text-xs">
+            <li>
+              <a className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}>
+                หมวดหมู่สินค้า
+              </a>
+              <ul className="p-2">
+                <li><Link href="/products?cat=all" className={`${isActive('/products') ? activeClass : inactiveClass}`}>ทั้งหมด</Link></li>
+                <li><Link href="/products?cat=cactus" className={inactiveClass}>แคคตัส</Link></li>
+                <li><Link href="/products?cat=soil" className={inactiveClass}>ดิน</Link></li>
+              </ul>
+            </li>
+            <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
+            <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
+            <li><Link href="/FAQ" className={`${isActive('/FAQ') ? activeClass : inactiveClass}`}>คำถามที่พบบ่อย</Link></li>
+            <li><Link href="/Insurance" className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}>การรับประกันสินค้า</Link></li>
+            <li><Link href="/About" className={`${isActive('/About') ? activeClass : inactiveClass}`}>รีวิวเกี่ยวกับเรา</Link></li>
+            {username ? (
+              <>
+                <li><Link href="/me" className={`${isActive('/me') ? activeClass : inactiveClass}`}>{username}</Link></li>
+                <li><button onClick={handleLogout} className={inactiveClass}>ออกจากระบบ</button></li>
+              </>
+            ) : (
+              <>
+                <li><Link href="/login" className={`${isActive('/login') ? activeClass : inactiveClass}`}>เข้าสู่ระบบ</Link></li>
+                <li><Link href="/register" className={`${isActive('/register') ? activeClass : inactiveClass}`}>สมัครสมาชิก</Link></li>
+              </>
+            )}
+          </ul>
         </div>
+        <Link href="/" className="btn btn-ghost btn-sm hover:bg-green-50">
+          <img src="/favicon.png" className="w-8 h-8 rounded-full" />
+        </Link>
       </div>
 
-      <div className="user-actions  flex items-center space-x-4 mr-16 text-white">
-        {username ? (
+      <div className="navbar-center hidden lg:flex">
+        <ul className="menu menu-horizontal px-1 text-xs">
+          <li>
+            <details>
+              <summary className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}>
+                หมวดหมู่สินค้า
+              </summary>
+              <ul className="p-2 bg-white shadow rounded-box text-xs">
+                <li><Link href="/products?cat=all" className={inactiveClass}>ทั้งหมด</Link></li>
+                <li><Link href="/products?cat=cactus" className={inactiveClass}>แคคตัส</Link></li>
+                <li><Link href="/products?cat=soil" className={inactiveClass}>ดิน</Link></li>
+              </ul>
+            </details>
+          </li>
+          <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
+          <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
+          <li><Link href="/FAQ" className={`${isActive('/FAQ') ? activeClass : inactiveClass}`}>คำถามที่พบบ่อย</Link></li>
+          <li><Link href="/Insurance" className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}>การรับประกันสินค้า</Link></li>
+          <li><Link href="/About" className={`${isActive('/About') ? activeClass : inactiveClass}`}>รีวิวเกี่ยวกับเรา</Link></li>
+        </ul>
+      </div>
 
-          <>
-            <Link href="/cart">
-            <FaShoppingCart className="text-xl hover:text-yellow-300 cursor-pointer" title="ดูตะกร้าสินค้า" />
-          </Link>
-            <div className=' bg-orange-200'> <Link href="/me" className="font-bold text-white hover:underline">
-              {username}
-            </Link></div>
-
-            <button
-              onClick={handleLogout}
-              className="bg-white text-green-600 px-3 py-1 rounded hover:bg-gray-100 transition"
-            >
-              ออกจากระบบ
-            </button>
-          </>
-        ) : (
-          <>
-            <a href="/login"><button type="button">เข้าสู่ระบบ</button></a>
-            <a href="/register"><button type="button">สมัครสมาชิก</button></a>
-          </>
-        )}
-        <button type="button" className="w-10 h-10">
-          <TbBellRingingFilled className="text-2xl" />
+      <div className="navbar-end gap-2">
+        <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </button>
+
+        <Link href="/cart" className={`btn btn-ghost btn-circle btn-sm ${isActive('/cart') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
+          <FaShoppingCart className="text-base" />
+        </Link>
+        <Link href="/favorites" className={`btn btn-ghost btn-circle btn-sm ${isActive('/favorites') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
+          <FaHeart className="text-base" />
+        </Link>
+
+        <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">
+          <div className="indicator">
+            <TbBellRingingFilled className="text-lg" />
+            <span className="badge badge-xs badge-primary indicator-item"></span>
+          </div>
+        </button>
+
+        {username ? (
+          <div className="dropdown dropdown-end">
+            <label tabIndex={0} className={`btn btn-ghost btn-sm text-xs ${isActive('/me') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
+              {username}
+            </label>
+            <ul
+              tabIndex={0}
+              className="dropdown-content bg-white rounded-box shadow w-40 p-2 text-xs"
+            >
+              <li><Link href="/me" className={`${isActive('/me') ? activeClass : inactiveClass}`}>โปรไฟล์</Link></li>
+              <li><button onClick={handleLogout} className={inactiveClass}>ออกจากระบบ</button></li>
+            </ul>
+          </div>
+        ) : (
+          <Link href="/login" className={`text-xs border-[#e5e5e5] px-4 py-2 rounded-lg transition-colors ${isActive('/login') ? 'text-green-600 border-green-600 bg-green-50' : 'text-black hover:text-green-600 hover:border-green-600'}`}>
+            เข้าสู่ระบบ
+          </Link>
+        )}
       </div>
-    </nav>
+    </div>
   );
 };
 

@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { FaShoppingCart, FaHeart, FaRegHeart, FaMinus, FaPlus, FaCheck, FaFacebook, FaLine } from "react-icons/fa";
+import { IoFlashSharp } from "react-icons/io5";
 
 interface Product {
   Pid: number;
@@ -18,6 +20,11 @@ export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [mainImage, setMainImage] = useState<string>("");
+  const [quantity, setQuantity] = useState<number>(1);
+  const [isFavorite, setIsFavorite] = useState<boolean>(false);
+  const pictures = product
+    ? product.Ppicture.split(",").map((pic) => pic.trim()).filter(pic => pic)
+    : [];
 
   const addToCart = () => {
     if (!product) return;
@@ -54,127 +61,175 @@ export default function ProductDetail() {
     window.location.href = "/checkout?type=buynow";
   };
 
-
-
-
   useEffect(() => {
     const fetchProduct = async () => {
       const res = await fetch(`http://localhost:3000/product/${id}`);
       const data = await res.json();
       setProduct(data);
-      setMainImage(data.Ppicture.split(",")[0].trim()); // ตั้งค่ารูปหลักเริ่มต้น
+      setMainImage(data.Ppicture.split(",")[0].trim());
     };
     fetchProduct();
   }, [id]);
 
+  const toggleFavorite = () => {
+    setIsFavorite(prev => !prev);
+  };
+
+  const increaseQuantity = () => {
+    if (product && quantity < product.Pnumproduct) {
+      setQuantity(prev => prev + 1);
+    }
+  };
+
+  const decreaseQuantity = () => {
+    setQuantity(prev => (prev > 1 ? prev - 1 : 1));
+  };
 
   if (!product) return <p className="text-center mt-10">กำลังโหลดข้อมูลสินค้า...</p>;
 
   return (
-    <div className="p-10 pt-40 max-w-6xl mx-auto bg-white text-black space-y-8">
+    <div className="p-4 pt-14 max-w-7xl mx-auto bg-white text-gray-900 min-h-screen">
+      <div className="bg-white md:p-10">
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
 
+          <div className="w-full lg:w-1/2">
 
+            <div className="w-full aspect-[1/1] rounded-lg overflow-hidden shadow-xl border border-gray-200 relative">
+              <button
+                onClick={toggleFavorite}
+                className={`absolute top-4 right-4 z-10 p-3 rounded-full backdrop-blur-sm transition-all duration-300 ${isFavorite
+                  ? 'bg-red-500 text-white scale-110'
+                  : 'bg-white/80 text-red-500 hover:bg-red-50'
+                  }`}
+                title={isFavorite ? "ลบจากรายการโปรด" : "เพิ่มในรายการโปรด"}
+              >
+                {isFavorite ? (
+                  <FaHeart className="text-xl" />
+                ) : (
+                  <FaRegHeart className="text-xl" />
+                )}
+              </button>
 
-      <div className="flex flex-col lg:flex-row gap-10 items-start">
-
-        {/* ✅ ฝั่งซ้าย */}
-        <div className="w-full lg:w-1/2">
-
-          {/* 🔠 ชื่อสินค้า */}
-          <h1 className="text-2xl font-bold mb-4">{product.Pname}</h1>
-
-          {/* 📷 รูปหลัก */}
-          <div className="w-full aspect-[4/3] rounded-lg overflow-hidden shadow">
-            <img
-              src={`http://localhost:3000${mainImage}`}
-
-              alt={product.Pname}
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          {/* 🖼️ Thumbnail */}
-          <div className="flex gap-2 mt-4">
-            {product.Ppicture.split(",").map((pic, i) => (
               <img
-                key={i}
-                src={`http://localhost:3000${pic.trim()}`}
-                className="w-20 h-20 object-cover rounded cursor-pointer border hover:border-red-500"
-                onClick={() => setMainImage(pic.trim())}
+                src={`http://localhost:3000${mainImage}`}
+                alt={product.Pname}
+                className="w-full h-full object-cover"
               />
-            ))}
+            </div>
+
+            {pictures.length > 1 && (
+              <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                {pictures.map((pic, i) => (
+                  <div
+                    key={i}
+                    className={`w-20 h-20 flex-shrink-0 rounded-lg cursor-pointer relative transition-all duration-300 ${mainImage === pic ? "border-2 border-green-500 shadow-md" : "border border-gray-300 hover:border-gray-400"
+                      }`}
+                    onClick={() => setMainImage(pic)}
+                  >
+                    <img
+                      src={`http://localhost:3000${pic}`}
+                      alt={`รูปแบบ ${i + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    {mainImage === pic && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                        <FaCheck className="text-white text-2xl" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-        {/* ✅ ฝั่งขวา */}
 
+          <div className="w-full lg:w-1/2 flex flex-col gap-4">
 
-        {/* ✅ ฝั่งขวา (จัดแนวบนลงล่างแบบธรรมชาติ) */}
-        <div className="w-full lg:w-1/2 flex flex-col gap-6">
+            <h1 className="text-xl font-bold text-gray-800 pb-2 border-b">{product.Pname}</h1>
 
-          {/* 🟨 โปรดอ่าน */}
-          <div className="bg-yellow-100 border border-yellow-300 p-4 rounded shadow">
-            <p className="text-sm font-medium text-red-600">📌 โปรดอ่าน</p>
-            <ul className="text-sm text-gray-700 list-disc ml-4 mt-1">
-              <li>ผู้ประมูลจะต้องตรวจรายละเอียดก่อนตัดสินใจ</li>
-              <li>รายละเอียดต้องเป็นข้อมูลจริงเท่านั้น</li>
-            </ul>
-          </div>
+            <p className="text-sm text-gray-500">{product.Pdetail}</p>
+            <span className="text-xl font-extrabold">
+              {product.Pprice} บาท
+            </span>
 
-          {/* 🩷 ข้อมูลร้านค้า */}
-          <div className="bg-pink-100 p-4 rounded border border-pink-300 shadow">
-            <p className="font-medium text-gray-800 border-b pb-1 mb-2">ข้อมูลร้านค้า</p>
-            <div className="flex items-center gap-2">
-              <span>👥</span>
-              <p>liew</p>
+            {pictures.length > 1 && (
+              <div className="space-y-3 pt-3">
+                <p className="text-base font-semibold text-gray-700">เลือกแบบ:</p>
+                <div className="flex gap-3">
+                  {pictures.map((pic, i) => (
+                    <div key={i} className="text-center">
+                      <div
+                        className={`w-16 h-16 flex-shrink-0 rounded-lg cursor-pointer transition-all duration-300 ${mainImage === pic ? "border-2 border-red-500 shadow-md scale-105" : "border border-gray-300 hover:border-red-400"
+                          }`}
+                        onClick={() => setMainImage(pic)}
+                      >
+                        <img
+                          src={`http://localhost:3000${pic}`}
+                          alt={`รูปแบบ ${i + 1}`}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </div>
+                      <p className="text-xs mt-1 text-gray-600">{i + 1}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <div className="flex items-center gap-4">
+                <p className="text-base font-semibold text-gray-700">จำนวน:</p>
+                <div className="flex items-center border border-gray-300 rounded-md">
+                  <button
+                    onClick={decreaseQuantity}
+                    className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                    disabled={quantity <= 1}
+                  >
+                    <FaMinus className="w-4 h-4" />
+                  </button>
+                  <span className="px-4 font-semibold text-lg border-l border-r border-gray-300">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={increaseQuantity}
+                    className="p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                    disabled={product.Pnumproduct <= quantity}
+                  >
+                    <FaPlus className="w-4 h-4" />
+                  </button>
+                </div>
+                <span className="text-sm text-gray-500">เหลือสินค้า {product.Pnumproduct} ชิ้น</span>
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <button
+                  onClick={addToCart}
+                  className="flex items-center justify-center gap-2 w-1/2
+             bg-white border-2 border-green-500 text-green-600
+             font-semibold px-6 py-3 rounded-xl
+             hover:bg-green-50 transition-all duration-300 shadow-md
+             hover:shadow-xl"
+                >
+                  <FaShoppingCart className="text-lg" />
+                  เพิ่มใส่ตะกร้า
+                </button>
+
+                <button
+                  onClick={handleBuyNow}
+                  className="flex items-center justify-center gap-2 w-1/2
+             bg-gradient-to-r from-green-500 to-green-600
+             hover:from-green-600 hover:to-green-700
+             text-white font-semibold px-6 py-3 rounded-xl
+             transition-all duration-300 shadow-md hover:shadow-xl
+             flex items-center justify-center gap-2 transform hover:scale-105"
+                >
+                  <IoFlashSharp className="text-lg" />
+                  สั่งซื้อเลย
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* ❤️ ปุ่มซื้อ + รายละเอียด */}
-          <div className="space-y-3">
-            <button className="border border-red-500 text-red-500 px-4 py-2 rounded hover:bg-red-100 text-sm w-full">
-              ❤️ เพิ่มรายการโปรด
-            </button>
-
-            <h2 className="text-[28px] font-extrabold text-black">
-              ซื้อทันทีในราคา <span className="text-red-600 text-[36px] font-extrabold">{product.Pprice} บาท</span>
-            </h2>
-            <button
-              onClick={addToCart}
-              className="bg-orange-400 text-white px-6 py-2 rounded hover:bg-orange-500 text-base w-full"
-            >
-              🛒 เพิ่มใส่ตะกร้า
-            </button>
-
-            <button
-              onClick={handleBuyNow}
-              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm w-full"
-            >
-              ซื้อเลย
-            </button>
-
-
-            <p className="text-xs text-gray-700">รหัสสินค้า: cac:{product.Pid.toString().padStart(4, "0")}</p>
-            <p className="text-xs text-gray-700">สถานะ: {product.Pstatus}</p>
-          </div>
-
         </div>
-
-
-
-
-
-      </div>
-
-      {/* 🔎 รายละเอียดสินค้า */}
-      <div>
-        <h2 className="font-semibold text-xl mb-2">รายละเอียดสินค้า</h2>
-        <div className="whitespace-pre-line p-3 border bg-slate-50 rounded text-sm text-gray-800">
-          {product.Pdetail}
-        </div>
-
       </div>
     </div>
   );
-
-
 }

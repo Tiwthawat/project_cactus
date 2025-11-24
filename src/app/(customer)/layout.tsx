@@ -14,7 +14,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
   return (
     <>
       <Navbar />
-      <Navigation />
+      {/* <Navigation /> */}
       {children}
     </>
   );
