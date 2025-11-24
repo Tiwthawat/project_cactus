@@ -42,7 +42,7 @@ function formatRemaining(ms: number): string {
 
   const d = days > 0 ? `${days} วัน ` : "";
 
-  return `${d} ${hours}:${mins}:${secs}นาที: วินาที`;
+  return `${d} ${hours}:${mins}:${secs} วินาที`;
 }
 
 
