@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Navigation from './component/Navigation';
 import Navbar from './component/Navbar';
 import AuctionItems from './component/AuctionItems';
+import BannerSlider from './component/BannerSlider';
 
 
 
@@ -45,16 +46,17 @@ const HomePage = () => {
   return (
     <>
       <Navbar />
-      <Navigation />
+      {/* <Navigation /> */}
+      <div className="!pt-16">
+        <BannerSlider />
+      </div>
 
-      <main className="pt-36 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
-
+      <main className="mt-16 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
         <section>
-  <h2 className="text-2xl font-semibold mb-4">🔥 กำลังประมูล</h2>
-  <AuctionItems />
-</section>
+          <h2 className="text-2xl font-semibold mb-4">🔥 กำลังประมูล</h2>
+          <AuctionItems />
+        </section>
 
-  
         <section>
           <h2 className="text-2xl font-semibold mb-4">🆕 สินค้ามาใหม่</h2>
           <CactusItems type="latest" />

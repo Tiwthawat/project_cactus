@@ -51,6 +51,7 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
 
   // state สำหรับ countdown
   const [remaining, setRemaining] = useState<string>("");
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     function update() {
@@ -67,44 +68,71 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
   return (
     <Link
       href={`/auctions/${auction.Aid}`}
-      className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition border"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="group relative bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden transform hover:-translate-y-2 border"
     >
-      {imgSrc ? (
-        <img src={imgSrc} alt={auction.PROname} className="w-full h-40 object-cover rounded" />
-      ) : (
-        <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400">
-          ไม่มีรูป
-        </div>
-      )}
+      <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+        🔥 ประมูล
+      </div>
 
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <h3 className="text-lg font-semibold line-clamp-2">{auction.PROname}</h3>
-        <span
-          className={`text-xs px-2 py-1 rounded-full border ${
-            auction.status === "open"
-              ? "border-green-500 text-green-700"
-              : "border-gray-400 text-gray-600"
+      <div className="relative overflow-hidden bg-gray-100 aspect-square">
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={auction.PROname}
+            className={`w-full h-full object-cover transition-transform duration-500 ${
+              hovered ? "scale-110" : "scale-100"
+            }`}
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
+            ไม่มีรูป
+          </div>
+        )}
+
+        <div
+          className={`absolute inset-0 bg-black/20 transition-opacity duration-300 ${
+            hovered ? "opacity-100" : "opacity-0"
           }`}
         >
-          {auction.status}
-        </span>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="bg-white text-gray-800 px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+              ดูรายละเอียด →
+            </span>
+          </div>
+        </div>
       </div>
 
-      
-      <p className="text-red-600 font-bold text-lg">ราคาปัจจุบัน: {baht(auction.current_price)}</p>
+      <div className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 hover:text-red-600 transition-colors min-h-[2.5rem]">
+          {auction.PROname}
+        </h3>
 
-      <p className="text-sm text-gray-500">
-        ปิดประมูล: {new Date(auction.end_time).toLocaleString("th-TH")}
-      </p>
+        <p className="text-red-600 font-bold text-xl">
+          {baht(auction.current_price)}
+        </p>
 
-      {/* 🕒 เวลาที่เหลือ */}
-      <p className="text-sm font-semibold text-blue-600">
-        เวลาที่เหลือ: ***{remaining}
-      </p>
+        <p className="text-sm text-gray-500">
+          ปิดประมูล: {new Date(auction.end_time).toLocaleString("th-TH")}
+        </p>
 
-      <div className="mt-3 text-center bg-red-500 hover:bg-red-300 text-white px-4 py-2 rounded">
-        ประมูลเลยตอนนี้
+        <p className="text-sm font-semibold text-blue-600">
+          เวลาที่เหลือ: {remaining}
+        </p>
+
+        <div className="space-y-2 mt-4">
+          <div className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 shadow-md hover:shadow-xl flex items-center justify-center gap-2 transform hover:scale-105">
+            ประมูลเลยตอนนี้
+          </div>
+        </div>
       </div>
+
+      <div
+        className={`absolute inset-0 rounded-2xl border-2 border-transparent transition-all duration-300 pointer-events-none ${
+          hovered ? "border-red-400" : ""
+        }`}
+      ></div>
     </Link>
   );
 }

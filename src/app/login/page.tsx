@@ -137,7 +137,7 @@ export default function Login() {
   return (
     <>
       <Navbar />
-      <Navigation />
+      {/* <Navigation /> */}
 
       <div className="min-h-screen pt-48 bg-white flex flex-col justify-start items-center">
         <div className="w-full max-w-xs bg-white border border-gray-300 rounded-xl shadow-md p-6">
