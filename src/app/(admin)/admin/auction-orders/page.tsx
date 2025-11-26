@@ -9,28 +9,23 @@ interface AuctionOrder {
     PROname: string;
     Cname: string;
     current_price: number;
-    PROstatus: string;
+    payment_status: string;
 }
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
-
-
-
 export default function AuctionOrdersPage() {
     const [orders, setOrders] = useState<AuctionOrder[]>([]);
     const [filterStatus, setFilterStatus] = useState("all");
+
     const statusColorMap: Record<string, string> = {
-        auction: 'bg-gray-200 text-gray-800',
         pending_payment: 'bg-yellow-100 text-yellow-800',
         payment_review: 'bg-blue-100 text-blue-800',
         paid: 'bg-green-100 text-green-800',
-        ready_to_ship: 'bg-purple-100 text-purple-800',
-        shipped: 'bg-indigo-100 text-indigo-800',
+        shipping: 'bg-purple-100 text-purple-800',
         delivered: 'bg-emerald-100 text-emerald-800',
         returned: 'bg-red-100 text-red-800',
         payment_failed: 'bg-rose-100 text-rose-800',
-        unsold: 'bg-slate-200 text-slate-700',
     };
 
     useEffect(() => {
@@ -48,12 +43,12 @@ export default function AuctionOrdersPage() {
         });
 
         setOrders(prev =>
-            prev.map(o => o.Aid === Aid ? { ...o, PROstatus: status } : o)
+            prev.map(o => o.Aid === Aid ? { ...o, payment_status: status } : o)
         );
     };
 
     const filtered = orders.filter(o =>
-        filterStatus === 'all' ? true : o.PROstatus === filterStatus
+        filterStatus === 'all' ? true : o.payment_status === filterStatus
     );
 
     return (
@@ -101,31 +96,27 @@ export default function AuctionOrdersPage() {
                                 <td className="p-2 border">{o.PROname}</td>
                                 <td className="p-2 border">{o.Cname}</td>
                                 <td className="p-2 border text-right">{o.current_price} บาท</td>
-                                <td className="p-2 border text-center">{o.PROstatus}</td>
+
+                                {/* ✔ สถานะจริง */}
+                                <td className="p-2 border text-center">
+                                    {o.payment_status}
+                                </td>
 
                                 <td className="p-2 border text-center">
                                     <select
-                                        className={`
-      px-2 py-1 rounded border text-sm font-medium
-      ${statusColorMap[o.PROstatus] ?? 'bg-gray-100 text-gray-800'}
-    `}
-                                        value={o.PROstatus}
+                                        className={`px-2 py-1 rounded border text-sm font-medium
+                                            ${statusColorMap[o.payment_status] ?? 'bg-gray-100 text-gray-800'}
+                                        `}
+                                        value={o.payment_status}
                                         onChange={(e) => updateStatus(o.Aid, e.target.value)}
                                     >
-                                        <option value="auction">auction</option>
                                         <option value="pending_payment">pending_payment</option>
                                         <option value="payment_review">payment_review</option>
                                         <option value="paid">paid</option>
-                                        <option value="ready_to_ship">ready_to_ship</option>
-                                        <option value="shipped">shipped</option>
+                                        <option value="shipping">shipping</option>
                                         <option value="delivered">delivered</option>
-                                        <option value="returned">returned</option>
-                                        <option value="payment_failed">payment_failed</option>
-                                        <option value="unsold">unsold</option>
                                     </select>
                                 </td>
-
-
 
                                 <td className="p-2 border text-center">
                                     <Link href={`/admin/auction-orders/${o.Aid}`}>

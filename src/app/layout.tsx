@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
   
   title: "Cactus Auction",
-  description: "ระบบประมูลต้นไม้แคคตัสสุดเทพ",
+  description: "ระบบประมูลต้นไม้แคคตัส",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -149,15 +149,17 @@ export default function AdminAuctionProductsPage() {
       ) : (
         <table className="w-full bg-white border">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 border">รูป</th>
-              <th className="p-2 border w-[110px] text-center">รหัส</th>
-              <th className="p-2 border">สินค้า</th>
-              <th className="p-2 border text-right">ราคา</th>
-              <th className="p-2 border text-center">สถานะ</th>
-              <th className="p-2 border text-center">จัดการ</th>
-            </tr>
-          </thead>
+  <tr className="bg-gray-100">
+    <th className="p-2 border">รูป</th>
+    <th className="p-2 border w-[110px] text-center">รหัส</th>
+    <th className="p-2 border">สินค้า</th>
+    <th className="p-2 border text-right">ราคาตั้งต้น</th>
+    <th className="p-2 border text-right">ราคาขายจริง</th>
+    <th className="p-2 border text-center">สถานะ</th>
+    <th className="p-2 border text-center">จัดการ</th>
+  </tr>
+</thead>
+
 
           <tbody>
             {filtered.map((p) => {
@@ -169,17 +171,17 @@ export default function AdminAuctionProductsPage() {
                 <tr key={p.PROid} className="odd:bg-white even:bg-gray-50">
 
                   <td className="p-2 border text-center">
-                    
-                      {fullImg ? <img src={fullImg} className="h-12 rounded inline-block" /> : '—'}
-                   
+
+                    {fullImg ? <img src={fullImg} className="h-12 rounded inline-block" /> : '—'}
+
                   </td>
 
                   <td className="p-2 border text-center font-mono text-sm">{code}</td>
 
                   <td className="p-2 border">
-                    
-                      {p.PROname}
-              
+
+                    {p.PROname}
+
 
                     {p.active_aid ? (
                       <div className="text-xs text-green-600">
@@ -190,7 +192,18 @@ export default function AdminAuctionProductsPage() {
                     )}
                   </td>
 
-                  <td className="p-2 border text-right">{fmtBaht(p.PROprice)} ฿</td>
+                  <td className="p-2 border text-right">
+  {fmtBaht(p.PROprice)} ฿
+</td>
+
+<td className="p-2 border text-right font-semibold">
+  {p.active_current_price
+    ? `${fmtBaht(p.active_current_price)} ฿`
+    : "-"}
+</td>
+
+
+
 
                   <td className="p-2 border text-center">
                     {p.PROstatus === 'ready' && <span className="px-2 py-1 rounded text-white bg-green-600">พร้อมเปิดรอบ</span>}

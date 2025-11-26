@@ -26,40 +26,42 @@ export default function ProductDetail() {
     ? product.Ppicture.split(",").map((pic) => pic.trim()).filter(pic => pic)
     : [];
 
-  const addToCart = () => {
-    if (!product) return;
+const addToCart = () => {
+  if (!product) return;
 
-    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
 
-    const existingIndex = cart.findIndex((item: any) => item.Pid === product.Pid);
+  const existingIndex = cart.findIndex((item: any) => item.Pid === product.Pid);
 
-    if (existingIndex !== -1) {
-      cart[existingIndex].quantity += 1;
-    } else {
-      cart.push({
-        Pid: product.Pid,
-        Pname: product.Pname,
-        Pprice: Number(product.Pprice),
-        Ppicture: product.Ppicture.split(",")[0].trim(),
-        quantity: 1,
-      });
-    }
+  if (existingIndex !== -1) {
+    cart[existingIndex].quantity += quantity; // ใช้ quantity จริง
+  } else {
+    cart.push({
+      Pid: product.Pid,
+      Pname: product.Pname,
+      Pprice: Number(product.Pprice),
+      Ppicture: product.Ppicture.split(",")[0].trim(),
+      quantity: quantity, // ใช้ quantity จริง
+    });
+  }
 
-    localStorage.setItem("cart", JSON.stringify(cart));
-    alert("เพิ่มลงตะกร้าแล้ว");
-  };
+  localStorage.setItem("cart", JSON.stringify(cart));
+  alert("เพิ่มลงตะกร้าแล้ว");
+};
 
 
-  const handleBuyNow = () => {
-    if (!product) return;
 
-    localStorage.setItem(
-      "buynow",
-      JSON.stringify({ pid: product.Pid, qty: 1 })
-    );
+const handleBuyNow = () => {
+  if (!product) return;
 
-    window.location.href = "/checkout?type=buynow";
-  };
+  localStorage.setItem(
+    "buynow",
+    JSON.stringify({ pid: product.Pid, qty: quantity })
+  );
+
+  window.location.href = "/checkout?type=buynow";
+};
+
 
   useEffect(() => {
     const fetchProduct = async () => {

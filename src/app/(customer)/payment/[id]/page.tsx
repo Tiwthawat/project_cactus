@@ -14,6 +14,7 @@ interface Transfer {
 interface Order {
   Oid: number;
   Oprice: number;
+  Ostatus: string; 
 }
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
@@ -99,6 +100,23 @@ export default function PaymentPage() {
       </p>
     );
   }
+  // ถ้าออเดอร์กำลังตรวจสอบ หรือจ่ายแล้ว → ห้ามส่งซ้ำ
+if (order.Ostatus === "payment_review") {
+  return (
+    <p className="text-center p-10 text-orange-600 bg-white">
+      สลิปกำลังตรวจสอบ กรุณารอแอดมินยืนยันค่ะ
+    </p>
+  );
+}
+
+if (order.Ostatus === "paid") {
+  return (
+    <p className="text-center p-10 text-green-600 bg-white">
+      ชำระเงินแล้ว ไม่ต้องส่งสลิปซ้ำค่ะ
+    </p>
+  );
+}
+
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -172,12 +190,19 @@ export default function PaymentPage() {
 
         <div className="text-right">
           <button
-            onClick={handleSubmit}
-            disabled={loading || !slip || !selectedTid}
-            className="bg-green-600 text-white px-8 py-2 text-lg rounded hover:bg-green-700 disabled:opacity-50"
-          >
-            {loading ? 'กำลังส่งข้อมูล...' : 'แจ้งชำระเงิน'}
-          </button>
+  onClick={handleSubmit}
+  disabled={
+    loading ||
+    !slip ||
+    !selectedTid ||
+    order.Ostatus !== "pending_payment"
+  }
+  className="bg-green-600 text-white px-8 py-2 text-lg rounded
+             hover:bg-green-700 disabled:opacity-50"
+>
+  {loading ? 'กำลังส่งข้อมูล...' : 'แจ้งชำระเงิน'}
+</button>
+
         </div>
       </div>
     </div>

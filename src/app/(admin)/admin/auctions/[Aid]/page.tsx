@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -18,11 +18,6 @@ interface AuctionDetail {
 
   winner_id?: number;
   winnerName?: string | null;
-  payment_status?: 'pending_payment' | 'paid' | string;
-
-  shipping_company?: string | null;
-  tracking_number?: string | null;
-  shipping_status?: string | null;
 }
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
@@ -35,19 +30,12 @@ export default function AdminAuctionDetailPage() {
   const [data, setData] = useState<AuctionDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ฟอร์มจัดส่ง
-  const [shipComp, setShipComp] = useState("");
-  const [trackNo, setTrackNo] = useState("");
-
   const fetchDetail = async () => {
     try {
       setLoading(true);
       const res = await fetch(`${API}/auction/${Aid}`, { cache: "no-store" });
       const d: AuctionDetail = await res.json();
       setData(d);
-
-      setShipComp(d.shipping_company ?? "");
-      setTrackNo(d.tracking_number ?? "");
     } finally {
       setLoading(false);
     }
@@ -55,7 +43,6 @@ export default function AdminAuctionDetailPage() {
 
   useEffect(() => {
     fetchDetail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Aid]);
 
   const imageUrls = useMemo(() => {
@@ -92,53 +79,6 @@ export default function AdminAuctionDetailPage() {
     }
     alert("ลบสินค้าแล้ว");
     router.push("/admin/auction-products");
-  };
-
-  const saveShipping = async () => {
-    if (!data) return;
-
-    if (!shipComp || !trackNo) {
-      alert("กรอกข้อมูลให้ครบก่อน");
-      return;
-    }
-
-    const res = await fetch(
-      `${API}/admin/auction-products/${data.PROid}/shipping`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shipping_company: shipComp,
-          tracking_number: trackNo,
-          shipping_status: "shipped",
-        }),
-      }
-    );
-
-    const b = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(b.error || "บันทึกการจัดส่งไม่สำเร็จ");
-      return;
-    }
-
-    alert("บันทึกข้อมูลจัดส่งสำเร็จ");
-    fetchDetail();
-  };
-
-  // ⭐ อันใหม่: แอดมินกดปิดสถานะเป็น delivered
-  const markDelivered = async () => {
-    const res = await fetch(`${API}/admin/auction-orders/${Aid}/delivered`, {
-      method: "PATCH",
-    });
-
-    const json = await res.json();
-    if (!res.ok) {
-      alert(json.error || "อัปเดตไม่สำเร็จ");
-      return;
-    }
-
-    alert("✔ อัปเดตเป็น delivered สำเร็จ");
-    fetchDetail();
   };
 
   if (loading || !data)
@@ -222,25 +162,19 @@ export default function AdminAuctionDetailPage() {
               </div>
 
               {data.status === "closed" && (
-                <>
-                  <div className="flex justify-between border-b py-2">
-                    <span className="text-gray-600">ผู้ชนะ</span>
-                    <b>{data.winnerName || "—"}</b>
-                  </div>
+                <div className="flex justify-between border-b py-2">
+                  <span className="text-gray-600">ผู้ชนะ</span>
+                  {data.winner_id && (
+  <button
+    onClick={() => router.push(`/admin/auction-orders/${data.Aid}`)}
+    className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+  >
+    ดูออเดอร์ประมูล
+  </button>
+)}
 
-                  <div className="flex justify-between border-b py-2">
-                    <span className="text-gray-600">สถานะชำระเงิน</span>
-                    <b
-                      className={`${
-                        data.payment_status === "paid"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {data.payment_status}
-                    </b>
-                  </div>
-                </>
+                  <b>{data.winnerName || "—"}</b>
+                </div>
               )}
             </div>
 
@@ -268,71 +202,6 @@ export default function AdminAuctionDetailPage() {
                 ลบสินค้า
               </button>
             </div>
-
-            {/* จัดส่ง */}
-            {data.status === "closed" && (
-              <div className="mt-8 p-4 border rounded-lg bg-gray-50">
-                <h3 className="font-semibold mb-3">ข้อมูลการจัดส่ง</h3>
-
-                {data.payment_status === "paid" ? (
-                  <>
-                    <div className="mb-3">
-                      <label className="text-sm">ขนส่ง</label>
-                      <select
-                        className="border w-full px-3 py-2 rounded bg-white"
-                        value={shipComp}
-                        onChange={(e) => setShipComp(e.target.value)}
-                      >
-                        <option value="">เลือกขนส่ง</option>
-                        <option value="Flash">Flash</option>
-                        <option value="J&T">J&T</option>
-                        <option value="Kerry">Kerry</option>
-                        <option value="ThaiPost">ไปรษณีย์ไทย</option>
-                      </select>
-                    </div>
-
-                    <div className="mb-3">
-                      <label className="text-sm">เลขพัสดุ</label>
-                      <input
-                        type="text"
-                        className="border w-full px-3 py-2 rounded"
-                        value={trackNo}
-                        onChange={(e) => setTrackNo(e.target.value)}
-                      />
-                    </div>
-
-                    <button
-                      onClick={saveShipping}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                    >
-                      บันทึกการจัดส่ง
-                    </button>
-                  </>
-                ) : (
-                  <p className="text-sm text-red-500">
-                    * ต้องชำระเงินก่อนถึงจะจัดส่งได้
-                  </p>
-                )}
-
-                {(data.shipping_company || data.tracking_number) && (
-                  <div className="mt-4 text-sm">
-                    <div>ขนส่ง: {data.shipping_company || "—"}</div>
-                    <div>เลขพัสดุ: {data.tracking_number || "—"}</div>
-                    <div>สถานะ: {data.shipping_status || "—"}</div>
-                  </div>
-                )}
-
-                {/* ⭐ ปุ่มแอดมินกดยืนยัน delivered */}
-                {data.shipping_status === "shipped" && (
-                  <button
-                    onClick={markDelivered}
-                    className="mt-4 bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
-                  >
-                    ✔ ปิดเป็นจัดส่งสำเร็จ (delivered)
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>

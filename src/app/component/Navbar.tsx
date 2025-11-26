@@ -6,9 +6,26 @@ import Link from 'next/link';
 import { FaHeart, FaShoppingCart } from 'react-icons/fa';
 import { usePathname } from 'next/navigation';
 
+
+interface CategoryEventDetail {
+  typeid: number | null;
+  subtypeid: number | null;
+}
+
+// ฟังก์ชันส่ง event
+const emitCategory = (detail: CategoryEventDetail) => {
+  window.dispatchEvent(
+    new CustomEvent("select-category", { detail })
+  );
+};
 const Navbar = () => {
   const [username, setUsername] = useState<string | null>(null);
   const router = useRouter();
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState("");
+
+
+
 
   const loadUser = async () => {
     const token = localStorage.getItem('token');
@@ -74,12 +91,8 @@ const Navbar = () => {
 
   const pathname = usePathname();
 
-  const isActive = (path: any) => {
-    if (path === '/products') {
-      return pathname.startsWith('/products');
-    }
-    return pathname === path;
-  };
+  const isActive = (path: string) => pathname === path;
+
 
   const activeClass = "!bg-green-100 !text-green-600 font-semibold";
   const inactiveClass = "hover:!bg-green-50 hover:!text-green-600 active:!bg-green-100 focus:!bg-green-100 focus:!text-green-600";
@@ -102,11 +115,49 @@ const Navbar = () => {
               <a className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}>
                 หมวดหมู่สินค้า
               </a>
-              <ul className="p-2">
-                <li><Link href="/products?cat=all" className={`${isActive('/products') ? activeClass : inactiveClass}`}>ทั้งหมด</Link></li>
-                <li><Link href="/products?cat=cactus" className={inactiveClass}>แคคตัส</Link></li>
-                <li><Link href="/products?cat=soil" className={inactiveClass}>ดิน</Link></li>
-              </ul>
+              <div className="flex gap-6 text-sm font-medium">
+
+                {/* หมวด 1: หนามสั้น */}
+                <button
+                  onClick={() => emitCategory({ typeid: 1, subtypeid: null })}
+                  className="hover:text-green-600"
+                >
+                  หนามสั้น
+                </button>
+
+                {/* หมวด 2: หนามยาว */}
+                <button
+                  onClick={() => emitCategory({ typeid: 2, subtypeid: null })}
+                  className="hover:text-green-600"
+                >
+                  หนามยาว
+                </button>
+
+                {/* หมวด 3: ไม้อวบน้ำ */}
+                <button
+                  onClick={() => emitCategory({ typeid: 3, subtypeid: null })}
+                  className="hover:text-green-600"
+                >
+                  ไม้อวบน้ำ
+                </button>
+
+                {/* หมวด 4: ของตกแต่งกระถาง */}
+                <button
+                  onClick={() => emitCategory({ typeid: 4, subtypeid: null })}
+                  className="hover:text-green-600"
+                >
+                  ของตกแต่ง
+                </button>
+
+                {/* หมวดพิเศษ: แสดงทั้งหมด */}
+                <button
+                  onClick={() => emitCategory({ typeid: null, subtypeid: null })}
+                  className="hover:text-green-600"
+                >
+                  สินค้าทั้งหมด
+                </button>
+              </div>
+
             </li>
             <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
             <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
@@ -139,10 +190,56 @@ const Navbar = () => {
                 หมวดหมู่สินค้า
               </summary>
               <ul className="p-2 bg-white shadow rounded-box text-xs">
-                <li><Link href="/products?cat=all" className={inactiveClass}>ทั้งหมด</Link></li>
-                <li><Link href="/products?cat=cactus" className={inactiveClass}>แคคตัส</Link></li>
-                <li><Link href="/products?cat=soil" className={inactiveClass}>ดิน</Link></li>
+
+                <li>
+                  <button
+                    onClick={() => emitCategory({ typeid: 1, subtypeid: null })}
+                    className="w-full text-left hover:text-green-600"
+                  >
+                    แคคตัสหนามสั้น
+                  </button>
+                </li>
+
+                <li>
+                  <button
+                    onClick={() => emitCategory({ typeid: 2, subtypeid: null })}
+                    className="w-full text-left hover:text-green-600"
+                  >
+                    แคคตัสหนามยาว
+                  </button>
+                </li>
+
+                <li>
+                  <button
+                    onClick={() => emitCategory({ typeid: 3, subtypeid: null })}
+                    className="w-full text-left hover:text-green-600"
+                  >
+                    ไม้อวบน้ำ
+                  </button>
+                </li>
+
+                <li>
+                  <button
+                    onClick={() => emitCategory({ typeid: 4, subtypeid: null })}
+                    className="w-full text-left hover:text-green-600"
+                  >
+                    ของตกแต่งกระถาง
+                  </button>
+                </li>
+
+                {/* ปุ่มดูทั้งหมด */}
+                <li>
+                  <button
+                    onClick={() => emitCategory({ typeid: null, subtypeid: null })}
+                    className="w-full text-left hover:text-green-600"
+                  >
+                    สินค้าทั้งหมด
+                  </button>
+                </li>
+
               </ul>
+
+
             </details>
           </li>
           <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
@@ -154,13 +251,56 @@ const Navbar = () => {
       </div>
 
       <div className="navbar-end gap-2">
-        <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
-            viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </button>
+        <div className="relative">
+
+          {/* ปุ่มค้นหา */}
+          <button
+            onClick={() => setShowSearch(prev => !prev)}
+            className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          {/* popup ค้นหา */}
+          {showSearch && (
+            <div className="absolute right-0 top-10 w-52 bg-white p-3 rounded-lg shadow-lg z-50">
+              <input
+                type="text"
+                placeholder="ค้นหา..."
+                value={searchKeyword}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchKeyword(val);
+
+                  window.dispatchEvent(
+                    new CustomEvent("do-search", { detail: val })
+                  );
+                }}
+                className="w-full border p-2 rounded-lg text-sm"
+              />
+
+
+
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("do-search", { detail: searchKeyword })
+                  );
+                  setShowSearch(false);
+                }}
+                className="mt-2 w-full bg-green-600 text-white py-1 rounded-lg text-sm"
+              >
+                ค้นหา
+              </button>
+            </div>
+          )}
+
+        </div>
+
 
         <Link href="/cart" className={`btn btn-ghost btn-circle btn-sm ${isActive('/cart') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
           <FaShoppingCart className="text-base" />
