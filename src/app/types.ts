@@ -1,5 +1,9 @@
 // src/app/types.ts
-export type Status = 'open' | 'closed';
+
+/* ===========================
+   Auction Types
+=========================== */
+export type Status = "open" | "closed";
 
 export interface Auction {
   Aid: number;
@@ -17,15 +21,12 @@ export interface Auction {
 
   seller_name?: string;
   winner_id?: number | null;
-  winner_name?: string ;
-
+  winner_name?: string;
   latest_bidder_id?: number | null;
   latest_bidder_name?: string | null;
   latest_bid_amount?: number | null;
   final_price?: number | null;
-  winnerName?: string| null;
-
-  
+  winnerName?: string | null;
 }
 
 export interface Leader {
@@ -33,4 +34,41 @@ export interface Leader {
   username: string;
   amount: number;
   created_at: string;
+}
+
+/* ===========================
+   Forum Types
+=========================== */
+
+export interface ForumQuestion {
+  Askid: number;
+  Cid: number;
+  Asktopic: string;
+  Askdetails: string;
+  Askdate: string;
+  Askvisits: number;
+  Cname: string;
+  Cprofile: string | null;
+  ReplyCount: number;
+}
+
+export interface ForumReply {
+  Replyid: number;
+  Askid: number;
+  Cid: number;
+  Replydetails: string;
+  Replydate: string;
+  Cname: string;
+  Cprofile: string | null;
+}
+
+export interface ForumTopicDetail {
+  topic: ForumQuestion;
+  comments: ForumReply[];
+}
+
+export interface UserData {
+  Cid: number;
+  Cname: string;
+  Cprofile: string | null;
 }

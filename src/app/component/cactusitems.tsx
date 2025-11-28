@@ -11,27 +11,30 @@ interface Product {
   Pname: string;
   Pprice: number;
   Ppicture: string;
-  Pnumproduct?: number; 
- 
+  Pnumproduct?: number;
+
 }
 interface Props {
   type?: "latest";
   typeid?: number;
   subtypeid?: number;
   search?: string;
+  filterFavorites?: number[];
+
 }
 interface FavoriteProduct {
   product_id: number;
 }
 
-const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
+const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props) => {
+
 
 
   const [products, setProducts] = useState<Product[]>([]);
   const [favorites, setFavorites] = useState<number[]>([]);
-  const [customerId, setCustomerId] = useState<number | null>(null);
   const [hoveredProduct, setHoveredProduct] = useState<number | null>(null);
   const router = useRouter();
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   // โหลดข้อมูลสินค้า
   useEffect(() => {
@@ -56,15 +59,27 @@ const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
       }
     };
 
-    const fetchFavorites = async (cid: number) => {
-      try {
-        const res = await fetch(`http://localhost:3000/favorites/${cid}`);
-        const data: FavoriteProduct[] = await res.json();
+    
+
+
+    const fetchFavorites = async () => {
+      const res = await fetch("http://localhost:3000/favorites", {
+        headers: {
+    "Authorization": `Bearer ${token}`,     // ⭐ เพิ่มบรรทัดนี้
+  },
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
         setFavorites(data.map((item) => item.product_id));
-      } catch (err) {
-        console.error("โหลดรายการโปรดล้มเหลว:", err);
+      } else {
+        setFavorites([]); // กัน error
       }
     };
+
+
 
     fetchProducts();
 
@@ -73,34 +88,42 @@ const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
       try {
         const parsed = JSON.parse(storedUser);
         if (parsed?.Cid) {
-          setCustomerId(parsed.Cid);
-          fetchFavorites(parsed.Cid);
+          fetchFavorites(); // ⭐ ดึงรายการโปรดได้เลย
         }
       } catch (err) {
         console.error("อ่าน user ไม่ได้:", err);
       }
     }
-}, [type, typeid, subtypeid, search]);
+
+  }, [type, typeid, subtypeid, search,token]);
+
 
 
 
   // สลับรายการโปรด
   const toggleFavorite = async (productId: number) => {
-    if (!customerId) return;
     const res = await fetch("http://localhost:3000/favorites", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customer_id: customerId, product_id: productId }),
+      headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,     // ⭐ เพิ่มบรรทัดนี้
+  },
+      
+      credentials: "include", // ⭐ สำคัญ
+      body: JSON.stringify({ product_id: productId }),
     });
+
+    const data = await res.json();
 
     if (res.ok) {
       setFavorites((prev) =>
-        prev.includes(productId)
-          ? prev.filter((id) => id !== productId)
-          : [...prev, productId]
+        data.is_favorite
+          ? [...prev, productId]
+          : prev.filter((id) => id !== productId)
       );
     }
   };
+
 
   const handleBuyNow = (product: Product) => {
     localStorage.setItem("buynow", JSON.stringify({ pid: product.Pid, qty: 1 }));
@@ -127,9 +150,18 @@ const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
     alert("เพิ่มลงตะกร้าแล้ว");
   };
 
+  // ⭐ ถ้ามี filterFavorites → กรองสินค้าเฉพาะที่ถูกใจ
+const visibleProducts = filterFavorites?.length
+  ? products.filter((p) => filterFavorites.includes(p.Pid))
+  : products;
+
+
+
+  
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 w-full">
-      {products.map((product) => {
+      {visibleProducts.map((product) => {
         const isOut = product.Pnumproduct !== undefined && product.Pnumproduct <= 0;
 
         return (
@@ -144,7 +176,10 @@ const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
 
             {/* ปุ่มรายการโปรด */}
             <button
-              onClick={() => !isOut && toggleFavorite(product.Pid)}
+              onClick={(e) => {
+                e.stopPropagation();  // ป้องกันทะลุไป Link
+                toggleFavorite(product.Pid);
+              }}
               className={`absolute top-3 right-3 z-10 p-2 rounded-full backdrop-blur-sm transition-all duration-300 
                 ${favorites.includes(product.Pid)
                   ? "bg-red-500 text-white scale-110"
@@ -166,17 +201,18 @@ const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
             <Link href={!isOut ? `/product/${product.Pid}` : "#"} className="block">
               <div className="relative overflow-hidden bg-gray-100 aspect-square">
                 {/* POPUP: หยิบใส่ตะกร้าเร็ว! */}
-{product.Pnumproduct !== undefined && product.Pnumproduct > 0 && (
-  <div
-    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 z-30
-      ${hoveredProduct === product.Pid ? "opacity-100" : "opacity-0"}
-    `}
-  >
-    <span className="bg-green-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold">
-      🛒ดูรายละเอียด
-    </span>
-  </div>
-)}
+                {product.Pnumproduct !== undefined && product.Pnumproduct > 0 && (
+                  <div
+  className={`absolute inset-0 bg-black/20 transition-opacity duration-300 
+  pointer-events-none
+  ${hoveredProduct === product.Pid ? "opacity-100" : "opacity-0"}
+`}>
+
+                    <span className="bg-green-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold">
+                      🛒ดูรายละเอียด
+                    </span>
+                  </div>
+                )}
 
 
 
@@ -227,12 +263,12 @@ const CactusItems = ({ type, typeid, subtypeid, search }: Props) => {
                 </span>
                 <span className="text-sm text-gray-500">฿</span>
               </div>{product.Pnumproduct !== undefined && (
-  <p className="text-xs text-gray-500">
-    {product.Pnumproduct > 0
-      ? `เหลือ ${product.Pnumproduct} ชิ้น`
-      : "หมดแล้ว"}
-  </p>
-)}
+                <p className="text-xs text-gray-500">
+                  {product.Pnumproduct > 0
+                    ? `เหลือ ${product.Pnumproduct} ชิ้น`
+                    : "หมดแล้ว"}
+                </p>
+              )}
 
 
               {/* ปุ่ม */}

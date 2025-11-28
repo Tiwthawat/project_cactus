@@ -14,6 +14,10 @@ const HomePage = () => {
   const [keyword, setKeyword] = useState("");
   const [selectedType, setSelectedType] = useState<number | null>(null);
 const [selectedSubtype, setSelectedSubtype] = useState<number | null>(null);
+const [showFavorites, setShowFavorites] = useState(false);
+const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
 
 useEffect(() => {
   const handleCategory = (e: Event) => {
@@ -48,6 +52,38 @@ useEffect(() => {
     }
   };
 
+useEffect(() => {
+  const handleShowFavorites = async () => {
+    // reset ทุก state ก่อน
+    setKeyword("");
+    setSelectedType(null);
+    setSelectedSubtype(null);
+    setShowFavorites(false); // reset ก่อนเพื่อบังคับ re-render
+
+    if (!token) {
+      alert("กรุณาเข้าสู่ระบบก่อนดูรายการโปรด ❤️");
+      return;
+    }
+
+    const res = await fetch("http://localhost:3000/favorites", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      setFavoriteIds(data.map((item: any) => item.product_id));
+
+      // ⭐⭐⭐ สำคัญมาก — ต้อง delay setShowFavorites
+      setTimeout(() => setShowFavorites(true), 0);
+    }
+  };
+
+  window.addEventListener("show-favorites", handleShowFavorites);
+  return () => window.removeEventListener("show-favorites", handleShowFavorites);
+}, [token]);
+
+
+
   useEffect(() => {
     if (localStorage.getItem('token')) loadUser();
     window.addEventListener('login-success', loadUser);
@@ -80,8 +116,16 @@ useEffect(() => {
 
       <main className="mt-16 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
 
-  {/* 1) ถ้าค้นหา */}
-  {keyword ? (
+        
+
+  {/* ❤️ ถ้าเลือกดูเฉพาะสินค้าที่ถูกใจ */}
+{showFavorites ? (
+  <>
+    <h2 className="text-2xl font-semibold mb-4">❤️ รายการโปรดของคุณ</h2>
+    <CactusItems filterFavorites={favoriteIds} />
+  </>
+) : keyword ? (
+
     <>
       <h2 className="text-2xl font-semibold mb-4">🔍 ผลการค้นหา: {keyword}</h2>
       <CactusItems search={keyword} />

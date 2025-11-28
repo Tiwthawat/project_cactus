@@ -144,7 +144,7 @@ export default function MePage() {
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-semibold border-b pb-2 mb-3">เมนูการใช้งาน</h2>
           <ul className="space-y-1 text-sm text-gray-800 list-disc list-inside">
-            <Link href="/favorites" className="text-blue-600">🤍 รายการโปรด</Link>
+            
 
             
             <li>

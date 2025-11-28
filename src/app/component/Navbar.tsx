@@ -162,6 +162,12 @@ const Navbar = () => {
             <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
             <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
             <li><Link href="/FAQ" className={`${isActive('/FAQ') ? activeClass : inactiveClass}`}>คำถามที่พบบ่อย</Link></li>
+            <li>
+              <Link href="/forum" className={`${isActive('/forum') ? activeClass : inactiveClass}`}>
+                กระทู้
+              </Link>
+            </li>
+
             <li><Link href="/Insurance" className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}>การรับประกันสินค้า</Link></li>
             <li><Link href="/About" className={`${isActive('/About') ? activeClass : inactiveClass}`}>รีวิวเกี่ยวกับเรา</Link></li>
             {username ? (
@@ -246,6 +252,12 @@ const Navbar = () => {
           <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
           <li><Link href="/FAQ" className={`${isActive('/FAQ') ? activeClass : inactiveClass}`}>คำถามที่พบบ่อย</Link></li>
           <li><Link href="/Insurance" className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}>การรับประกันสินค้า</Link></li>
+          <li>
+            <Link href="/forum" className={`${isActive('/forum') ? activeClass : inactiveClass}`}>
+              กระทู้
+            </Link>
+          </li>
+
           <li><Link href="/About" className={`${isActive('/About') ? activeClass : inactiveClass}`}>รีวิวเกี่ยวกับเรา</Link></li>
         </ul>
       </div>
@@ -305,9 +317,17 @@ const Navbar = () => {
         <Link href="/cart" className={`btn btn-ghost btn-circle btn-sm ${isActive('/cart') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
           <FaShoppingCart className="text-base" />
         </Link>
-        <Link href="/favorites" className={`btn btn-ghost btn-circle btn-sm ${isActive('/favorites') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
-          <FaHeart className="text-base" />
-        </Link>
+        <Link
+  href="#"
+  onClick={(e) => {
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent("show-favorites"));
+  }}
+  className={`btn btn-ghost btn-circle btn-sm ${isActive('/favorites') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}
+>
+  <FaHeart className="text-base" />
+</Link>
+
 
         <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">
           <div className="indicator">
