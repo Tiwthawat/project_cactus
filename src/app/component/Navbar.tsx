@@ -5,6 +5,7 @@ import { TbBellRingingFilled } from 'react-icons/tb';
 import Link from 'next/link';
 import { FaHeart, FaShoppingCart } from 'react-icons/fa';
 import { usePathname } from 'next/navigation';
+import { useCart } from '../context/CartContext';
 
 
 interface CategoryEventDetail {
@@ -23,6 +24,7 @@ const Navbar = () => {
   const router = useRouter();
   const [showSearch, setShowSearch] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const { cartCount } = useCart();
 
 
 
@@ -315,18 +317,25 @@ const Navbar = () => {
 
 
         <Link href="/cart" className={`btn btn-ghost btn-circle btn-sm ${isActive('/cart') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
-          <FaShoppingCart className="text-base" />
+          <div className="indicator">
+            <FaShoppingCart className="text-base" />
+            {cartCount > 0 && (
+              <span className="badge badge-sm badge-error indicator-item text-white text-[10px] h-4 w-4 p-0 flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </div>
         </Link>
         <Link
-  href="#"
-  onClick={(e) => {
-    e.preventDefault();
-    window.dispatchEvent(new CustomEvent("show-favorites"));
-  }}
-  className={`btn btn-ghost btn-circle btn-sm ${isActive('/favorites') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}
->
-  <FaHeart className="text-base" />
-</Link>
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent("show-favorites"));
+          }}
+          className={`btn btn-ghost btn-circle btn-sm ${isActive('/favorites') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}
+        >
+          <FaHeart className="text-base" />
+        </Link>
 
 
         <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">

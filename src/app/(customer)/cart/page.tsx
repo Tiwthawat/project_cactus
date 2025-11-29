@@ -1,6 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useCart } from '../../context/CartContext';
 
 interface CartItem {
   Pid: number;
@@ -28,27 +29,28 @@ const API = process.env.NEXT_PUBLIC_API_BASE as string;
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const router = useRouter();
+  const { refreshCart } = useCart();
   // ใน component CartPage
-const [auctionOrders, setAuctionOrders] = useState<AuctionOrderLite[]>([]);
-const [loadingAuctions, setLoadingAuctions] = useState<boolean>(true);
+  const [auctionOrders, setAuctionOrders] = useState<AuctionOrderLite[]>([]);
+  const [loadingAuctions, setLoadingAuctions] = useState<boolean>(true);
 
-useEffect(() => {
-  // โหลดออเดอร์ประมูลที่ยังไม่ชำระของผู้ใช้ที่ล็อกอิน
-  const loadAuctionOrders = async () => {
-    try {
-      setLoadingAuctions(true);
-      const res = await fetch(`${API}/my/auction-orders?status=pending`, { cache: 'no-store', credentials: 'include' });
-      if (!res.ok) throw new Error('load auction orders failed');
-      const rows: AuctionOrderLite[] = await res.json();
-      setAuctionOrders(Array.isArray(rows) ? rows : []);
-    } catch {
-      setAuctionOrders([]);
-    } finally {
-      setLoadingAuctions(false);
-    }
-  };
-  loadAuctionOrders();
-}, []);
+  useEffect(() => {
+    // โหลดออเดอร์ประมูลที่ยังไม่ชำระของผู้ใช้ที่ล็อกอิน
+    const loadAuctionOrders = async () => {
+      try {
+        setLoadingAuctions(true);
+        const res = await fetch(`${API}/my/auction-orders?status=pending`, { cache: 'no-store', credentials: 'include' });
+        if (!res.ok) throw new Error('load auction orders failed');
+        const rows: AuctionOrderLite[] = await res.json();
+        setAuctionOrders(Array.isArray(rows) ? rows : []);
+      } catch {
+        setAuctionOrders([]);
+      } finally {
+        setLoadingAuctions(false);
+      }
+    };
+    loadAuctionOrders();
+  }, []);
 
 
   useEffect(() => {
@@ -60,6 +62,7 @@ useEffect(() => {
     const newCart = cartItems.filter(item => item.Pid !== Pid);
     setCartItems(newCart);
     localStorage.setItem('cart', JSON.stringify(newCart));
+    refreshCart();
   };
 
   const updateQuantity = (Pid: number, delta: number) => {
@@ -70,6 +73,7 @@ useEffect(() => {
     );
     setCartItems(newCart);
     localStorage.setItem('cart', JSON.stringify(newCart));
+    refreshCart();
   };
 
   const totalPrice = cartItems.reduce((sum, item) => sum + item.Pprice * item.quantity, 0);
@@ -87,73 +91,73 @@ useEffect(() => {
       <div className="p-10 pt-40 max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-6">ตะกร้าสินค้า</h1>
         <div className="border-2 border-yellow-400 bg-yellow-100 rounded-xl p-4 mb-6 flex items-center gap-4">
-  <span className="text-2xl">🚚</span>
-  <div className="text-sm text-gray-800 leading-snug">
-    <p>🟡 <b>ค่าจัดส่งเหมาจ่าย 50 บาท</b></p>
-    <p>💚 สั่งซื้อครบ <b className="text-green-600">1,000 บาท</b> ขึ้นไป <span className="font-bold text-green-700">ส่งฟรี!</span></p>
-  </div>
-</div>{/* กล่อง: คุณมีรายการประมูลที่ค้างชำระ */}
-<div className="max-w-4xl mx-auto mt-4">
-  <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
-    <div className="flex items-center gap-3 mb-2">
-      <span className="text-2xl">🔔</span>
-      <h2 className="text-lg font-semibold text-indigo-900">
-        รายการประมูลที่ยังไม่ได้ชำระ
-      </h2>
-    </div>
-
-    {loadingAuctions ? (
-      <p className="text-sm text-gray-600">กำลังโหลด...</p>
-    ) : auctionOrders.length === 0 ? (
-      <p className="text-sm text-gray-600">ไม่มีรายการค้างชำระจากประมูล</p>
-    ) : (
-      <div className="space-y-3">
-        {auctionOrders.map(o => (
-          <div key={o.orderId} className="flex items-center justify-between bg-white border rounded-lg p-3">
-            <div className="flex items-center gap-3">
-              <img
-                src={`${API}${o.productPicture?.startsWith('/') ? '' : '/'}${o.productPicture}`}
-                alt={o.productName}
-                className="w-14 h-14 object-cover rounded"
-              />
-              <div>
-                <div className="font-medium">{o.productName}</div>
-                <div className="text-sm text-gray-600">
-                  ราคาปิด: {o.finalPrice.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
-                </div>
-                <div className="text-xs text-gray-500">
-                  เลขออเดอร์ #{o.orderId} • รอบ #{o.auctionId}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 border border-amber-200">
-                รอชำระเงิน
-              </span>
-              <button
-                onClick={() => {
-                  // ไปหน้า payment/checkout เดิม พร้อมระบุ order
-                  // เลือกใช้ตามระบบที่มีอยู่: /payment?order= หรือ /orders/[id]
-                  // ตัวอย่าง:
-                  router.push(`/payment?order=${o.orderId}`);
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded"
-              >
-                ไปชำระเงิน
-              </button>
-            </div>
+          <span className="text-2xl">🚚</span>
+          <div className="text-sm text-gray-800 leading-snug">
+            <p>🟡 <b>ค่าจัดส่งเหมาจ่าย 50 บาท</b></p>
+            <p>💚 สั่งซื้อครบ <b className="text-green-600">1,000 บาท</b> ขึ้นไป <span className="font-bold text-green-700">ส่งฟรี!</span></p>
           </div>
-        ))}
-      </div>
-    )}
+        </div>{/* กล่อง: คุณมีรายการประมูลที่ค้างชำระ */}
+        <div className="max-w-4xl mx-auto mt-4">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">🔔</span>
+              <h2 className="text-lg font-semibold text-indigo-900">
+                รายการประมูลที่ยังไม่ได้ชำระ
+              </h2>
+            </div>
 
-    {/* หมายเหตุเล็ก ๆ เพื่อความชัดเจนว่าไม่รวมกับตะกร้า */}
-    <p className="text-xs text-gray-500 mt-2">
-      * ยอดจากประมูลจะแยกชำระต่างหาก และไม่รวมกับยอดในตะกร้าสินค้าทั่วไป
-    </p>
-  </div>
-</div>
+            {loadingAuctions ? (
+              <p className="text-sm text-gray-600">กำลังโหลด...</p>
+            ) : auctionOrders.length === 0 ? (
+              <p className="text-sm text-gray-600">ไม่มีรายการค้างชำระจากประมูล</p>
+            ) : (
+              <div className="space-y-3">
+                {auctionOrders.map(o => (
+                  <div key={o.orderId} className="flex items-center justify-between bg-white border rounded-lg p-3">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={`${API}${o.productPicture?.startsWith('/') ? '' : '/'}${o.productPicture}`}
+                        alt={o.productName}
+                        className="w-14 h-14 object-cover rounded"
+                      />
+                      <div>
+                        <div className="font-medium">{o.productName}</div>
+                        <div className="text-sm text-gray-600">
+                          ราคาปิด: {o.finalPrice.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          เลขออเดอร์ #{o.orderId} • รอบ #{o.auctionId}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                        รอชำระเงิน
+                      </span>
+                      <button
+                        onClick={() => {
+                          // ไปหน้า payment/checkout เดิม พร้อมระบุ order
+                          // เลือกใช้ตามระบบที่มีอยู่: /payment?order= หรือ /orders/[id]
+                          // ตัวอย่าง:
+                          router.push(`/payment?order=${o.orderId}`);
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded"
+                      >
+                        ไปชำระเงิน
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* หมายเหตุเล็ก ๆ เพื่อความชัดเจนว่าไม่รวมกับตะกร้า */}
+            <p className="text-xs text-gray-500 mt-2">
+              * ยอดจากประมูลจะแยกชำระต่างหาก และไม่รวมกับยอดในตะกร้าสินค้าทั่วไป
+            </p>
+          </div>
+        </div>
 
 
 
@@ -211,7 +215,7 @@ useEffect(() => {
             ))}
 
 
-           
+
 
 
 
