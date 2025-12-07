@@ -15,6 +15,7 @@ interface UserInfo {
   Cstatus: string;
   Cdate: string;
   Cbirth: string;
+  Cprofile: string | null;
 }
 
 interface Props {
@@ -31,25 +32,27 @@ export default function EditProfileModal({ user, onClose }: Props) {
     Cdistrict: user.Cdistrict,
     Cprovince: user.Cprovince,
     Czipcode: user.Czipcode,
+    Cprofile: user.Cprofile || null,
   });
+
   const [profileFile, setProfileFile] = useState<File | null>(null);
-const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (file) {
-    setProfileFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-  }
-};
+    const file = e.target.files?.[0];
+    if (file) {
+      setProfileFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
 
   useEffect(() => {
     const fetchAddress = async () => {
-      
       if ((formData.Czipcode ?? '').length === 5) {
         try {
           const res = await fetch(`http://localhost:3000/zipcode/${formData.Czipcode}`);
@@ -62,171 +65,116 @@ const [previewUrl, setPreviewUrl] = useState<string | null>(null);
               Cprovince: data.province || '',
             }));
           }
-        } catch (error) {
-          console.error('❌ โหลดที่อยู่ไม่สำเร็จ:', error);
+        } catch (err) {
+          console.error("โหลดข้อมูลที่อยู่ล้มเหลว", err);
         }
       }
     };
-
     fetchAddress();
   }, [formData.Czipcode]);
 
   const handleSubmit = async () => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    alert('กรุณาเข้าสู่ระบบอีกครั้ง');
-    return;
-  }
+    const token = localStorage.getItem('token');
+    if (!token) return alert("กรุณาเข้าสู่ระบบใหม่");
 
-  try {
     const form = new FormData();
-    form.append('Cid', user.Cid.toString());
-    form.append('Cname', formData.Cname);
-    form.append('Cphone', formData.Cphone);
-    form.append('Caddress', formData.Caddress);
-    form.append('Csubdistrict', formData.Csubdistrict);
-    form.append('Cdistrict', formData.Cdistrict);
-    form.append('Cprovince', formData.Cprovince);
-    form.append('Czipcode', formData.Czipcode);
-    if (profileFile) {
-  form.append('profile', profileFile);
-}
+    form.append("Cid", user.Cid.toString());
+    form.append("Cname", formData.Cname);
+    form.append("Cphone", formData.Cphone);
+    form.append("Caddress", formData.Caddress);
+    form.append("Csubdistrict", formData.Csubdistrict);
+    form.append("Cdistrict", formData.Cdistrict);
+    form.append("Cprovince", formData.Cprovince);
+    form.append("Czipcode", formData.Czipcode);
 
+    if (profileFile) form.append("profile", profileFile);
 
-    const res = await fetch('http://localhost:3000/update', {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await fetch("http://localhost:3000/update", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
       body: form,
     });
 
     if (res.ok) {
-      alert('อัปเดตสำเร็จ');
+      alert("อัปเดตสำเร็จ");
       onClose();
       location.reload();
     } else {
-      alert('อัปเดตไม่สำเร็จ');
+      alert("อัปเดตไม่สำเร็จ");
     }
-  } catch (err) {
-    console.error(err);
-    alert('เกิดข้อผิดพลาด');
-  }
-};
-
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-xl shadow w-full max-w-2xl relative">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl p-8 relative animate-fadeIn">
+
         {/* ปุ่มปิด */}
         <button
-          className="absolute top-2 right-3 text-xl font-bold text-gray-700 hover:text-red-500"
+          className="absolute top-4 right-4 text-gray-600 hover:text-red-500 text-3xl font-bold"
           onClick={onClose}
         >
           ×
         </button>
 
-        <h2 className="text-lg font-semibold  text-black mb-4">แก้ไขข้อมูลส่วนตัว</h2>
+        <h2 className="text-2xl font-bold text-emerald-700 mb-6 text-center">
+          ✏️ แก้ไขข้อมูลส่วนตัว
+        </h2>
 
-        {/* ฟอร์ม */}
-        <div className="col-span-2">
-  <label className="block text-sm font-medium text-gray-700 mb-1">รูปโปรไฟล์</label>
-  <input
-    type="file"
-    accept="image/*"
-    onChange={handleProfileChange}
-    className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-  />
-  {previewUrl && (
-    <img
-      src={previewUrl}
-      alt="Preview"
-      className="mt-2 w-28 h-28 object-cover rounded-full border"
-    />
-  )}
-</div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล</label>
-            <input
-              name="Cname"
-              value={formData.Cname}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
+        {/* รูปโปรไฟล์ */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-32 h-32 rounded-full overflow-hidden shadow-lg ring-4 ring-emerald-200">
+            <img
+              src={previewUrl || (user.Cprofile ? `http://localhost:3000/profiles/${user.Cprofile}` : `/default-profile.png`)}
+              alt="Profile"
+              className="w-full h-full object-cover"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์</label>
-            <input
-              name="Cphone"
-              value={formData.Cphone}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">บ้านเลขที่</label>
-            <input
-              name="Caddress"
-              value={formData.Caddress}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">รหัสไปรษณีย์</label>
-            <input
-              name="Czipcode"
-              value={formData.Czipcode}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ตำบล</label>
-            <input
-              name="Csubdistrict"
-              value={formData.Csubdistrict}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">อำเภอ</label>
-            <input
-              name="Cdistrict"
-              value={formData.Cdistrict}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">จังหวัด</label>
-            <input
-              name="Cprovince"
-              value={formData.Cprovince}
-              onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded bg-white text-black"
-            />
-          </div>
+          <label className="mt-4 cursor-pointer bg-emerald-600 text-white px-4 py-2 rounded-lg shadow hover:bg-emerald-700 transition">
+            เปลี่ยนรูปโปรไฟล์
+            <input type="file" accept="image/*" onChange={handleProfileChange} className="hidden" />
+          </label>
         </div>
 
+        {/* ฟอร์มข้อมูล */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        <div className="mt-6 text-right">
+          {[
+            { label: "ชื่อ-นามสกุล", name: "Cname" },
+            { label: "เบอร์โทรศัพท์", name: "Cphone" },
+            { label: "บ้านเลขที่", name: "Caddress" },
+            { label: "รหัสไปรษณีย์", name: "Czipcode" },
+            { label: "ตำบล", name: "Csubdistrict" },
+            { label: "อำเภอ", name: "Cdistrict" },
+            { label: "จังหวัด", name: "Cprovince" },
+          ].map((field) => (
+            <div key={field.name}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {field.label}
+              </label>
+              <input
+                name={field.name}
+                value={(formData as any)[field.name]}
+                onChange={handleChange}
+                className="w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 
+                focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 transition"
+              />
+            </div>
+          ))}
+
+        </div>
+
+        {/* ปุ่มบันทึก */}
+        <div className="mt-8 text-center">
           <button
             onClick={handleSubmit}
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            className="w-full md:w-1/2 bg-emerald-600 text-white py-3 rounded-xl shadow 
+            font-semibold hover:bg-emerald-700 transition text-lg"
           >
-            บันทึกการเปลี่ยนแปลง
+            บันทึก
           </button>
         </div>
+
       </div>
     </div>
   );

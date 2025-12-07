@@ -117,8 +117,7 @@ const Navbar = () => {
               <a className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}>
                 หมวดหมู่สินค้า
               </a>
-              <div className="flex gap-6 text-sm font-medium">
-
+              <div className="flex flex-col items-start gap-4 text-sm font-medium pl-4">
                 {/* หมวด 1: หนามสั้น */}
                 <button
                   onClick={() => emitCategory({ typeid: 1, subtypeid: null })}
@@ -172,7 +171,7 @@ const Navbar = () => {
 
             <li><Link href="/Insurance" className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}>การรับประกันสินค้า</Link></li>
             <li><Link href="/About" className={`${isActive('/About') ? activeClass : inactiveClass}`}>รีวิวเกี่ยวกับเรา</Link></li>
-            {username ? (
+            {/* {username ? (
               <>
                 <li><Link href="/me" className={`${isActive('/me') ? activeClass : inactiveClass}`}>{username}</Link></li>
                 <li><button onClick={handleLogout} className={inactiveClass}>ออกจากระบบ</button></li>
@@ -182,7 +181,7 @@ const Navbar = () => {
                 <li><Link href="/login" className={`${isActive('/login') ? activeClass : inactiveClass}`}>เข้าสู่ระบบ</Link></li>
                 <li><Link href="/register" className={`${isActive('/register') ? activeClass : inactiveClass}`}>สมัครสมาชิก</Link></li>
               </>
-            )}
+            )} */}
           </ul>
         </div>
         <Link href="/" className="btn btn-ghost btn-sm hover:bg-green-50">
@@ -347,19 +346,63 @@ const Navbar = () => {
 
         {username ? (
           <div className="dropdown dropdown-end">
-            <label tabIndex={0} className={`btn btn-ghost btn-sm text-xs ${isActive('/me') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
+            <label
+              tabIndex={0}
+              className={`btn btn-ghost btn-sm text-xs px-3 py-2 rounded-lg 
+      ${isActive('/me')
+                  ? 'bg-green-100 text-green-600 shadow-sm'
+                  : 'hover:bg-green-50 hover:text-green-600'}`}
+            >
               {username}
             </label>
+
             <ul
               tabIndex={0}
-              className="dropdown-content bg-white rounded-box shadow w-40 p-2 text-xs"
+              className="
+        dropdown-content 
+        mt-2 
+        bg-white 
+        rounded-xl 
+        shadow-lg 
+        w-44 
+        p-2 
+        text-sm 
+        space-y-1
+        border border-gray-100
+      "
             >
-              <li><Link href="/me" className={`${isActive('/me') ? activeClass : inactiveClass}`}>โปรไฟล์</Link></li>
-              <li><button onClick={handleLogout} className={inactiveClass}>ออกจากระบบ</button></li>
+              <li>
+                <Link
+                  href="/me"
+                  className={`${isActive('/me')
+                    ? 'text-green-600 font-medium rounded-lg px-3 py-2'
+                    : 'hover:bg-gray-100 rounded-lg px-3 py-2'
+                    }`}
+                >
+                  โปรไฟล์
+                </Link>
+              </li>
+
+              <li>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left hover:bg-red-50 text-red-600 rounded-lg px-3 py-2"
+                >
+                  ออกจากระบบ
+                </button>
+              </li>
             </ul>
           </div>
         ) : (
-          <Link href="/login" className={`text-xs border-[#e5e5e5] px-4 py-2 rounded-lg transition-colors ${isActive('/login') ? 'text-green-600 border-green-600 bg-green-50' : 'text-black hover:text-green-600 hover:border-green-600'}`}>
+          <Link
+            href="/login"
+            className={`
+      text-xs px-4 py-2 rounded-lg border transition 
+      ${isActive('/login')
+                ? 'text-green-600 border-green-600 bg-green-50'
+                : 'text-black border-gray-300 hover:text-green-600 hover:border-green-600'}
+    `}
+          >
             เข้าสู่ระบบ
           </Link>
         )}

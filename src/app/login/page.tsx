@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Navbar from '../component/Navbar';
 import Navigation from '../component/Navigation';
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 export default function Login() {
   const router = useRouter();
@@ -24,6 +25,10 @@ export default function Login() {
   const [confirmPass, setConfirmPass] = useState("");
 
   const [resetToken, setResetToken] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   // -------------------------
   // ลืมรหัสผ่าน step1
@@ -137,17 +142,23 @@ export default function Login() {
   return (
     <>
       <Navbar />
-      {/* <Navigation /> */}
 
-      <div className="min-h-screen pt-48 bg-white flex flex-col justify-start items-center">
-        <div className="w-full max-w-xs bg-white border border-gray-300 rounded-xl shadow-md p-6">
-          <h1 className="text-xl font-bold text-center mb-6 text-green-600">
-            เข้าสู่ระบบ
-          </h1>
+      <div className="min-h-screen pt-40 bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col justify-start items-center px-4">
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-emerald-200">
+
+          <div className="text-center mb-8">
+            <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+              ยินดีต้อนรับกลับมา
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              เข้าสู่ระบบ
+            </h1>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 ชื่อผู้ใช้ (Username)
               </label>
               <input
@@ -155,26 +166,37 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block bg-white w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 รหัสผ่าน
               </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block bg-white w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
+
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm 
+      focus:ring-2 focus:ring-emerald-500 outline-none pr-12"
+                />
+
+                <span
+                  className="absolute inset-y-0 right-4 flex items-center cursor-pointer text-gray-500"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition"
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-semibold shadow-lg hover:opacity-90 transition"
             >
               เข้าสู่ระบบ
             </button>
@@ -182,10 +204,18 @@ export default function Login() {
             <button
               type="button"
               onClick={() => setShowForgot(true)}
-              className="text-sm text-blue-600 hover:underline text-right w-full mt-2"
+              className="text-sm text-emerald-700 hover:underline text-right w-full mt-2"
             >
               ลืมรหัสผ่าน?
             </button>
+
+            {/* REGISTER BUTTON */}
+            <a
+              href="/register"
+              className="block w-full text-center bg-white text-green-600 py-3 rounded-xl font-semibold border border-green-500 hover:bg-green-50 transition"
+            >
+              สมัครสมาชิก
+            </a>
           </form>
         </div>
       </div>
@@ -195,7 +225,7 @@ export default function Login() {
       ------------------------------ */}
       {showForgot && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-80 relative animate-fadeIn">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-80 relative animate-fadeIn border border-emerald-200">
 
             <button
               className="absolute top-2 right-2 text-gray-400 hover:text-black"
@@ -204,30 +234,45 @@ export default function Login() {
               ✕
             </button>
 
-            <h2 className="text-lg font-bold mb-4 text-green-700">ลืมรหัสผ่าน</h2>
+            <h2 className="text-lg font-bold mb-4 text-green-700">
+              ลืมรหัสผ่าน
+            </h2>
 
-            <input
-              type="text"
-              placeholder="ชื่อผู้ใช้"
-              value={fpUsername}
-              onChange={(e) => setFpUsername(e.target.value)}
-              className="w-full border p-2 rounded mb-3"
-            />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ชื่อผู้ใช้
+              </label>
+              <input
+                type="text"
+                placeholder="ชื่อผู้ใช้"
+                value={fpUsername}
+                onChange={(e) => setFpUsername(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm 
+    focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
 
-            <input
-              type="text"
-              placeholder="เบอร์โทร"
-              value={fpPhone}
-              onChange={(e) => setFpPhone(e.target.value)}
-              className="w-full border p-2 rounded mb-3"
-            />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                เบอร์โทร
+              </label>
+              <input
+                type="text"
+                placeholder="เบอร์โทร"
+                value={fpPhone}
+                onChange={(e) => setFpPhone(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm 
+    focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
 
             <button
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 rounded-xl shadow hover:opacity-90"
               onClick={handleForgotSubmit}
-              className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
             >
               ยืนยัน
             </button>
+
           </div>
         </div>
       )}
@@ -237,7 +282,7 @@ export default function Login() {
       ------------------------------ */}
       {showReset && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-80 relative animate-fadeIn">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-80 relative animate-fadeIn border border-emerald-200">
 
             <button
               className="absolute top-2 right-2 text-gray-400 hover:text-black"
@@ -250,32 +295,66 @@ export default function Login() {
               ตั้งรหัสผ่านใหม่
             </h2>
 
-            <input
-              type="password"
-              placeholder="รหัสผ่านใหม่"
-              value={newPass}
-              onChange={(e) => setNewPass(e.target.value)}
-              className="w-full border p-2 rounded mb-3"
-            />
+            {/* New Password */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                รหัสผ่านใหม่
+              </label>
 
-            <input
-              type="password"
-              placeholder="ยืนยันรหัสผ่าน"
-              value={confirmPass}
-              onChange={(e) => setConfirmPass(e.target.value)}
-              className="w-full border p-2 rounded mb-3"
-            />
+              <div className="relative">
+                <input
+                  type={showNewPass ? "text" : "password"}
+                  placeholder="รหัสผ่านใหม่"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm 
+      focus:ring-2 focus:ring-emerald-500 outline-none pr-12"
+                />
+
+                <span
+                  className="absolute inset-y-0 right-4 flex items-center cursor-pointer text-gray-500"
+                  onClick={() => setShowNewPass(!showNewPass)}
+                >
+                  {showNewPass ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ยืนยันรหัสผ่าน
+              </label>
+
+              <div className="relative">
+                <input
+                  type={showConfirmPass ? "text" : "password"}
+                  placeholder="ยืนยันรหัสผ่าน"
+                  value={confirmPass}
+                  onChange={(e) => setConfirmPass(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm 
+      focus:ring-2 focus:ring-emerald-500 outline-none pr-12"
+                />
+
+                <span
+                  className="absolute inset-y-0 right-4 flex items-center cursor-pointer text-gray-500"
+                  onClick={() => setShowConfirmPass(!showConfirmPass)}
+                >
+                  {showConfirmPass ? <FaEyeSlash /> : <FaEye />}
+                </span>
+              </div>
+            </div>
 
             <button
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 rounded-xl shadow hover:opacity-90"
               onClick={handleResetPassword}
-              className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
             >
               เปลี่ยนรหัสผ่าน
             </button>
+
           </div>
         </div>
       )}
-
     </>
   );
 }
