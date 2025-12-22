@@ -87,76 +87,91 @@ export default function CartPage() {
 
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      <div className="p-10 pt-40 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">ตะกร้าสินค้า</h1>
-        <div className="border-2 border-yellow-400 bg-yellow-100 rounded-xl p-4 mb-6 flex items-center gap-4">
-          <span className="text-2xl">🚚</span>
-          <div className="text-sm text-gray-800 leading-snug">
-            <p>🟡 <b>ค่าจัดส่งเหมาจ่าย 50 บาท</b></p>
-            <p>💚 สั่งซื้อครบ <b className="text-green-600">1,000 บาท</b> ขึ้นไป <span className="font-bold text-green-700">ส่งฟรี!</span></p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
+      <div className="p-6 pt-32 max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+            รายการสินค้าของคุณ
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
+            ตะกร้าสินค้า
+          </h1>
+        </div>
+
+        {/* Shipping Info Card */}
+        <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 rounded-2xl p-6 mb-8 shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-2xl shadow-md">
+              🚚
+            </div>
+            <div className="flex-1">
+              <p className="text-gray-800 font-semibold mb-1">🟡 ค่าจัดส่งเหมาจ่าย 50 บาท</p>
+              <p className="text-gray-700">💚 สั่งซื้อครบ <span className="font-bold text-green-600">1,000 บาท</span> ขึ้นไป <span className="font-bold text-green-700">ส่งฟรี!</span></p>
+            </div>
           </div>
         </div>{/* กล่อง: คุณมีรายการประมูลที่ค้างชำระ */}
-        <div className="max-w-4xl mx-auto mt-4">
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl">🔔</span>
-              <h2 className="text-lg font-semibold text-indigo-900">
-                รายการประมูลที่ยังไม่ได้ชำระ
-              </h2>
+        {/* Auction Orders Section */}
+        <div className="bg-white rounded-2xl shadow-lg border-2 border-indigo-200 p-6 mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-2xl shadow-md">
+              🔔
             </div>
+            <h2 className="text-xl font-bold text-gray-800">
+              รายการประมูลที่ยังไม่ได้ชำระ
+            </h2>
+          </div>
 
-            {loadingAuctions ? (
-              <p className="text-sm text-gray-600">กำลังโหลด...</p>
-            ) : auctionOrders.length === 0 ? (
-              <p className="text-sm text-gray-600">ไม่มีรายการค้างชำระจากประมูล</p>
-            ) : (
-              <div className="space-y-3">
-                {auctionOrders.map(o => (
-                  <div key={o.orderId} className="flex items-center justify-between bg-white border rounded-lg p-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={`${API}${o.productPicture?.startsWith('/') ? '' : '/'}${o.productPicture}`}
-                        alt={o.productName}
-                        className="w-14 h-14 object-cover rounded"
-                      />
-                      <div>
-                        <div className="font-medium">{o.productName}</div>
-                        <div className="text-sm text-gray-600">
-                          ราคาปิด: {o.finalPrice.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          เลขออเดอร์ #{o.orderId} • รอบ #{o.auctionId}
-                        </div>
+          {loadingAuctions ? (
+            <p className="text-sm text-gray-600">กำลังโหลด...</p>
+          ) : auctionOrders.length === 0 ? (
+            <p className="text-sm text-gray-600">ไม่มีรายการค้างชำระจากประมูล</p>
+          ) : (
+            <div className="space-y-4">
+              {auctionOrders.map(o => (
+                <div key={o.orderId} className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-300 hover:shadow-md transition-all duration-300">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={`${API}${o.productPicture?.startsWith('/') ? '' : '/'}${o.productPicture}`}
+                      alt={o.productName}
+                      className="w-16 h-16 object-cover rounded-lg shadow-sm"
+                    />
+                    <div>
+                      <div className="font-medium">{o.productName}</div>
+                      <div className="text-sm text-gray-600">
+                        ราคาปิด: {o.finalPrice.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        เลขออเดอร์ #{o.orderId} • รอบ #{o.auctionId}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 border border-amber-200">
-                        รอชำระเงิน
-                      </span>
-                      <button
-                        onClick={() => {
-                          // ไปหน้า payment/checkout เดิม พร้อมระบุ order
-                          // เลือกใช้ตามระบบที่มีอยู่: /payment?order= หรือ /orders/[id]
-                          // ตัวอย่าง:
-                          router.push(`/payment?order=${o.orderId}`);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded"
-                      >
-                        ไปชำระเงิน
-                      </button>
-                    </div>
                   </div>
-                ))}
-              </div>
-            )}
 
-            {/* หมายเหตุเล็ก ๆ เพื่อความชัดเจนว่าไม่รวมกับตะกร้า */}
-            <p className="text-xs text-gray-500 mt-2">
-              * ยอดจากประมูลจะแยกชำระต่างหาก และไม่รวมกับยอดในตะกร้าสินค้าทั่วไป
-            </p>
-          </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                      รอชำระเงิน
+                    </span>
+                    <button
+                      onClick={() => {
+                        // ไปหน้า payment/checkout เดิม พร้อมระบุ order
+                        // เลือกใช้ตามระบบที่มีอยู่: /payment?order= หรือ /orders/[id]
+                        // ตัวอย่าง:
+                        router.push(`/payment?order=${o.orderId}`);
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded"
+                    >
+                      ไปชำระเงิน
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* หมายเหตุเล็ก ๆ เพื่อความชัดเจนว่าไม่รวมกับตะกร้า */}
+          <p className="text-sm text-gray-600 mt-4 bg-gray-50 p-3 rounded-lg">
+            💡 ยอดจากประมูลจะแยกชำระต่างหาก และไม่รวมกับยอดในตะกร้าสินค้าทั่วไป
+          </p>
         </div>
 
 
@@ -165,73 +180,87 @@ export default function CartPage() {
 
         {cartItems.length === 0 ? (
           <div className="flex justify-center items-center min-h-[400px]">
-            <div className="bg-gray-100 border border-gray-300 rounded-xl px-10 py-16 text-center shadow-md w-full max-w-xl">
-              <p className="text-gray-800 text-2xl font-semibold">ไม่มีสินค้าในตะกร้า</p>
-              <p className="text-gray-500 text-base mt-4">ไปเลือกแคคตัสน่ารัก ๆ มาใส่ตะกร้าดีกว่า 🌵💚</p>
+            <div className="bg-white rounded-3xl shadow-2xl px-12 py-20 text-center border-2 border-gray-200 w-full max-w-xl">
+              <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">
+                🛒
+              </div>
+              <p className="text-gray-800 text-3xl font-bold mb-3">ไม่มีสินค้าในตะกร้า</p>
+              <p className="text-gray-500 text-lg">ไปเลือกแคคตัสน่ารัก ๆ มาใส่ตะกร้าดีกว่า 🌵💚</p>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* 🟢 Header ตาราง */}
-            <div className="grid grid-cols-5 font-semibold border-b pb-2">
-              <span className="col-span-2">สินค้า</span>
-              <span className="text-center">จำนวน</span>
-              <span className="text-right">ยอดรวม</span>
-              <span className="text-right">ลบ</span>
+            {/* Cart Items */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">รายการสินค้า</h2>
+              <div className="space-y-4">
+
+                {cartItems.map(item => (
+                  <div key={item.Pid} className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 rounded-xl p-4 hover:border-green-300 hover:shadow-md transition-all duration-300">
+                    {/* ภาพ + ชื่อ */}
+                    <div className="flex items-center gap-4 flex-1">
+                      <img
+                        src={`http://localhost:3000${item.Ppicture}`}
+                        className="w-24 h-24 object-cover rounded-xl shadow-sm"
+                        alt={item.Pname}
+                      />
+                      <div>
+                        <p className="font-bold text-gray-800 text-lg">{item.Pname}</p>
+                        <p className="text-green-600 font-semibold">{item.Pprice} บาท</p>
+                      </div>
+                    </div>
+
+                    {/* จำนวน */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center border-2 border-gray-300 rounded-lg">
+                        <button onClick={() => updateQuantity(item.Pid, -1)} className="px-3 py-2 hover:bg-gray-100 transition-colors">-</button>
+                        <span className="px-4 font-semibold border-x-2 border-gray-300">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.Pid, 1)} className="px-3 py-2 hover:bg-gray-100 transition-colors">+</button>
+                      </div>
+                    </div>
+
+                    {/* ยอดรวม + ลบ */}
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">ยอดรวม</p>
+                        <p className="text-xl font-bold text-green-600">{(item.quantity * item.Pprice).toFixed(2)} บาท</p>
+                      </div>
+                      <button onClick={() => removeItem(item.Pid)} className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg font-semibold transition-colors">
+                        ลบ
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {cartItems.map(item => (
-              <div key={item.Pid} className="grid grid-cols-5 items-center border-b py-4 gap-4">
-                {/* ภาพ + ชื่อ */}
-                <div className="col-span-2 flex items-center gap-4">
-                  <img
-                    src={`http://localhost:3000${item.Ppicture}`}
-                    className="w-20 h-20 object-cover rounded"
-                    alt={item.Pname}
-                  />
-                  <div>
-                    <p className="font-semibold">{item.Pname}</p>
-                    <p className="text-sm text-red-600">{item.Pprice} บาท</p>
+
+
+
+
+
+            {/* Summary */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">สรุปยอดรวม</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between text-lg">
+                  <span className="text-gray-600">ยอดสินค้า:</span>
+                  <span className="font-semibold">{totalPrice.toFixed(2)} บาท</span>
+                </div>
+                <div className="flex justify-between text-lg">
+                  <span className="text-gray-600">ค่าจัดส่ง:</span>
+                  <span className="font-semibold">{shippingFee === 0 ? 'ส่งฟรี 🎉' : `${shippingFee} บาท`}</span>
+                </div>
+                <div className="border-t-2 border-gray-200 pt-3 mt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xl font-bold text-gray-800">รวมทั้งหมด:</span>
+                    <span className="text-2xl font-bold text-green-600">{grandTotal.toFixed(2)} บาท</span>
                   </div>
                 </div>
-
-                {/* จำนวน */}
-                <div className="flex justify-center items-center gap-2">
-                  <button onClick={() => updateQuantity(item.Pid, -1)} className="px-2 py-1 border">-</button>
-                  <span>{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.Pid, 1)} className="px-2 py-1 border">+</button>
-                </div>
-
-                {/* ยอดรวม */}
-                <div className="text-right font-medium">
-                  {(item.quantity * item.Pprice).toFixed(2)} บาท
-                </div>
-
-                {/* ลบ */}
-                <div className="text-right">
-                  <button onClick={() => removeItem(item.Pid)} className="text-red-500 text-sm">ลบ</button>
-                </div>
               </div>
-            ))}
-
-
-
-
-
-
-            {/* 🟢 สรุปยอดรวม */}
-            <div className="text-right space-y-2 mt-6">
-              <p>ยอดสินค้า: {totalPrice.toFixed(2)} บาท</p>
-              <p>ค่าจัดส่ง: {shippingFee === 0 ? 'ส่งฟรี' : `${shippingFee} บาท`}</p>
-              <p className="text-xl font-bold text-red-600">
-                รวมทั้งหมด: {grandTotal.toFixed(2)} บาท
-              </p>
-            </div>
-
-            <div className="text-right mt-4">
               <button
                 onClick={handleCheckout}
-                className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+                className="w-full mt-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 ดำเนินการสั่งซื้อ
               </button>

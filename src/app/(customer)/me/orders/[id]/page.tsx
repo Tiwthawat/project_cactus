@@ -142,23 +142,23 @@ export default function OrderDetailPage() {
     await fetchReviewAgain();
   };
   const handleDeleteReview = async () => {
-  const confirmDelete = confirm('ต้องการลบรีวิวนี้หรือไม่?');
-  if (!confirmDelete) return;
+    const confirmDelete = confirm('ต้องการลบรีวิวนี้หรือไม่?');
+    if (!confirmDelete) return;
 
-  try {
-    const res = await fetch(`http://localhost:3000/review/${id}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
+    try {
+      const res = await fetch(`http://localhost:3000/review/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
 
-    if (!res.ok) throw new Error('ลบรีวิวไม่สำเร็จ');
-    setReview(null); // ล้างรีวิวจาก state เพื่อให้แสดงแบบฟอร์มใหม่
-  } catch (err) {
-    alert('เกิดข้อผิดพลาดในการลบรีวิว');
-  }
-};
+      if (!res.ok) throw new Error('ลบรีวิวไม่สำเร็จ');
+      setReview(null); // ล้างรีวิวจาก state เพื่อให้แสดงแบบฟอร์มใหม่
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการลบรีวิว');
+    }
+  };
 
 
 
@@ -169,132 +169,216 @@ export default function OrderDetailPage() {
   if (!order) return <p className="p-6 text-center text-red-600">ไม่พบคำสั่งซื้อ</p>;
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white text-black">
-      <h1 className="text-2xl font-bold mb-4">รายละเอียดคำสั่งซื้อ</h1>
-      <p>เลขคำสั่งซื้อ: #{order.Oid}</p>
-      <p>วันที่สั่งซื้อ: {new Date(order.Odate).toLocaleDateString()}</p>
-      <p>สถานะ: <span className="text-gray-700">{order.Ostatus}</span></p>
-      <p>ชำระแบบ: <span className="text-gray-700">{order.Opayment}</span></p>
-      <p className="mb-4">ยอดรวม: {(+order.Oprice || 0).toFixed(2)} บาท</p>
-
-      {/* ปุ่มยืนยันรับของ */}
-      {order.Ostatus === 'shipped' && (
-        <button onClick={handleConfirmReceived} className="bg-blue-600 text-white px-4 py-2 rounded mt-6">
-          ✅ ยืนยันรับสินค้า
-        </button>
-      )}
-
-      {/* แบบฟอร์มรีวิว */}
-      {order.Ostatus === 'delivered' && !review && (
-        <form onSubmit={handleReviewSubmit} className="mt-6 space-y-4">
-          <h3 className="text-lg font-semibold">ให้คะแนนสินค้า</h3>
-
-          <label>
-            คะแนน:
-            <select value={rating} onChange={(e) => setRating(Number(e.target.value))} className="ml-2 border p-1 rounded">
-              <option value={5}>⭐️⭐️⭐️⭐️⭐️</option>
-              <option value={4}>⭐️⭐️⭐️⭐️</option>
-              <option value={3}>⭐️⭐️⭐️</option>
-              <option value={2}>⭐️⭐️</option>
-              <option value={1}>⭐️</option>
-            </select>
-          </label>
-
-          <textarea
-            placeholder="เขียนรีวิวเพิ่มเติม..."
-            className="w-full border rounded p-2"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
-
-          <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-            ส่งรีวิว
-          </button>
-        </form>
-      )}
-
-      {/* แสดงรีวิวถ้ามีแล้ว */}
-      {review && (
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold">รีวิวของคุณ</h3>
-          <p className="font-semibold">คะแนน:<div>
-            {Array(review.stars).fill('⭐')}
-          </div>ดาว</p>
-          <p className="text-gray-700">{review.text}</p>
-
-          {/* ปุ่มลบรีวิว */}
-    <button
-      onClick={handleDeleteReview}
-      className="mt-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
-    >
-      ลบรีวิว
-    </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
+      <div className="max-w-4xl mx-auto pt-32 p-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+            รายละเอียดออเดอร์
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
+            คำสั่งซื้อ #{order.Oid}
+          </h1>
         </div>
-      )}
 
-      <h2 className="text-lg font-semibold mt-8 mb-2">รายการสินค้า</h2>
-      <ul className="space-y-4">
-        {order.items?.map(item => (
-          <li key={item.Pid} className="flex gap-4 items-center border-b pb-2">
-            <img
-              src={`http://localhost:3000${item.Ppicture.split(',')[0]}`}
-              alt={item.Pname}
-              className="w-16 h-16 object-cover rounded"
-            />
-            <div>
-              <p className="font-semibold">{item.Pname}</p>
-              <p>จำนวน: {item.Oquantity}</p>
-              <p>ราคาต่อชิ้น: {Number(item.Oprice).toFixed(2)} บาท</p>
-              <p>รวม: {(Number(item.Oprice) * item.Oquantity).toFixed(2)} บาท</p>
+        {/* Order Info Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+              📋
             </div>
-          </li>
-        ))}
-      </ul>
+            <h2 className="text-2xl font-bold text-gray-800">ข้อมูลคำสั่งซื้อ</h2>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">วันที่สั่งซื้อ:</span>
+              <span className="font-semibold">{new Date(order.Odate).toLocaleDateString('th-TH')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">สถานะ:</span>
+              <span className="font-semibold text-blue-600">{order.Ostatus}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">ชำระแบบ:</span>
+              <span className="font-semibold">{order.Opayment === 'cod' ? 'ชำระปลายทาง' : 'โอนเงิน'}</span>
+            </div>
+            <div className="flex justify-between items-center border-t-2 border-gray-200 pt-2 mt-2">
+              <span className="text-lg font-bold text-gray-800">ยอดรวม:</span>
+              <span className="text-2xl font-bold text-green-600">{(+order.Oprice || 0).toFixed(2)} บาท</span>
+            </div>
+          </div>
 
-      <hr className="my-6" />
-
-      {/* อัปโหลดสลิป */}
-      {order.Opayment !== 'cod' ? (
-        <>
-          <h2 className="text-lg font-semibold mb-2">แนบสลิปโอนเงิน</h2>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="mb-4"
-          />
-          {preview && (
-            <img
-              src={preview}
-              alt="preview"
-              className="w-full h-auto rounded shadow mb-4"
-            />
+          {/* ปุ่มยืนยันรับของ */}
+          {order.Ostatus === 'shipped' && (
+            <button
+              onClick={handleConfirmReceived}
+              className="w-full mt-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              ✅ ยืนยันรับสินค้า
+            </button>
           )}
-          <button
-            onClick={handleSlipUpload}
-            disabled={!slipFile}
-            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-          >
-            อัปโหลดสลิป
-          </button>
-        </>
-      ) : (
-        <p className="text-green-700 mt-4 font-semibold">
-          คำสั่งซื้อแบบชำระปลายทาง
-        </p>
-      )}
-
-      {/* แสดงสลิปที่แนบแล้ว */}
-      {order.Oslip && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">สลิปที่แนบไว้</h2>
-          <img
-            src={`http://localhost:3000${order.Oslip}`}
-            alt="slip"
-            className="w-full h-auto rounded border"
-          />
         </div>
-      )}
+
+        {/* Items Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+              🛍️
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800">รายการสินค้า</h2>
+          </div>
+          <div className="space-y-4">
+            {order.items?.map(item => (
+              <div key={item.Pid} className="flex gap-4 items-center p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200">
+                <img
+                  src={`http://localhost:3000${item.Ppicture.split(',')[0]}`}
+                  alt={item.Pname}
+                  className="w-20 h-20 object-cover rounded-xl shadow-sm"
+                />
+                <div className="flex-1">
+                  <p className="font-bold text-gray-800 text-lg">{item.Pname}</p>
+                  <p className="text-gray-600">จำนวน: {item.Oquantity} ชิ้น</p>
+                  <p className="text-green-600 font-semibold">ราคาต่อชิ้น: {Number(item.Oprice).toFixed(2)} บาท</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">ยอดรวม</p>
+                  <p className="text-xl font-bold text-green-600">{(Number(item.Oprice) * item.Oquantity).toFixed(2)} บาท</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Review Form */}
+        {order.Ostatus === 'delivered' && !review && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+                ⭐
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">ให้คะแนนสินค้า</h2>
+            </div>
+            <form onSubmit={handleReviewSubmit} className="space-y-4">
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">คะแนน:</label>
+                <select
+                  value={rating}
+                  onChange={(e) => setRating(Number(e.target.value))}
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors"
+                >
+                  <option value={5}>⭐️⭐️⭐️⭐️⭐️</option>
+                  <option value={4}>⭐️⭐️⭐️⭐️</option>
+                  <option value={3}>⭐️⭐️⭐️</option>
+                  <option value={2}>⭐️⭐️</option>
+                  <option value={1}>⭐️</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">ความคิดเห็น:</label>
+                <textarea
+                  placeholder="เขียนรีวิวเพิ่มเติม..."
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors min-h-[100px]"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                ส่งรีวิว
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Display Review */}
+        {review && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+                ⭐
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">รีวิวของคุณ</h2>
+            </div>
+            <div className="mb-3">
+              <p className="text-gray-600 mb-1">คะแนน:</p>
+              <div className="flex gap-1">
+                {Array(review.stars).fill('⭐').map((star, i) => (
+                  <span key={i} className="text-2xl">{star}</span>
+                ))}
+              </div>
+            </div>
+            <p className="text-gray-700 bg-gray-50 p-4 rounded-xl">"{review.text}"</p>
+            <button
+              onClick={handleDeleteReview}
+              className="mt-4 bg-red-50 hover:bg-red-100 text-red-600 px-6 py-2 rounded-xl font-semibold transition-colors"
+            >
+              ลบรีวิว
+            </button>
+          </div>
+        )}
+
+        {/* Upload Slip */}
+        {order.Opayment !== 'cod' && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+                📎
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">แนบสลิปโอนเงิน</h2>
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="block w-full border-2 border-gray-200 p-3 rounded-xl cursor-pointer bg-gray-50 hover:border-green-300 transition-colors mb-4 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-500 file:text-white file:font-semibold hover:file:bg-green-600"
+            />
+            {preview && (
+              <img
+                src={preview}
+                alt="preview"
+                className="w-full h-auto rounded-xl shadow-lg border-2 border-gray-200 mb-4"
+              />
+            )}
+            <button
+              onClick={handleSlipUpload}
+              disabled={!slipFile}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+            >
+              อัปโหลดสลิป
+            </button>
+          </div>
+        )}
+
+        {order.Opayment === 'cod' && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6 mb-6">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">💵</span>
+              <p className="text-green-700 font-semibold text-lg">คำสั่งซื้อแบบชำระปลายทาง</p>
+            </div>
+          </div>
+        )}
+
+        {/* Display Uploaded Slip */}
+        {order.Oslip && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+                ✅
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">สลิปที่แนบไว้</h2>
+            </div>
+            <img
+              src={`http://localhost:3000${order.Oslip}`}
+              alt="slip"
+              className="w-full h-auto rounded-xl border-2 border-gray-200 shadow-lg"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
