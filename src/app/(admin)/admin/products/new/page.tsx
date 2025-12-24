@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -39,7 +39,7 @@ export default function AddProductPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   useEffect(() => {
-    fetch('http://localhost:3000/product-types')
+    apiFetch('http://localhost:3000/product-types')
       .then((res) => res.json())
       .then((data: ProductType[]) => setTypes(data))
       .catch((err) => console.error('Failed to fetch types:', err));
@@ -82,7 +82,7 @@ const removeUploadedImage = (index: number) => {
       formData.append('image', file);
 
       try {
-        const res = await fetch('http://localhost:3000/upload', {
+        const res = await apiFetch('http://localhost:3000/upload', {
           method: 'POST',
           body: formData,
         });
@@ -114,9 +114,9 @@ const removeUploadedImage = (index: number) => {
       Prenume: 0,
     };
 
-    const res = await fetch('http://localhost:3000/product', {
+    const res = await apiFetch('http://localhost:3000/product', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      
       body: JSON.stringify(productData),
     });
 
@@ -128,7 +128,7 @@ const removeUploadedImage = (index: number) => {
   };
   useEffect(() => {
   if (form.Typeid) {
-    fetch(`http://localhost:3000/subtypes/${form.Typeid}`)
+    apiFetch(`http://localhost:3000/subtypes/${form.Typeid}`)
       .then((res) => res.json())
       .then((data) => setSubtypes(data))
       .catch((err) => console.error('โหลดประเภทย่อยไม่สำเร็จ:', err));

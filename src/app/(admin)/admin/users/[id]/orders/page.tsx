@@ -1,5 +1,5 @@
 'use client'
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -20,13 +20,23 @@ export default function OrdersOfUserPage() {
   `${prefix}:${String(id).padStart(4, '0')}`;
 
   useEffect(() => {
-    fetch(`http://localhost:3000/orders/customer/${id}`)
-      .then(res => res.json())
-      .then(data => {
-        console.log("✅ data จาก backend:", data)
-        setOrders(Array.isArray(data) ? data : [])
-      })
-  }, [id])
+  const load = async () => {
+    try {
+      const res = await apiFetch(`http://localhost:3000/orders/customer/${id}`);
+      if (!res.ok) {
+        setOrders([]);
+        return;
+      }
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setOrders([]);
+    }
+  };
+
+  if (id) load();
+}, [id]);
+
 
   const filteredOrders = filterStatus === 'all'
     ? orders

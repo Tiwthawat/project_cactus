@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState, useMemo } from 'react';
 import {
   BarChart,
@@ -177,41 +177,71 @@ export default function AdminDashboardStats() {
   const [dailyData, setDailyData] = useState<DailyStat[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* ---------- Load Stats + Orders + AuctionOrders ---------- */
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [sRes, oRes] = await Promise.all([
-          fetch(`${API}/stats/full`),
-          fetch(`${API}/orders/all`),
-        ]);
+useEffect(() => {
+  const load = async () => {
+    try {
+      setLoading(true);
 
-        const statsData: FullStats = await sRes.json();
-        const orderData: AdminOrder[] = await oRes.json();
+      const [sRes, oRes, aoRes] = await Promise.all([
+        apiFetch(`${API}/stats/full`),
+        apiFetch(`${API}/orders/all`),
+        apiFetch(`${API}/auction-orders/all`),
+      ]);
 
-        setStats(statsData);
-        setOrders(orderData);
-
-        // โหลด auction orders เพิ่ม
-        const aoRes = await fetch(`${API}/auction-orders/all`);
-        const auctionOrders: AuctionOrder[] = await aoRes.json();
-
-        const daily = summarizeDailyStats(orderData, auctionOrders);
-        setDailyData(daily);
-      } catch (err) {
-        console.error('โหลดสถิติผิด:', err);
-      } finally {
-        setLoading(false);
+      if (sRes.status === 401 || sRes.status === 403) {
+        window.location.href = "/";
+        return;
       }
-    };
 
-    load();
-  }, []);
+      // --- stats ---
+      if (!sRes.ok) {
+        setStats(null);
+        setOrders([]);
+        setDailyData([]);
+        return;
+      }
+      const statsJson: unknown = await sRes.json();
+      setStats(
+        typeof statsJson === "object" && statsJson !== null
+          ? (statsJson as FullStats)
+          : null
+      );
+
+      // --- orders ---
+      const ordersJson: unknown = oRes.ok ? await oRes.json() : [];
+      const safeOrders = Array.isArray(ordersJson)
+        ? (ordersJson as AdminOrder[])
+        : [];
+      setOrders(safeOrders);
+
+      // --- auction orders ---
+      const aoJson: unknown = aoRes.ok ? await aoRes.json() : [];
+      const auctionOrders = Array.isArray(aoJson)
+        ? (aoJson as AuctionOrder[])
+        : [];
+
+      setDailyData(summarizeDailyStats(safeOrders, auctionOrders));
+    } catch (err) {
+      console.error("โหลดสถิติผิด:", err);
+      setStats(null);
+      setOrders([]);
+      setDailyData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  load();
+}, []);
+
+
 
   /* ---------- 10 ออเดอร์ล่าสุด ---------- */
   const latestOrders = useMemo(() => {
-    return [...orders].sort((a, b) => b.Oid - a.Oid).slice(0, 10);
-  }, [orders]);
+  const safe = Array.isArray(orders) ? orders : [];
+  return [...safe].sort((a, b) => b.Oid - a.Oid).slice(0, 10);
+}, [orders]);
+
 
   if (loading || !stats) {
     return (

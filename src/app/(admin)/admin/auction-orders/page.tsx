@@ -1,5 +1,7 @@
 'use client';
 
+
+import { apiFetch } from '@/app/lib/apiFetch';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -29,23 +31,37 @@ export default function AuctionOrdersPage() {
     };
 
     useEffect(() => {
-        fetch(`${API}/auction-orders`)
-            .then((res) => res.json())
-            .then((data) => setOrders(data))
-            .catch((err) => console.error(err));
-    }, []);
+  const load = async () => {
+    try {
+      const res = await apiFetch(`${API}/auction-orders`);
+      if (!res.ok) {
+        setOrders([]);
+        return;
+      }
 
-    const updateStatus = async (Aid: number, status: string) => {
-        await fetch(`${API}/auction-orders/${Aid}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-        });
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setOrders([]);
+    }
+  };
 
-        setOrders(prev =>
-            prev.map(o => o.Aid === Aid ? { ...o, payment_status: status } : o)
-        );
-    };
+  load();
+}, []);
+
+
+   const updateStatus = async (Aid: number, status: string) => {
+  await apiFetch(`${API}/auction-orders/${Aid}`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
+
+  setOrders(prev =>
+    prev.map(o => (o.Aid === Aid ? { ...o, payment_status: status } : o))
+  );
+};
+
 
     const filtered = orders.filter(o =>
         filterStatus === 'all' ? true : o.payment_status === filterStatus

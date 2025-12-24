@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -18,19 +18,28 @@ export default function OrdersPage() {
   const [filterPay, setFilterPay] = useState<string>('all');
 
 
-  useEffect(() => {
-    fetch('http://localhost:3000/orders/all')
-      .then((res) => res.json())
-      .then((data) => setOrders(data))
-      .catch((err) => {
-        console.error('❌ โหลด orders fail:', err);
-      });
-  }, []);
+ useEffect(() => {
+  const load = async () => {
+    try {
+      const res = await apiFetch('http://localhost:3000/orders/all');
+      if (!res.ok) {
+        setOrders([]);
+        return;
+      }
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('❌ โหลด orders fail:', err);
+      setOrders([]);
+    }
+  };
+  load();
+}, []);
+
 
   const updateStatus = async (Oid: number, newStatus: string) => {
-    await fetch(`http://localhost:3000/orders/${Oid}/status`, {
+    await apiFetch(`http://localhost:3000/orders/${Oid}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     });
 

@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
@@ -59,18 +59,29 @@ export default function AuctionOrderDetailPage() {
   const [trackNo, setTrackNo] = useState("");
   const [editShip, setEditShip] = useState(false);
 
-  // ⬇ โหลดข้อมูล
-  useEffect(() => {
-    if (!id) return;
-    fetch(`${API}/auction-orders/${id}`)
-      .then((res) => res.json())
-      .then((d) => {
-        setData(d);
-        setShipComp(d.shipping_company ?? "");
-        setTrackNo(d.tracking_number ?? "");
-      })
-      .catch(() => setData(null));
-  }, [id]);
+ useEffect(() => {
+  if (!id) return;
+
+  const load = async () => {
+    try {
+      const res = await apiFetch(`${API}/auction-orders/${id}`);
+      if (!res.ok) {
+        setData(null);
+        return;
+      }
+
+      const d = (await res.json()) as AuctionOrderDetail;
+      setData(d);
+      setShipComp(d.shipping_company ?? "");
+      setTrackNo(d.tracking_number ?? "");
+    } catch {
+      setData(null);
+    }
+  };
+
+  load();
+}, [id]);
+
 
   if (!data) return <p className="p-6">ไม่พบข้อมูล</p>;
 
@@ -79,11 +90,11 @@ export default function AuctionOrderDetailPage() {
 
   // อัปเดตสถานะชำระเงิน
   const updatePaymentStatus = async (newStatus: string) => {
-    const res = await fetch(`${API}/auction-orders/${data.Aid}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
+    const res = await apiFetch(`${API}/auction-orders/${data.Aid}/status`, {
+  method: "PATCH",
+  body: JSON.stringify({ status: newStatus }),
+});
+
 
     if (!res.ok) return alert("แก้สถานะไม่สำเร็จ");
 
@@ -97,9 +108,8 @@ export default function AuctionOrderDetailPage() {
       return;
     }
 
-    const res = await fetch(`${API}/auction-orders/${data.Aid}/shipping`, {
+    const res = await apiFetch(`${API}/auction-orders/${data.Aid}/shipping`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         shipping_company: shipComp,
         tracking_number: trackNo,
@@ -122,7 +132,7 @@ export default function AuctionOrderDetailPage() {
 
   // กดยืนยัน delivered
   const markDelivered = async () => {
-    const res = await fetch(`${API}/auction-orders/${data.Aid}/delivered`, {
+    const res = await apiFetch(`${API}/auction-orders/${data.Aid}/delivered`, {
       method: "PATCH",
     });
 

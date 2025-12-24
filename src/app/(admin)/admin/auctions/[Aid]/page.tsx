@@ -1,5 +1,5 @@
 "use client";
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -31,15 +31,22 @@ export default function AdminAuctionDetailPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchDetail = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API}/auction/${Aid}`, { cache: "no-store" });
-      const d: AuctionDetail = await res.json();
-      setData(d);
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+
+    const res = await apiFetch(`${API}/auction/${Aid}`, { cache: "no-store" });
+    if (!res.ok) {
+      setData(null);
+      return;
     }
-  };
+
+    const d: AuctionDetail = await res.json();
+    setData(d);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchDetail();
@@ -58,7 +65,7 @@ export default function AdminAuctionDetailPage() {
 
   const closeAuction = async () => {
     if (!confirm("ต้องการปิดประมูลนี้?")) return;
-    const res = await fetch(`${API}/auctions/${Aid}/close`, { method: "PATCH" });
+    const res = await apiFetch(`${API}/auctions/${Aid}/close`, { method: "PATCH" });
     if (!res.ok) {
       alert("ปิดประมูลไม่สำเร็จ");
       return;
@@ -70,7 +77,7 @@ export default function AdminAuctionDetailPage() {
   const deleteProduct = async () => {
     if (!data) return;
     if (!confirm("ลบสินค้าออกจากคลัง?")) return;
-    const res = await fetch(`${API}/auction-products/${data.PROid}`, {
+    const res = await apiFetch(`${API}/auction-products/${data.PROid}`, {
       method: "DELETE",
     });
     if (!res.ok) {

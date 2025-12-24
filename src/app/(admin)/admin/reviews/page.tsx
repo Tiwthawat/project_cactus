@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState } from 'react';
 
 interface Review {
@@ -14,19 +15,38 @@ export default function AdminReviewPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchReviews = async () => {
-    const res = await fetch('http://localhost:3000/admin/reviews');
-    const data = await res.json();
-    setReviews(data);
+  try {
+    const res = await apiFetch('http://localhost:3000/admin/reviews');
+
+    if (res.status === 401 || res.status === 403) {
+      // ไม่ใช่แอดมิน → เด้งไป login (หรือจะไปหน้า / ก็ได้)
+      window.location.href = "/";
+      return;
+    }
+
+    const data: unknown = await res.json();
+    setReviews(Array.isArray(data) ? (data as Review[]) : []);
+  } finally {
     setLoading(false);
-  };
+  }
+};
+
 
   const handleDelete = async (id: number) => {
     const confirm = window.confirm('ยืนยันการลบรีวิวนี้?');
     if (!confirm) return;
 
-    await fetch(`http://localhost:3000/admin/reviews/${id}`, {
-      method: 'DELETE',
-    });
+   const res = await apiFetch(`http://localhost:3000/admin/reviews/${id}`, {
+  method: 'DELETE',
+});
+
+if (!res.ok) {
+  alert("ลบไม่สำเร็จ");
+  return;
+}
+
+setReviews((prev) => prev.filter((r) => r.id !== id));
+
 
     setReviews((prev) => prev.filter((r) => r.id !== id));
   };

@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/app/lib/apiFetch';
 
 import { useState } from "react";
 
@@ -19,8 +20,13 @@ export default function AdminBiddingLogsPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/admin/bidding-logs?Aid=${aid}`);
+      const res = await apiFetch(`${API}/admin/bidding-logs?Aid=${aid}`);
       const data = await res.json();
+       if (res.status === 401 || res.status === 403) {
+      // ไม่ใช่แอดมิน → เด้งไป login (หรือจะไปหน้า / ก็ได้)
+      window.location.href = "/";
+      return;
+    }
 
       if (!res.ok) {
         alert(data.message || "โหลดข้อมูลไม่สำเร็จ");

@@ -1,37 +1,127 @@
-// About.tsx
 'use client';
 import { useState, useEffect } from 'react';
 import { FaStar, FaRegStar, FaPaperPlane, FaQuoteLeft, FaUserCircle } from 'react-icons/fa';
 
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
+interface ReviewItem {
+  id: number;
+  text: string;
+  stars: number;
+}
+
+interface ReviewsErrorResponse {
+  message?: string;
+  error?: string;
+}
+
+function isReviewArray(data: unknown): data is ReviewItem[] {
+  if (!Array.isArray(data)) return false;
+  return data.every((x) => {
+    if (typeof x !== 'object' || x === null) return false;
+    const obj = x as Record<string, unknown>;
+    return (
+      typeof obj.id === 'number' &&
+      typeof obj.text === 'string' &&
+      typeof obj.stars === 'number'
+    );
+  });
+}
+
 export default function About() {
-  const [review, setReview] = useState("");
+  const [review, setReview] = useState('');
   const [rating, setRating] = useState(0);
-  const [reviews, setReviews] = useState<{ id: number; text: string; stars: number }[]>([]);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [hoverRating, setHoverRating] = useState(0);
 
+  function toReviewItem(x: unknown): ReviewItem | null {
+  if (typeof x !== "object" || x === null) return null;
+  const o = x as Record<string, unknown>;
+
+  // รองรับหลายชื่อคอลัมน์ที่พบบ่อย
+  const id =
+    (typeof o.id === "number" ? o.id :
+    typeof o.Reviewid === "number" ? o.Reviewid :
+    typeof o.Rid === "number" ? o.Rid :
+    typeof o.Payid === "number" ? o.Payid : null);
+
+  const text =
+    (typeof o.text === "string" ? o.text :
+    typeof o.Reviewdetails === "string" ? o.Reviewdetails :
+    typeof o.comment === "string" ? o.comment :
+    typeof o.message === "string" ? o.message : null);
+
+  const stars =
+    (typeof o.stars === "number" ? o.stars :
+    typeof o.rating === "number" ? o.rating :
+    typeof o.score === "number" ? o.score : null);
+
+  if (id === null || text === null || stars === null) return null;
+
+  return { id, text, stars };
+}
+
+const loadReviews = async () => {
+  try {
+    const token = localStorage.getItem("token"); // เผื่อ API ต้องใช้สิทธิ์
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API}/reviews/store`, { headers });
+    const data: unknown = await res.json();
+
+    console.log("GET /reviews =>", data); // ✅ ดูใน console ว่า API ส่งอะไรมา
+
+    if (!res.ok) {
+      setReviews([]);
+      return;
+    }
+
+    if (!Array.isArray(data)) {
+      setReviews([]);
+      return;
+    }
+
+    const normalized = data.map(toReviewItem).filter((x): x is ReviewItem => x !== null);
+    setReviews(normalized);
+  } catch (err) {
+    console.error("โหลดรีวิวผิด:", err);
+    setReviews([]);
+  }
+};
+
+
   useEffect(() => {
-    fetch("http://localhost:3000/reviews")
-      .then((res) => res.json())
-      .then((data) => setReviews(data))
-      .catch((err) => console.error("โหลดรีวิวผิด:", err));
+    loadReviews();
   }, []);
 
   const handleSubmit = async () => {
-    if (review.trim() === "" || rating < 1 || rating > 5) return;
+    if (review.trim() === '' || rating < 1 || rating > 5) return;
 
-    await fetch("http://localhost:3000/reviews", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: review, stars: rating }),
-    });
+    try {
+      const res = await fetch(`${API}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: review, stars: rating }),
+      });
 
-    setReview("");
-    setRating(0);
+      const data: unknown = await res.json();
 
-    // reload review
-    const res = await fetch("http://localhost:3000/reviews");
-    const data = await res.json();
-    setReviews(data);
+      if (!res.ok) {
+        const err = data as ReviewsErrorResponse;
+        alert(err.message || err.error || 'ส่งรีวิวไม่สำเร็จ');
+        return;
+      }
+
+      setReview('');
+      setRating(0);
+      setHoverRating(0);
+
+      await loadReviews();
+    } catch (err) {
+      console.error(err);
+      alert('เกิดข้อผิดพลาด');
+    }
   };
 
   const StarRating = ({ count, interactive = false }: { count: number; interactive?: boolean }) => {
@@ -44,8 +134,9 @@ export default function About() {
             onClick={interactive ? () => setRating(star) : undefined}
             onMouseEnter={interactive ? () => setHoverRating(star) : undefined}
             onMouseLeave={interactive ? () => setHoverRating(0) : undefined}
-            className={`text-3xl focus:outline-none transition-all duration-200 ${interactive ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
-              }`}
+            className={`text-3xl focus:outline-none transition-all duration-200 ${
+              interactive ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
+            }`}
             disabled={!interactive}
           >
             {star <= (interactive ? (hoverRating || rating) : count) ? (
@@ -85,9 +176,7 @@ export default function About() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 text-lg font-semibold mb-3">
-              ความคิดเห็น
-            </label>
+            <label className="block text-gray-700 text-lg font-semibold mb-3">ความคิดเห็น</label>
             <div className="relative">
               <textarea
                 value={review}
@@ -100,20 +189,14 @@ export default function About() {
           </div>
 
           <div className="mb-8">
-            <label className="block text-gray-700 text-lg font-semibold mb-3">
-              ให้คะแนน
-            </label>
-            <StarRating count={rating} interactive={true} />
-            {rating > 0 && (
-              <p className="mt-2 text-green-600 font-medium">
-                คุณให้ {rating} ดาว
-              </p>
-            )}
+            <label className="block text-gray-700 text-lg font-semibold mb-3">ให้คะแนน</label>
+            <StarRating count={rating} interactive />
+            {rating > 0 && <p className="mt-2 text-green-600 font-medium">คุณให้ {rating} ดาว</p>}
           </div>
 
           <button
             onClick={handleSubmit}
-            disabled={review.trim() === "" || rating < 1}
+            disabled={review.trim() === '' || rating < 1}
             className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           >
             <FaPaperPlane />
@@ -124,9 +207,7 @@ export default function About() {
         {/* Reviews Section */}
         <div>
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold text-gray-800">
-              รีวิวจากลูกค้า
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-800">รีวิวจากลูกค้า</h2>
             <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-semibold">
               {reviews.length} รีวิว
             </div>
@@ -159,18 +240,13 @@ export default function About() {
                           {[1, 2, 3, 4, 5].map((star) => (
                             <FaStar
                               key={star}
-                              className={`text-xl ${star <= r.stars ? 'text-yellow-400' : 'text-gray-200'
-                                }`}
+                              className={`text-xl ${star <= r.stars ? 'text-yellow-400' : 'text-gray-200'}`}
                             />
                           ))}
                         </div>
-                        <span className="text-sm text-gray-400 font-medium">
-                          {r.stars}/5
-                        </span>
+                        <span className="text-sm text-gray-400 font-medium">{r.stars}/5</span>
                       </div>
-                      <p className="text-gray-700 text-base leading-relaxed">
-                        "{r.text}"
-                      </p>
+                      <p className="text-gray-700 text-base leading-relaxed">"{r.text}"</p>
                     </div>
                   </div>
                 </div>
@@ -184,9 +260,7 @@ export default function About() {
           <div className="mt-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl p-8 text-white">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
               <div>
-                <div className="text-4xl font-bold mb-2">
-                  {reviews.length}
-                </div>
+                <div className="text-4xl font-bold mb-2">{reviews.length}</div>
                 <div className="text-green-100">รีวิวทั้งหมด</div>
               </div>
               <div>
@@ -197,7 +271,7 @@ export default function About() {
               </div>
               <div>
                 <div className="text-4xl font-bold mb-2">
-                  {Math.round((reviews.filter(r => r.stars >= 4).length / reviews.length) * 100)}%
+                  {Math.round((reviews.filter((r) => r.stars >= 4).length / reviews.length) * 100)}%
                 </div>
                 <div className="text-green-100">ความพึงพอใจ</div>
               </div>

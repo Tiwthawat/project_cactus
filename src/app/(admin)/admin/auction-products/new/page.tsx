@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/app/lib/apiFetch';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -67,7 +68,11 @@ export default function AddAuctionProductPage() {
       fd.append('image', file);
 
       try {
-        const res = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+        const res = await apiFetch(`${API}/upload`, { method: 'POST', body: fd });
+        if (!res.ok) {
+  alert(`อัปโหลดรูป ${file.name} ไม่สำเร็จ`);
+  continue;
+}
         const data = await res.json();
         // สมมติ backend ตอบ { url: "/uploads/products/xxxx.png" }
         // ใช้รูปแบบเดียวกับหน้าปกติ: ตัด "/uploads" ออกให้กลายเป็น "/products/xxxx.png"
@@ -100,9 +105,9 @@ export default function AddAuctionProductPage() {
       PROdetail: form.PROdetail || null,
     };
 
-    const res = await fetch(`${API}/auction-products`, {
+    const res = await apiFetch(`${API}/auction-products`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      
       body: JSON.stringify(productData),
     });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/app/lib/apiFetch";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
@@ -69,17 +70,29 @@ export default function OrderDetailPage() {
   const [editShip, setEditShip] = useState(false);
 
   // โหลดข้อมูลออเดอร์
-  useEffect(() => {
-    if (!id) return;
-    fetch(`${API}/orders/${id}`)
-      .then((res) => res.json())
-      .then((d) => {
-        setOrder(d);
-        setShipComp(d.Oshipping ?? "");
-        setTrackNo(d.Otracking ?? "");
-      })
-      .catch(() => setOrder(null));
-  }, [id]);
+useEffect(() => {
+  if (!id) return;
+
+  const load = async () => {
+    try {
+      const res = await apiFetch(`${API}/orders/${id}`);
+      if (!res.ok) {
+        setOrder(null);
+        return;
+      }
+
+      const d = await res.json();
+      setOrder(d);
+      setShipComp(d.Oshipping ?? "");
+      setTrackNo(d.Otracking ?? "");
+    } catch {
+      setOrder(null);
+    }
+  };
+
+  load();
+}, [id]);
+
 
   if (!order) return <p className="p-6">ไม่พบข้อมูลคำสั่งซื้อ</p>;
 
@@ -88,9 +101,8 @@ export default function OrderDetailPage() {
 
   // เปลี่ยนสถานะคำสั่งซื้อ
   const updateStatus = async (newStatus: string) => {
-    const res = await fetch(`${API}/orders/${order.Oid}/status`, {
+    const res = await apiFetch(`${API}/orders/${order.Oid}/status`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
 
@@ -106,9 +118,8 @@ export default function OrderDetailPage() {
       return;
     }
 
-    const res = await fetch(`${API}/orders/${order.Oid}/shipping`, {
+    const res = await apiFetch(`${API}/orders/${order.Oid}/shipping`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         Oshipping: shipComp,
         Otracking: trackNo,
@@ -132,7 +143,7 @@ export default function OrderDetailPage() {
 
   // ปิดเป็น delivered
   const markDelivered = async () => {
-    const res = await fetch(`${API}/orders/${order.Oid}/delivered`, {
+    const res = await apiFetch(`${API}/orders/${order.Oid}/delivered`, {
       method: "PATCH",
     });
 

@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
@@ -55,12 +55,18 @@ export default function AdminAuctionsPage() {
       if (p) params.append('payment_status', p);
       if (s) params.append('shipping_status', s);
 
-      const res = await fetch(`${API}/auctions?${params.toString()}`, {
+      const res = await apiFetch(`${API}/auctions?${params.toString()}`, {
         cache: 'no-store'
       });
 
-      const data = await res.json();
-      setAuctions(data ?? []);
+      if (!res.ok) {
+  setAuctions([]);
+  return;
+}
+
+const data = await res.json();
+setAuctions(Array.isArray(data) ? data : []);
+
     } catch (e) {
       console.error(e);
       setAuctions([]);

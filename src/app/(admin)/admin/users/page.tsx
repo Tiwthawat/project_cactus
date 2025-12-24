@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -36,20 +36,36 @@ const handleViewOrders = (id: number) => {
 
 
 
-  useEffect(() => {
-    fetch('http://localhost:3000/customers')
-      .then(res => res.json())
-      .then(data => setUsers(data))
-      .catch(err => console.error('โหลดรายชื่อลูกค้าล้มเหลว:', err));
-  }, []);
+useEffect(() => {
+  const load = async () => {
+    try {
+      const res = await apiFetch('http://localhost:3000/customers');
+      if (!res.ok) {
+        setUsers([]);
+        return;
+      }
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('โหลดรายชื่อลูกค้าล้มเหลว:', err);
+      setUsers([]);
+    }
+  };
+  load();
+}, []);
+
 
   const handleDelete = async (id: number) => {
     if (!confirm("คุณแน่ใจว่าต้องการลบผู้ใช้นี้?")) return;
-    await fetch(`http://localhost:3000/customers/delete/${id}`, {
-      method: "PUT",
-    });
-    // ดึงข้อมูลใหม่ หรือ filter ทิ้งจาก list
-    setUsers(prev => prev.filter(user => user.Cid !== id));
+    const res = await apiFetch(`http://localhost:3000/customers/delete/${id}`, {
+  method: "PUT",
+});
+if (!res.ok) {
+  alert("ลบผู้ใช้ไม่สำเร็จ");
+  return;
+}
+setUsers(prev => prev.filter(user => user.Cid !== id));
+
   };
   const [searchTerm, setSearchTerm] = useState('');
 

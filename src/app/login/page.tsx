@@ -1,13 +1,22 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Navbar from '../component/Navbar';
-import Navigation from '../component/Navigation';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { getRole, isLoggedIn } from '../lib/authClient';
 
 export default function Login() {
   const router = useRouter();
+
+  useEffect(() => {
+  if (isLoggedIn()) {
+    const role = getRole();
+    if (role === "admin") router.replace("/admin/dashboard");
+    else router.replace("/");
+  }
+}, [router]);
+
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -107,33 +116,57 @@ export default function Login() {
   // -------------------------
   // login
   // -------------------------
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+type LoginRole = "admin" | "user";
 
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Cusername: email, Cpassword: password }),
-      });
+interface LoginResponse {
+  token: string;
+  role: LoginRole;
+  user?: unknown;  // ถ้าตะเอ๊งมี interface user จริง ค่อยเปลี่ยนได้
+  admin?: unknown; // เช่นกัน
+  message?: string;
+}
 
-      if (!res.ok) {
-        const err = await res.json();
-        alert(`❌ เข้าสู่ระบบไม่สำเร็จ: ${err.message}`);
-        return;
-      }
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  if (localStorage.getItem("token")) {
+    alert("ตอนนี้มีผู้ใช้งานล็อกอินอยู่แล้ว กรุณาออกจากระบบก่อน");
+    return;
+  }
 
-      const data = await res.json();
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Cusername: email, Cpassword: password }),
+    });
 
-      window.dispatchEvent(new Event('login-success'));
-      router.push('/me');
-    } catch (error) {
-      console.error('🔥 Error:', error);
-      alert('เกิดข้อผิดพลาด');
+    const data: LoginResponse = await res.json();
+
+    if (!res.ok) {
+      alert(`❌ เข้าสู่ระบบไม่สำเร็จ: ${data.message || "เกิดข้อผิดพลาด"}`);
+      return;
     }
-  };
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("role", data.role);
+
+    // เก็บ user/admin ถ้ามี (กันพัง)
+    if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
+    if (data.admin) localStorage.setItem("admin", JSON.stringify(data.admin));
+
+    window.dispatchEvent(new Event("login-success"));
+
+    if (data.role === "admin") {
+      router.replace("/admin/dashboard"); // ✅ ไปหน้านี้ตามที่ตะเอ๊งต้องการ
+    } else {
+      router.replace("/");
+    }
+  } catch (error) {
+    console.error("🔥 Error:", error);
+    alert("เกิดข้อผิดพลาด");
+  }
+};
+
 
   // ================================
   //          UI STARTS HERE

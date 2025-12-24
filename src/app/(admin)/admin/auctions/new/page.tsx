@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -47,14 +47,28 @@ export default function NewAuctionPage() {
 
   // โหลดสินค้าพร้อมราคา (สถานะ ready)
   useEffect(() => {
-    setLoadingItems(true);
+  setLoadingItems(true);
 
-    fetch(`${API}/auction-products?status=ready`)
-      .then(res => res.json())
-      .then((rows: AuctionProduct[]) => setProducts(rows ?? []))
-      .catch(() => setProducts([]))
-      .finally(() => setLoadingItems(false));
-  }, []);
+  const load = async () => {
+    try {
+      const res = await apiFetch(`${API}/auction-products?status=ready`);
+      if (!res.ok) {
+        setProducts([]);
+        return;
+      }
+
+      const rows = await res.json();
+      setProducts(Array.isArray(rows) ? rows : []);
+    } catch {
+      setProducts([]);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
+  load();
+}, []);
+
 
   // เมื่อเลือกสินค้า → ตั้งราคาเริ่มต้นอัตโนมัติ
   const handleSelectProduct = (value: string) => {
@@ -104,9 +118,8 @@ const valid =
     setMsg('');
 
     try {
-      const res = await fetch(`${API}/auctions`, {
+      const res = await apiFetch(`${API}/auctions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           PROid: selectedProduct,
           start_price: Number(startPrice),

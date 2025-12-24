@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -57,7 +57,11 @@ export default function AdminAuctionProductsPage() {
       p.set('status', s);
       if (query.trim()) p.set('q', query.trim());
 
-      const res = await fetch(`${API}/auction-products?${p.toString()}`, { cache: 'no-store' });
+      const res = await apiFetch(`${API}/auction-products?${p.toString()}`, { cache: 'no-store' });
+      if (!res.ok) {
+  setItems([]);
+  return;
+}
       const data: Row[] = await res.json();
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -95,7 +99,7 @@ export default function AdminAuctionProductsPage() {
 
   const delProduct = async (id: number) => {
     if (!confirm('ลบสินค้านี้?')) return;
-    const res = await fetch(`${API}/auction-products/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API}/auction-products/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       alert('ลบไม่สำเร็จ');
       return;

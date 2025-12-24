@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer,
@@ -56,19 +56,28 @@ export default function AdminStatsPage() {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(`${API}/stats/full`);
-        const data: FullStats = await res.json();
-        setStats(data);
-      } catch (err) {
-        console.error('โหลดสถิติไม่สำเร็จ:', err);
-      } finally {
-        setLoading(false);
+  const load = async () => {
+    try {
+      const res = await apiFetch(`${API}/stats/full`);
+
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/";
+        return;
       }
-    };
-    load();
-  }, []);
+
+      const data: FullStats = await res.json();
+      setStats(data);
+
+    } catch (err) {
+      console.error('โหลดสถิติไม่สำเร็จ:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  load();
+}, []);
+
 
   const methodRows: MethodRow[] = useMemo(() => {
     if (!stats) return [];

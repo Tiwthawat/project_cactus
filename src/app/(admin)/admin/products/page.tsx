@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
@@ -21,11 +21,22 @@ export default function AdminProducts() {
   const [typeFilter, setTypeFilter] = useState<number | "all">("all");
 
   const fetchProducts = async (typeid?: number) => {
-    const url = typeid ? `http://localhost:3000/product?typeid=${typeid}` : "http://localhost:3000/product";
-    const res = await fetch(url);
-    const data = await res.json();
-    setProducts(data);
-  };
+  const url = typeid
+    ? `http://localhost:3000/product?typeid=${typeid}`
+    : "http://localhost:3000/product";
+
+  const res = await apiFetch(url);
+  if (!res.ok) {
+    setProducts([]);
+    return;
+  }
+
+ const data = await res.json().catch(() => []);
+setProducts(Array.isArray(data) ? data : []);
+
+  
+};
+
 
   useEffect(() => {
     if (typeFilter === "all") {
@@ -37,8 +48,15 @@ export default function AdminProducts() {
 
   const deleteProduct = async (id: number) => {
     if (!confirm('คุณแน่ใจว่าต้องการลบสินค้านี้?')) return;
-    await fetch(`http://localhost:3000/product/${id}`, { method: 'DELETE' });
-    setProducts(products.filter((p) => p.Pid !== id));
+    const res = await apiFetch(`http://localhost:3000/product/${id}`, {
+  method: 'DELETE'
+});
+if (!res.ok) {
+  alert('ลบสินค้าไม่สำเร็จ');
+  return;
+}
+setProducts(prev => prev.filter(p => p.Pid !== id));
+
   };
 
   return (

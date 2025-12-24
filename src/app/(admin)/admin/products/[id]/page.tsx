@@ -1,5 +1,5 @@
 'use client';
-
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useState, ChangeEvent, FormEvent } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
@@ -40,7 +40,7 @@ export default function EditProducts() {
   });
 
   useEffect(() => {
-    fetch(`http://localhost:3000/product/${id}`)
+    apiFetch(`http://localhost:3000/product/${id}`)
       .then((res) => res.json())
       .then((data: any) => {
         setForm({
@@ -57,7 +57,7 @@ export default function EditProducts() {
         setLoading(false);
       });
 
-    fetch('http://localhost:3000/product-types')
+    apiFetch('http://localhost:3000/product-types')
       .then((res) => res.json())
       .then((data: ProductType[]) => setTypes(data));
   }, [id]);
@@ -91,7 +91,7 @@ export default function EditProducts() {
     for (const file of selectedFiles) {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch('http://localhost:3000/upload', {
+      const res = await apiFetch('http://localhost:3000/upload', {
         method: 'POST',
         body: formData,
       });
@@ -108,9 +108,9 @@ export default function EditProducts() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const res = await fetch(`http://localhost:3000/product/${id}`, {
+    const res = await apiFetch(`http://localhost:3000/product/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+     
       body: JSON.stringify({
         ...form,
         Pprice: parseFloat(form.Pprice),
@@ -128,7 +128,7 @@ export default function EditProducts() {
   };
   useEffect(() => {
     if (form.Typeid) {
-      fetch(`http://localhost:3000/subtypes/${form.Typeid}`)
+      apiFetch(`http://localhost:3000/subtypes/${form.Typeid}`)
         .then((res) => res.json())
         .then((data) => setSubtypes(data))
         .catch((err) => console.error('โหลด subtypes ไม่สำเร็จ:', err));
