@@ -80,9 +80,8 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className={`px-2 py-1 rounded-full text-xs font-medium ${
-        classes[status] || 'bg-gray-300 text-gray-800'
-      }`}
+      className={`px-2 py-1 rounded-full text-xs font-medium ${classes[status] || 'bg-gray-300 text-gray-800'
+        }`}
     >
       {status}
     </span>
@@ -319,64 +318,100 @@ export default function AdminDashboardStats() {
       </section>
 
       {/* กราฟยอดขายรายวัน */}
-      <section className="bg-white p-5 rounded-xl border shadow">
-        <h2 className="text-xl font-bold mb-3">
-          📊 ยอดขายรายวัน (โอน / COD / ประมูล)
-        </h2>
+      <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+            📊
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">ยอดขายรายวัน</h2>
+            <p className="text-sm text-gray-500">โอน / COD / ประมูล</p>
+          </div>
+        </div>
 
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart
-            data={dailyData}
-            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="dateLabel" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="transfer" fill="#4ade80" name="โอน" />
-            <Bar dataKey="cod" fill="#60a5fa" name="COD" />
-            <Bar dataKey="auction" fill="#fbbf24" name="ประมูล" />
-          </BarChart>
-        </ResponsiveContainer>
+        {dailyData.length === 0 ? (
+          <div className="text-center py-10 text-gray-500">
+            <p className="text-lg">ยังไม่มีข้อมูลยอดขาย</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart
+              data={dailyData}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                dataKey="dateLabel"
+                tick={{ fill: '#6b7280', fontSize: 12 }}
+                axisLine={{ stroke: '#d1d5db' }}
+              />
+              <YAxis
+                tick={{ fill: '#6b7280', fontSize: 12 }}
+                axisLine={{ stroke: '#d1d5db' }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Legend
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="circle"
+              />
+              <Bar dataKey="transfer" fill="#10b981" name="โอน" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="cod" fill="#3b82f6" name="COD" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="auction" fill="#f59e0b" name="ประมูล" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </section>
 
       {/* Latest orders */}
       <section>
-        <h2 className="text-xl font-bold mb-3">📋 10 ออเดอร์ล่าสุด</h2>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+            📋
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">10 ออเดอร์ล่าสุด</h2>
+        </div>
 
-        <div className="bg-white rounded-xl border shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-2 text-left">รหัส</th>
-                <th className="px-3 py-2 text-left">ลูกค้า</th>
-                <th className="px-3 py-2 text-right">ยอดรวม</th>
-                <th className="px-3 py-2 text-center">สถานะ</th>
-                <th className="px-3 py-2 text-center">วันที่</th>
-              </tr>
-            </thead>
-            <tbody>
-              {latestOrders.map((o) => {
-                const code = `ord:${String(o.Oid).padStart(4, '0')}`;
-                return (
-                  <tr key={o.Oid} className="border-t hover:bg-gray-50">
-                    <td className="px-3 py-2 font-mono text-xs">{code}</td>
-                    <td className="px-3 py-2">{o.Cname}</td>
-                    <td className="px-3 py-2 text-right">
-                      {fmtBaht(o.Oprice)} บาท
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <StatusBadge status={o.Ostatus} />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {formatThaiDate(o.Odate)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+                  <th className="px-4 py-3 text-left">รหัส</th>
+                  <th className="px-4 py-3 text-left">ลูกค้า</th>
+                  <th className="px-4 py-3 text-right">ยอดรวม</th>
+                  <th className="px-4 py-3 text-center">สถานะ</th>
+                  <th className="px-4 py-3 text-center">วันที่</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestOrders.map((o) => {
+                  const code = `ord:${String(o.Oid).padStart(4, '0')}`;
+                  return (
+                    <tr key={o.Oid} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs bg-gray-50">{code}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">{o.Cname}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-700">
+                        {fmtBaht(o.Oprice)} บาท
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge status={o.Ostatus} />
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                        {formatThaiDate(o.Odate)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>
@@ -396,29 +431,28 @@ function Card({
   color: string;
   big?: boolean;
 }) {
-  const borderClass: Record<string, string> = {
-    emerald: 'border-emerald-300',
-    blue: 'border-blue-300',
-    indigo: 'border-indigo-300',
-    purple: 'border-purple-300',
-    gray: 'border-gray-300',
-    red: 'border-red-300',
-    rose: 'border-rose-300',
-    cyan: 'border-cyan-300',
-    amber: 'border-amber-300',
-    orange: 'border-orange-300',
-    green: 'border-green-300',
+  const gradientClass: Record<string, string> = {
+    emerald: 'from-emerald-500 to-emerald-600',
+    blue: 'from-blue-500 to-blue-600',
+    indigo: 'from-indigo-500 to-indigo-600',
+    purple: 'from-purple-500 to-purple-600',
+    gray: 'from-gray-500 to-gray-600',
+    red: 'from-red-500 to-red-600',
+    rose: 'from-rose-500 to-rose-600',
+    cyan: 'from-cyan-500 to-cyan-600',
+    amber: 'from-amber-500 to-amber-600',
+    orange: 'from-orange-500 to-orange-600',
+    green: 'from-green-500 to-green-600',
   };
 
   return (
-    <div
-      className={`p-5 rounded-xl bg-white border ${
-        borderClass[color]
-      } shadow hover:shadow-md transition`}
-    >
-      <div className="text-xs text-gray-600">{label}</div>
-      <div className={`font-bold text-black ${big ? 'text-2xl' : 'text-xl'}`}>
-        {value}
+    <div className="relative overflow-hidden rounded-2xl bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300">
+      <div className={`absolute inset-x-0 top-0 h-2 bg-gradient-to-r ${gradientClass[color]}`} />
+      <div className="p-6 space-y-2">
+        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</div>
+        <div className={`font-bold text-gray-900 ${big ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl'}`}>
+          {value}
+        </div>
       </div>
     </div>
   );

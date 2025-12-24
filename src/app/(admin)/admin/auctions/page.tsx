@@ -116,227 +116,284 @@ export default function AdminAuctionsPage() {
   };
 
   return (
-    <div className="p-6 text-black">
-      <div className="flex justify-between items-center mb-5">
-        <h1 className="text-xl font-bold">จัดการสินค้าประมูล</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
+      <div className="p-6 pt-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+            จัดการประมูล
+          </div>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              🔨 จัดการสินค้าประมูล
+            </h1>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => fetchAuctions(filter, resultFilter, payFilter, shipFilter)}
-            className="border bg-white px-3 py-2 rounded"
-          >
-            รีเฟรช
-          </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => fetchAuctions(filter, resultFilter, payFilter, shipFilter)}
+                className="bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-300 px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg"
+              >
+                🔄 รีเฟรช
+              </button>
 
-          <Link href="/admin/auction-products/new" className="bg-green-600 text-white px-4 py-2 rounded">
-            + เพิ่มสินค้าประมูล
-          </Link>
+              <Link href="/admin/auction-products/new" className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl">
+                + เพิ่มสินค้าประมูล
+              </Link>
 
-          <Link href="/admin/auctions/new" className="bg-blue-600 text-white px-4 py-2 rounded">
-            + เปิดรอบประมูล
-          </Link>
+              <Link href="/admin/auctions/new" className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl">
+                + เปิดรอบประมูล
+              </Link>
+            </div>
+          </div>
         </div>
+
+        {/* Filters Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
+              🔍
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800">กรองรายการ</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* สถานะประมูล */}
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2">สถานะประมูล:</label>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as StatusFilter)}
+                className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors font-semibold"
+              >
+                <option value="all">📦 ทั้งหมด</option>
+                <option value="open">🟢 เปิดประมูล</option>
+                <option value="closed">🔴 ปิดแล้ว</option>
+              </select>
+            </div>
+
+            {/* ผลลัพธ์ */}
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2">ผลลัพธ์:</label>
+              <select
+                value={resultFilter}
+                onChange={(e) => setResultFilter(e.target.value as ResultFilter)}
+                className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors font-semibold"
+              >
+                <option value="">📋 ทั้งหมด</option>
+                <option value="won">🏆 มีผู้ชนะ</option>
+                <option value="unsold">❌ ไม่มีผู้ชนะ</option>
+              </select>
+            </div>
+
+            {/* ชำระเงิน */}
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2">ชำระเงิน:</label>
+              <select
+                value={payFilter}
+                onChange={(e) => setPayFilter(e.target.value as PayFilter)}
+                className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors font-semibold"
+              >
+                <option value="">💳 ทั้งหมด</option>
+                <option value="pending_payment">💰 รอชำระเงิน</option>
+                <option value="payment_review">⌛ รอตรวจสอบ</option>
+                <option value="paid">✅ ชำระเงินแล้ว</option>
+              </select>
+            </div>
+
+            {/* จัดส่ง */}
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2">สถานะจัดส่ง:</label>
+              <select
+                value={shipFilter}
+                onChange={(e) => setShipFilter(e.target.value as ShipFilter)}
+                className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors font-semibold"
+              >
+                <option value="">🚚 ทั้งหมด</option>
+                <option value="pending">📦 รอจัดส่ง</option>
+                <option value="shipped">🚛 กำลังจัดส่ง</option>
+                <option value="delivered">📬 จัดส่งสำเร็จ</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div className="bg-white rounded-2xl shadow-lg p-10 text-center border-2 border-gray-200">
+            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">กำลังโหลด...</p>
+          </div>
+        ) : auctions.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-lg p-10 text-center border-2 border-gray-200">
+            <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">
+              🔨
+            </div>
+            <p className="text-gray-800 text-2xl md:text-3xl font-bold mb-3">ไม่พบข้อมูล</p>
+            <p className="text-gray-500 text-base md:text-lg">ลองปรับเปลี่ยนตัวกรองหรือเพิ่มรอบประมูลใหม่</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+                    <th className="p-4 text-center">#</th>
+                    <th className="p-4 text-center">รหัส</th>
+                    <th className="p-4 text-center hidden md:table-cell">รูป</th>
+                    <th className="p-4 text-left">สินค้า</th>
+                    <th className="p-4 text-right">เริ่มต้น</th>
+                    <th className="p-4 text-right">ปัจจุบัน</th>
+                    <th className="p-4 text-center hidden lg:table-cell">ปิดประมูล</th>
+                    <th className="p-4 text-center hidden lg:table-cell">ผู้ชนะ</th>
+                    <th className="p-4 text-center">สถานะ</th>
+                    <th className="p-4 text-center hidden xl:table-cell">การชำระเงิน</th>
+                    <th className="p-4 text-center hidden xl:table-cell">สถานะจัดส่ง</th>
+                    <th className="p-4 text-center">จัดการ</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {auctions.map((a, idx) => {
+                    const firstImg = a.PROpicture?.split(',')[0] ?? '';
+                    const img = `${API}${firstImg}`;
+                    const remain = remainLabel(a.end_time, a.status);
+
+                    return (
+                      <tr key={a.Aid} className="border-b border-gray-200 hover:bg-green-50 transition-colors">
+                        <td className="p-4 text-center font-semibold text-gray-700">{idx + 1}</td>
+                        <td className="p-4 text-center font-mono text-sm bg-gray-50">{a.Aid}</td>
+
+                        {/* รูป */}
+                        <td className="p-4 text-center hidden md:table-cell">
+                          <img src={img} className="h-16 w-16 mx-auto rounded-lg object-cover shadow-md" alt={a.PROname} />
+                        </td>
+
+                        {/* ชื่อสินค้า */}
+                        <td className="p-4">
+                          <Link href={`/admin/auctions/${a.Aid}`} className="text-blue-600 hover:text-blue-800 font-semibold hover:underline">
+                            {a.PROname}
+                          </Link>
+                        </td>
+
+                        <td className="p-4 text-right font-semibold text-gray-700">{fmtPrice(a.start_price)}</td>
+                        <td className="p-4 text-right font-semibold text-green-600">{fmtPrice(a.current_price)}</td>
+
+                        {/* ปิดประมูล */}
+                        <td className="p-4 text-center hidden lg:table-cell">
+                          <div className="text-sm text-gray-600">{new Date(a.end_time).toLocaleString('th-TH')}</div>
+                          <div className={`text-xs font-semibold ${remain.c}`}>{remain.t}</div>
+                        </td>
+
+                        {/* ผู้ชนะ */}
+                        <td className="p-4 text-center hidden lg:table-cell">
+                          {a.status === 'closed' ? (
+                            a.winnerName ? (
+                              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-700 border-2 border-yellow-300">
+                                🏆 {a.winnerName}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+
+                        {/* สถานะ open/closed */}
+                        <td className="p-4 text-center">
+                          {a.status === 'open' ? (
+                            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700 border-2 border-green-300">
+                              🟢 เปิด
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-700 border-2 border-gray-300">
+                              🔴 ปิด
+                            </span>
+                          )}
+                        </td>
+
+                        {/* การชำระเงิน */}
+                        <td className="p-4 text-center hidden xl:table-cell">
+                          {a.winnerName ? (
+                            a.payment_status ? (
+                              <>
+                                {a.payment_status === 'pending_payment' && (
+                                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700 border-2 border-orange-300">
+                                    💰 รอชำระ
+                                  </span>
+                                )}
+                                {a.payment_status === 'payment_review' && (
+                                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700 border-2 border-blue-300">
+                                    ⌛ รอตรวจ
+                                  </span>
+                                )}
+                                {a.payment_status === 'paid' && (
+                                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700 border-2 border-green-300">
+                                    ✅ ชำระแล้ว
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+
+                        {/* สถานะจัดส่ง */}
+                        <td className="p-4 text-center hidden xl:table-cell">
+                          {a.winnerName ? (
+                            a.shipping_status ? (
+                              <>
+                                {a.shipping_status === 'pending' && (
+                                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700 border-2 border-orange-300">
+                                    📦 รอจัดส่ง
+                                  </span>
+                                )}
+                                {a.shipping_status === 'shipped' && (
+                                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700 border-2 border-blue-300">
+                                    🚛 กำลังส่ง
+                                  </span>
+                                )}
+                                {a.shipping_status === 'delivered' && (
+                                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700 border-2 border-green-300">
+                                    📬 สำเร็จ
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+
+                        {/* ปุ่มจัดการ */}
+                        <td className="p-4 text-center">
+                          <div className="flex flex-col gap-2">
+                            {a.status === 'open' && (
+                              <button className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap">
+                                ปิดประมูล
+                              </button>
+                            )}
+                            <button className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap">
+                              ลบรอบ
+                            </button>
+                            <button className="bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap">
+                              ลบสินค้า
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* ฟิลเตอร์ */}
-      <div className="flex gap-6 mb-5 flex-wrap">
-        {/* สถานะประมูล */}
-        <div>
-          <label>สถานะประมูล:</label>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as StatusFilter)}
-            className="border px-3  bg-white py-2 rounded ml-2"
-          >
-            <option value="all">ทั้งหมด</option>
-            <option value="open">open</option>
-            <option value="closed">closed</option>
-          </select>
-        </div>
-
-        {/* ผลลัพธ์ */}
-        <div>
-          <label>ผลลัพธ์:</label>
-          <select
-            value={resultFilter}
-            onChange={(e) => setResultFilter(e.target.value as ResultFilter)}
-            className="border px-3  bg-white py-2 rounded ml-2"
-          >
-            <option value="">ทั้งหมด</option>
-            <option value="won">มีผู้ชนะ</option>
-            <option value="unsold">ไม่มีผู้ชนะ</option>
-          </select>
-        </div>
-
-        {/* ชำระเงิน */}
-        <div>
-          <label>ชำระเงิน:</label>
-          <select
-            value={payFilter}
-            onChange={(e) => setPayFilter(e.target.value as PayFilter)}
-            className="border px-3 py-2  bg-white rounded ml-2"
-          >
-            <option value="">ทั้งหมด</option>
-            <option value="pending_payment">รอชำระเงิน</option>
-            <option value="payment_review">รอตรวจสอบ</option>
-            <option value="paid">ชำระเงินแล้ว</option>
-          </select>
-        </div>
-
-        {/* จัดส่ง */}
-        <div>
-          <label>สถานะจัดส่ง:</label>
-          <select
-            value={shipFilter}
-            onChange={(e) => setShipFilter(e.target.value as ShipFilter)}
-            className="border px-3  bg-white py-2 rounded ml-2"
-          >
-            <option value="">ทั้งหมด</option>
-            <option value="pending">รอจัดส่ง</option>
-            <option value="shipped">กำลังจัดส่ง</option>
-            <option value="delivered">จัดส่งสำเร็จ</option>
-          </select>
-        </div>
-      </div>
-
-      {/* ตาราง */}
-      {loading ? (
-        <div className="p-4 bg-white border rounded">กำลังโหลด...</div>
-      ) : auctions.length === 0 ? (
-        <div className="p-4 bg-white border rounded">ไม่พบข้อมูล</div>
-      ) : (
-        <table className="w-full bg-white border">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 border">#</th>
-              <th className="p-2 border">รหัส</th>
-              <th className="p-2 border">รูป</th>
-              <th className="p-2 border">สินค้า</th>
-              <th className="p-2 border">เริ่มต้น</th>
-              <th className="p-2 border">ปัจจุบัน</th>
-              <th className="p-2 border">ปิดประมูล</th>
-              <th className="p-2 border">ผู้ชนะ</th>
-              <th className="p-2 border">สถานะ</th>
-              <th className="p-2 border">การชำระเงิน</th>
-              <th className="p-2 border">สถานะจัดส่ง</th>
-              <th className="p-2 border">จัดการ</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {auctions.map((a, idx) => {
-              const firstImg = a.PROpicture?.split(',')[0] ?? '';
-              const img = `${API}${firstImg}`;
-              const remain = remainLabel(a.end_time, a.status);
-
-              return (
-                <tr key={a.Aid} className="even:bg-gray-50">
-                  <td className="p-2 border text-center">{idx + 1}</td>
-                  <td className="p-2 border text-center">{a.Aid}</td>
-
-                  {/* รูป */}
-                  <td className="p-2 border text-center">
-                    <img src={img} className="h-12 mx-auto rounded" />
-                  </td>
-
-                  {/* ชื่อสินค้า */}
-                  <td className="p-2 border">
-                    <Link href={`/admin/auctions/${a.Aid}`} className="text-blue-600 underline">
-                      {a.PROname}
-                    </Link>
-                  </td>
-
-                  <td className="p-2 border text-right">{fmtPrice(a.start_price)}</td>
-                  <td className="p-2 border text-right">{fmtPrice(a.current_price)}</td>
-
-                  {/* ปิดประมูล */}
-                  <td className="p-2 border text-center">
-                    {new Date(a.end_time).toLocaleString('th-TH')}
-                    <div className={`text-xs ${remain.c}`}>{remain.t}</div>
-                  </td>
-
-                  {/* ผู้ชนะ */}
-                  <td className="p-2 border text-center">
-                    {a.status === 'closed' ? a.winnerName ?? '-' : '-'}
-                  </td>
-
-                  {/* สถานะ open/closed */}
-                  <td className="p-2 border text-center">
-                    {a.status === 'open' ? (
-                      <span className="text-green-600 font-semibold">open</span>
-                    ) : (
-                      <span className="text-gray-600 font-semibold">closed</span>
-                    )}
-                  </td>
-
-                  {/* การชำระเงิน */}
-                  <td className="p-2 border text-center">
-                    {a.winnerName ? (
-                      a.payment_status ? (
-                        <>
-                          {a.payment_status === 'pending_payment' && (
-                            <span className="text-orange-600">รอชำระเงิน</span>
-                          )}
-                          {a.payment_status === 'payment_review' && (
-                            <span className="text-blue-600">รอตรวจ</span>
-                          )}
-                          {a.payment_status === 'paid' && (
-                            <span className="text-green-600">ชำระเงินแล้ว</span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-
-                  {/* สถานะจัดส่ง */}
-                  <td className="p-2 border text-center">
-                    {a.winnerName ? (
-                      a.shipping_status ? (
-                        <>
-                          {a.shipping_status === 'pending' && (
-                            <span className="text-orange-600">รอจัดส่ง</span>
-                          )}
-                          {a.shipping_status === 'shipped' && (
-                            <span className="text-blue-600">กำลังส่ง</span>
-                          )}
-                          {a.shipping_status === 'delivered' && (
-                            <span className="text-green-600">สำเร็จ</span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-
-                  {/* ปุ่มจัดการ */}
-                  <td className="p-2 border text-center">
-                    {a.status === 'open' && (
-                      <button
-                        className="bg-red-500 text-white px-2 py-1 rounded mr-2"
-                      >
-                        ปิดประมูล
-                      </button>
-                    )}
-                    <button className="bg-gray-700 text-white px-2 py-1 rounded mr-2">
-                      ลบรอบ
-                    </button>
-                    <button className="bg-gray-300 px-2 py-1 rounded">
-                      ลบสินค้า
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
     </div>
   );
 }
