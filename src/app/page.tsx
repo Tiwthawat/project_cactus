@@ -106,13 +106,23 @@ useEffect(() => {
     return () => window.removeEventListener("do-search", handleSearch);
   }, []);
 
+  const isFiltered =
+  showFavorites ||
+  !!keyword ||
+  selectedType !== null ||
+  selectedSubtype !== null;
+
+
   return (
     <>
       <Navbar />
 
-      <div className="!pt-16">
-        <BannerSlider />
-      </div>
+      {!isFiltered && (
+  <div className="!pt-16">
+    <BannerSlider />
+  </div>
+)}
+
 
       <main className="mt-16 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
 
@@ -132,7 +142,10 @@ useEffect(() => {
     </>
   ) : /* 2) ถ้าเลือกหมวดหมู่ */ selectedType !== null || selectedSubtype !== null ? (
     <>
-      <h2 className="text-2xl font-semibold mb-4">📂 หมวดหมู่สินค้า</h2>
+       <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+          หมวดหมู่สินค้า
+        </div>
+      
       <CactusItems
         typeid={selectedType ?? undefined}
         subtypeid={selectedSubtype ?? undefined}
@@ -144,6 +157,7 @@ useEffect(() => {
       <section>
   <div className="flex items-center justify-between mb-4">
     <h2 className="text-2xl font-semibold">🔥 กำลังประมูล</h2>
+    
 
     <Link
       href="/auctions"

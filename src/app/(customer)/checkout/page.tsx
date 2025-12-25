@@ -1,6 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { apiFetch } from '@/app/lib/apiFetch';
+
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
 interface CartItem {
   Pid: number;
@@ -24,7 +28,8 @@ interface User {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const type = searchParams.get('type');
+  const type = searchParams.get('type'); // "buynow" | null | "cart"(optional)
+  const isBuyNow = type === 'buynow';
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -32,89 +37,117 @@ export default function CheckoutPage() {
   const [payment, setPayment] = useState<'transfer' | 'cod'>('transfer');
   const [loading, setLoading] = useState(false);
 
-  const totalPrice = cartItems.reduce(
-    (sum, item) => sum + item.Pprice * item.quantity,
-    0
+  const totalPrice = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.Pprice * item.quantity, 0),
+    [cartItems]
   );
   const shippingFee = totalPrice >= 1000 ? 0 : 50;
   const grandTotal = totalPrice + shippingFee;
 
+  const fullAddress = useMemo(() => {
+    if (!user) return '';
+    return [user.Caddress, user.Csubdistrict, user.Cdistrict, user.Cprovince, user.Czipcode]
+      .filter((x) => typeof x === 'string' && x.trim().length > 0)
+      .join(', ');
+  }, [user]);
+
   // -------------------------------
-  // Load user + cart/buynow
+  // Load profile from DB (source of truth)
   // -------------------------------
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    if (storedUser?.Cid) {
-      setUser(storedUser);
-      setCid(storedUser.Cid);
-    }
+    const loadProfile = async () => {
+      try {
+        const res = await apiFetch(`${API}/me`);
+        if (!res.ok) return;
 
-    if (type === 'buynow') {
-      const data = JSON.parse(localStorage.getItem('buynow') || '{}');
-      if (data?.pid) {
-        fetch(`http://localhost:3000/product/${data.pid}`)
-          .then(res => res.json())
-          .then(product => {
-            setCartItems([
-              {
-                Pid: product.Pid,
-                Pname: product.Pname,
-                Ppicture: product.Ppicture.split(',')[0],
-                Pprice: product.Pprice,
-                quantity: data.qty || 1
-              }
-            ]);
-          });
+        const data = await res.json();
+        const u: User | null = (data?.user ?? data) || null;
+
+        if (u?.Cid) {
+          setUser(u);
+          setCid(u.Cid);
+          // 
+          localStorage.setItem('user', JSON.stringify(u));
+        }
+      } catch (err) {
+        console.error('โหลดข้อมูลผู้ใช้ล้มเหลว:', err);
       }
-    } else {
-      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-      setCartItems(cart);
-    }
-  }, [type]);
+    };
+
+    loadProfile();
+  }, []);
 
   // -------------------------------
-  // Update LocalStorage
+  // Load cart / buynow items
+  // -------------------------------
+  useEffect(() => {
+    const loadItems = async () => {
+      try {
+        if (isBuyNow) {
+          const data = JSON.parse(localStorage.getItem('buynow') || '{}') as { pid?: number; qty?: number };
+          if (!data?.pid) {
+            setCartItems([]);
+            return;
+          }
+
+          const res = await apiFetch(`${API}/product/${data.pid}`);
+          if (!res.ok) {
+            setCartItems([]);
+            return;
+          }
+
+          const product = await res.json();
+
+          const pic = typeof product?.Ppicture === 'string' ? product.Ppicture.split(',')[0] : '';
+          setCartItems([
+            {
+              Pid: product.Pid,
+              Pname: product.Pname,
+              Ppicture: pic,
+              Pprice: Number(product.Pprice) || 0,
+              quantity: data.qty || 1,
+            },
+          ]);
+        } else {
+          const cart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
+          setCartItems(Array.isArray(cart) ? cart : []);
+        }
+      } catch (err) {
+        console.error('โหลดรายการสินค้าล้มเหลว:', err);
+        setCartItems([]);
+      }
+    };
+
+    loadItems();
+  }, [isBuyNow]);
+
+  // -------------------------------
+  // Update LocalStorage (cart only)
   // -------------------------------
   const updateCartLS = (items: CartItem[]) => {
     setCartItems(items);
-    if (type === 'cart') {
-      localStorage.setItem('cart', JSON.stringify(items));
-    }
-    if (type === null) {
+    if (!isBuyNow) {
       localStorage.setItem('cart', JSON.stringify(items));
     }
   };
 
   // -------------------------------
-  // Increase
+  // Increase / Decrease / Delete
   // -------------------------------
   const increaseQty = (pid: number) => {
-    const updated = cartItems.map(item =>
-      item.Pid === pid
-        ? { ...item, quantity: item.quantity + 1 }
-        : item
+    const updated = cartItems.map((item) => (item.Pid === pid ? { ...item, quantity: item.quantity + 1 } : item));
+    updateCartLS(updated);
+  };
+
+  const decreaseQty = (pid: number) => {
+    const updated = cartItems.map((item) =>
+      item.Pid === pid ? { ...item, quantity: Math.max(1, item.quantity - 1) } : item
     );
     updateCartLS(updated);
   };
 
-  // -------------------------------
-  // Decrease
-  // -------------------------------
-  const decreaseQty = (pid: number) => {
-    const updated = cartItems
-      .map(item =>
-        item.Pid === pid
-          ? { ...item, quantity: Math.max(1, item.quantity - 1) }
-          : item
-      );
-    updateCartLS(updated);
-  };
-
-  // -------------------------------
-  // Delete
-  // -------------------------------
   const deleteItem = (pid: number) => {
-    const updated = cartItems.filter(item => item.Pid !== pid);
+    const updated = cartItems.filter((item) => item.Pid !== pid);
     updateCartLS(updated);
 
     if (updated.length === 0) {
@@ -134,19 +167,18 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3000/orders', {
+      const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           Cid,
           payment,
           totalPrice: grandTotal,
-          items: cartItems.map(item => ({
+          items: cartItems.map((item) => ({
             Pid: item.Pid,
             price: item.Pprice,
-            quantity: item.quantity
-          }))
-        })
+            quantity: item.quantity,
+          })),
+        }),
       });
 
       const data = await res.json();
@@ -159,13 +191,14 @@ export default function CheckoutPage() {
         if (payment === 'cod') router.push('/me/orders');
         else router.push(`/payment/${data.orderId}`);
       } else {
-        alert(data.message || 'เกิดข้อผิดพลาด');
+        alert(data?.message || 'เกิดข้อผิดพลาด');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   // -------------------------------
@@ -192,26 +225,31 @@ export default function CheckoutPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800">ข้อมูลการจัดส่ง</h2>
           </div>
+
           <div className="space-y-4">
             <input
-              defaultValue={user?.Cname || ''}
+              value={user?.Cname || ''}
+              readOnly
               placeholder="ชื่อผู้รับ"
-              className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:outline-none"
             />
             <input
-              defaultValue={user?.Cphone || ''}
+              value={user?.Cphone || ''}
+              readOnly
               placeholder="เบอร์โทรศัพท์"
-              className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:outline-none"
             />
             <textarea
-              defaultValue={
-                user
-                  ? `${user.Caddress}, ${user.Csubdistrict}, ${user.Cdistrict}, ${user.Cprovince} ${user.Czipcode}`
-                  : ''
-              }
+              value={fullAddress}
+              readOnly
               placeholder="ที่อยู่จัดส่ง"
-              className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors min-h-[100px]"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:outline-none min-h-[100px]"
             />
+            {!user && (
+              <p className="text-sm text-gray-500">
+                กำลังโหลดข้อมูลที่อยู่จากระบบ...
+              </p>
+            )}
           </div>
         </div>
 
@@ -223,6 +261,7 @@ export default function CheckoutPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800">เลือกวิธีชำระเงิน</h2>
           </div>
+
           <div className="space-y-3">
             <label className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-300 cursor-pointer transition-all">
               <input
@@ -264,27 +303,24 @@ export default function CheckoutPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800">รายการสินค้า</h2>
           </div>
+
           <div className="space-y-4">
-            {cartItems.map(item => (
+            {cartItems.map((item) => (
               <div
                 key={item.Pid}
                 className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 hover:border-green-300 transition-all"
               >
                 <img
-                  src={`http://localhost:3000${item.Ppicture}`}
+                  src={`${API}${item.Ppicture}`}
                   className="w-24 h-24 object-cover rounded-xl shadow-sm"
                   alt={item.Pname}
                 />
 
                 <div className="flex-grow">
                   <p className="font-bold text-gray-800 text-lg">{item.Pname}</p>
-                  <p className="text-green-600 font-semibold">
-                    ราคา {item.Pprice} บาท
-                  </p>
+                  <p className="text-green-600 font-semibold">ราคา {item.Pprice} บาท</p>
 
-                  {/* qty controls */}
                   <div className="flex items-center gap-3 mt-2">
-                    {/* decrease */}
                     <button
                       onClick={() => decreaseQty(item.Pid)}
                       className="w-8 h-8 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
@@ -292,25 +328,20 @@ export default function CheckoutPage() {
                       -
                     </button>
 
-                    {/* input – allow typing */}
                     <input
                       type="number"
                       min={1}
                       value={item.quantity}
                       onChange={(e) => {
-                        let val = parseInt(e.target.value);
-
+                        let val = parseInt(e.target.value, 10);
                         if (isNaN(val) || val < 1) val = 1;
 
-                        const updated = cartItems.map(x =>
-                          x.Pid === item.Pid ? { ...x, quantity: val } : x
-                        );
+                        const updated = cartItems.map((x) => (x.Pid === item.Pid ? { ...x, quantity: val } : x));
                         updateCartLS(updated);
                       }}
                       className="w-16 bg-white text-center border-2 border-gray-300 rounded-lg p-1 font-semibold"
                     />
 
-                    {/* increase */}
                     <button
                       onClick={() => increaseQty(item.Pid)}
                       className="w-8 h-8 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
@@ -318,7 +349,6 @@ export default function CheckoutPage() {
                       +
                     </button>
 
-                    {/* delete */}
                     <button
                       onClick={() => deleteItem(item.Pid)}
                       className="ml-4 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1 rounded-lg font-semibold transition-colors"
@@ -334,6 +364,8 @@ export default function CheckoutPage() {
                 </div>
               </div>
             ))}
+
+            {!cartItems.length && <p className="text-gray-500">ไม่มีสินค้าในรายการ</p>}
           </div>
         </div>
 
@@ -360,7 +392,7 @@ export default function CheckoutPage() {
 
         <button
           onClick={handleOrder}
-          disabled={loading}
+          disabled={loading || !user || cartItems.length === 0}
           className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
         >
           {loading ? 'กำลังสั่งซื้อ...' : 'ยืนยันคำสั่งซื้อ'}

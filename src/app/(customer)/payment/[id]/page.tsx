@@ -1,6 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { apiFetch } from '@/app/lib/apiFetch';
 
 interface Transfer {
   Tid: number;
@@ -8,7 +10,7 @@ interface Transfer {
   Tnum: string;
   Taccount: string;
   Tbranch: string;
-  Tqr: string;
+  Tqr: string; // path เช่น "/qrs/xxx.png"
 }
 
 interface Order {
@@ -19,9 +21,22 @@ interface Order {
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
+const getImageUrl = (path: string | null | undefined) => {
+  if (!path) return '/no-image.png';
+  const clean = String(path).trim();
+  if (clean.startsWith('http')) return clean;
+  if (clean.startsWith('/')) return `${API}${clean}`;
+  return `${API}/${clean}`;
+};
+
 export default function PaymentPage() {
-  const { id } = useParams();
+  const params = useParams();
   const router = useRouter();
+
+  const id = useMemo(() => {
+    const raw = (params as any)?.id;
+    return Array.isArray(raw) ? raw[0] : raw;
+  }, [params]);
 
   const [order, setOrder] = useState<Order | null>(null);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -29,79 +44,117 @@ export default function PaymentPage() {
   const [slip, setSlip] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
+  // โหลด order + transfers
   useEffect(() => {
-    // โหลดคำสั่งซื้อ
-    fetch(`${API}/orders/${id}`)
-      .then((res) => res.json())
-      .then((data: Order) => setOrder(data))
-      .catch(() => setOrder(null));
+    if (!id) return;
 
-    // โหลดบัญชีโอน
-    fetch(`${API}/transfer`)
-      .then((res) => res.json())
-      .then((data: Transfer[]) => setTransfers(data))
-      .catch(() => setTransfers([]));
+    const load = async () => {
+      setPageError(null);
+      try {
+        const [orderRes, transferRes] = await Promise.all([
+          apiFetch(`${API}/orders/${id}`),
+          apiFetch(`${API}/transfer`),
+        ]);
+
+        if (!orderRes.ok) {
+          setOrder(null);
+          setPageError('ไม่พบคำสั่งซื้อ หรือไม่มีสิทธิ์เข้าถึง');
+        } else {
+          const od = await orderRes.json();
+          // บาง route ของเธออาจคืน { ...order, items } ก็ยัง ok เพราะเราดึงเฉพาะฟิลด์นี้
+          setOrder({
+            Oid: Number(od.Oid),
+            Oprice: Number(od.Oprice),
+            Ostatus: String(od.Ostatus),
+          });
+        }
+
+        if (!transferRes.ok) {
+          setTransfers([]);
+        } else {
+          const ts = await transferRes.json();
+          setTransfers(Array.isArray(ts) ? ts : []);
+        }
+      } catch (err) {
+        console.error(err);
+        setOrder(null);
+        setTransfers([]);
+        setPageError('โหลดข้อมูลไม่สำเร็จ');
+      }
+    };
+
+    load();
   }, [id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
+
     if (file && file.size > 3 * 1024 * 1024) {
       alert('ไฟล์ใหญ่เกิน 3MB');
       return;
     }
+
     setSlip(file);
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    } else {
+
+    if (!file) {
       setPreview(null);
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onloadend = () => setPreview(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async () => {
-    if (!slip || !selectedTid || !order) {
+    if (!order) return;
+    if (!slip || !selectedTid) {
       alert('กรุณาเลือกช่องทางโอนและแนบสลิป');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('Oid', String(id));
-    formData.append('Payprice', String(order.Oprice));
-    formData.append('slip', slip);
-    formData.append('Tid', String(selectedTid));
-
     setLoading(true);
     try {
-      const res = await fetch(`${API}/payment`, {
+      const formData = new FormData();
+      formData.append('Oid', String(order.Oid));
+      formData.append('Payprice', String(order.Oprice));
+      formData.append('slip', slip);
+      formData.append('Tid', String(selectedTid));
+
+      const res = await apiFetch(`${API}/payment`, {
         method: 'POST',
-        body: formData,
+        body: formData, // ✅ ต้องเป็น FormData
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
         alert('แจ้งชำระเงินสำเร็จ!');
         router.push('/me/orders');
       } else {
-        alert(data.message || 'เกิดข้อผิดพลาด');
+        alert(data?.message || 'เกิดข้อผิดพลาด');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('เชื่อมต่อ server ไม่ได้');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!order) {
-    return (
-      <p className="text-center bg-white p-10">
-        กำลังโหลดข้อมูลคำสั่งซื้อ...
-      </p>
-    );
+  // Loading / Error
+  if (pageError) {
+    return <p className="text-center bg-white p-10 text-red-600">{pageError}</p>;
   }
-  // ถ้าออเดอร์กำลังตรวจสอบ หรือจ่ายแล้ว → ห้ามส่งซ้ำ
-  if (order.Ostatus === "payment_review") {
+
+  if (!order) {
+    return <p className="text-center bg-white p-10">กำลังโหลดข้อมูลคำสั่งซื้อ...</p>;
+  }
+
+  // บล็อกส่งซ้ำ
+  if (order.Ostatus === 'payment_review') {
     return (
       <p className="text-center p-10 text-orange-600 bg-white">
         สลิปกำลังตรวจสอบ กรุณารอแอดมินยืนยันค่ะ
@@ -109,7 +162,7 @@ export default function PaymentPage() {
     );
   }
 
-  if (order.Ostatus === "paid") {
+  if (order.Ostatus === 'paid') {
     return (
       <p className="text-center p-10 text-green-600 bg-white">
         ชำระเงินแล้ว ไม่ต้องส่งสลิปซ้ำค่ะ
@@ -117,125 +170,94 @@ export default function PaymentPage() {
     );
   }
 
-
+  // UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
-      <div className="max-w-4xl pt-32 mx-auto p-6">
-        {/* Header */}
+      <div className="max-w-5xl mx-auto pt-32 p-6">
         <div className="text-center mb-8">
           <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
-            ชำระเงิน
+            แจ้งชำระเงิน
           </div>
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
-            แจ้งชำระเงิน
+            ส่งสลิปการโอน
           </h1>
+          <p className="text-gray-600">
+            ออเดอร์ #{order.Oid} • ยอดที่ต้องชำระ <span className="font-semibold text-green-700">{order.Oprice}</span> บาท
+          </p>
         </div>
 
-        {/* Order Info Card */}
+        {/* เลือกบัญชีโอน */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              📋
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">ข้อมูลคำสั่งซื้อ</h2>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">เลขคำสั่งซื้อ:</span>
-              <span className="font-bold text-lg">#{order.Oid}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">ยอดที่ต้องชำระ:</span>
-              <span className="text-2xl font-bold text-green-600">{order.Oprice} บาท</span>
-            </div>
-          </div>
-        </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">เลือกบัญชีสำหรับโอน</h2>
 
-        {/* Transfer Methods Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              🏦
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">เลือกช่องทางการโอน</h2>
-          </div>
-          <div className="space-y-4">
-            {transfers.map((t) => (
-              <label
-                key={t.Tid}
-                className={`flex items-start justify-between border-2 p-4 rounded-xl cursor-pointer transition-all duration-300 ${selectedTid === t.Tid
-                    ? 'border-green-400 bg-green-50 shadow-md'
-                    : 'border-gray-200 hover:border-green-300 hover:shadow-sm'
-                  }`}
-              >
-                <div className="flex items-start gap-3 flex-1">
-                  <input
-                    type="radio"
-                    name="transfer"
-                    value={t.Tid}
-                    className="mt-1 w-5 h-5 text-green-600"
-                    onChange={() => setSelectedTid(t.Tid)}
-                  />
-                  <div>
-                    <p className="font-bold text-gray-800 text-lg">
-                      {t.Tname} — {t.Taccount}
-                    </p>
-                    <p className="text-gray-600">
-                      เลขบัญชี: {t.Tnum}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      สาขา: {t.Tbranch}
-                    </p>
-                  </div>
-                </div>
-                {t.Tqr && (
-                  <img
-                    src={t.Tqr}
-                    alt="QR"
-                    className="w-24 h-24 object-contain border-2 border-gray-200 rounded-xl shadow-sm"
-                  />
-                )}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Upload Slip Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              📎
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">แนบสลิป</h2>
-          </div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="block w-full border-2 border-gray-200 p-3 rounded-xl cursor-pointer bg-gray-50 hover:border-green-300 transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-green-500 file:text-white file:font-semibold hover:file:bg-green-600"
-          />
-          {preview && (
-            <div className="mt-4">
-              <img
-                src={preview}
-                alt="preview"
-                className="w-full h-auto rounded-xl shadow-lg border-2 border-gray-200"
-              />
+          {transfers.length === 0 ? (
+            <p className="text-gray-500">ยังไม่มีบัญชีโอน</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {transfers.map((t) => {
+                const active = selectedTid === t.Tid;
+                return (
+                  <button
+                    key={t.Tid}
+                    onClick={() => setSelectedTid(t.Tid)}
+                    className={[
+                      'text-left p-4 rounded-2xl border-2 transition-all',
+                      active ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300',
+                    ].join(' ')}
+                    type="button"
+                  >
+                    <div className="flex items-start gap-4">
+                      <img
+                        src={getImageUrl(t.Tqr)}
+                        alt="QR"
+                        className="w-24 h-24 object-cover rounded-xl border"
+                      />
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800">{t.Tname}</p>
+                        <p className="text-gray-700">เลขบัญชี: <span className="font-semibold">{t.Tnum}</span></p>
+                        <p className="text-gray-700">ชื่อบัญชี: {t.Taccount}</p>
+                        <p className="text-gray-700">สาขา: {t.Tbranch}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
+        {/* แนบสลิป */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">แนบสลิป</h2>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="block w-full text-sm text-gray-700
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-xl file:border-0
+              file:text-sm file:font-semibold
+              file:bg-green-50 file:text-green-700
+              hover:file:bg-green-100"
+          />
+
+          {preview && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-2">ตัวอย่างสลิป:</p>
+              <img src={preview} alt="slip preview" className="max-w-full rounded-xl border shadow-sm" />
+            </div>
+          )}
+
+          <p className="text-xs text-gray-500 mt-3">* รองรับรูปภาพ ขนาดไม่เกิน 3MB</p>
+        </div>
+
         <button
           onClick={handleSubmit}
-          disabled={
-            loading ||
-            !slip ||
-            !selectedTid ||
-            order.Ostatus !== "pending_payment"
-          }
-          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-4 text-lg rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading || !selectedTid || !slip}
+          className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
         >
-          {loading ? 'กำลังส่งข้อมูล...' : 'แจ้งชำระเงิน'}
+          {loading ? 'กำลังส่ง...' : 'ยืนยันส่งสลิป'}
         </button>
       </div>
     </div>

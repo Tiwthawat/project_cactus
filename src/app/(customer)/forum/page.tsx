@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from "react";
-
+import { apiFetch } from "@/app/lib/apiFetch";
 import PostList from "@/app/component/PostList";
 import PostModal from "@/app/component/PostModal";
 import CreatePostModal from "@/app/component/CreatePostModal";
@@ -31,14 +31,14 @@ export default function ForumPage() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/me`,)
       .then((res) => res.json())
       .then((data) => setUser(data.user || null));
   }, []);
 
   /* โหลดรายการกระทู้ */
   const loadList = async () => {
-    const res = await fetch(`${API}/forum/list`);
+    const res = await apiFetch(`${API}/forum/list`);
     const data = await res.json();
     if (Array.isArray(data)) setQuestions(data);
     setLoading(false);
@@ -50,7 +50,7 @@ export default function ForumPage() {
 
   /* เปิดโพสต์ */
   const openPost = async (Askid: number) => {
-    const res = await fetch(`${API}/forum/${Askid}`);
+    const res = await apiFetch(`${API}/forum/${Askid}`);
     const data = await res.json();
     setSelectedPost(data);
     setOpenModal(true);
@@ -61,18 +61,17 @@ export default function ForumPage() {
     const token = localStorage.getItem("token");
     if (!token) return alert("กรุณาเข้าสู่ระบบ");
 
-    const res = await fetch(
+    const res = await apiFetch(
       `${API}/forum/${selectedPost!.topic.Askid}/reply`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ Replydetails: replyText }),
       }
     );
 
     const data = await res.json();
     if (data.success) {
-      const reload = await fetch(`${API}/forum/${selectedPost!.topic.Askid}`);
+      const reload = await apiFetch(`${API}/forum/${selectedPost!.topic.Askid}`);
       setSelectedPost(await reload.json());
       setReplyText("");
     }
@@ -83,12 +82,9 @@ export default function ForumPage() {
     const token = localStorage.getItem("token");
     if (!token) return alert("กรุณาเข้าสู่ระบบ");
 
-    const res = await fetch(`${API}/forum`, {
+    const res = await apiFetch(`${API}/forum`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+     
       body: JSON.stringify({ Asktopic: topic, Askdetails: details }),
     });
 
@@ -106,9 +102,9 @@ export default function ForumPage() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    await fetch(`${API}/forum/${Askid}`, {
+    await apiFetch(`${API}/forum/${Askid}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      
     });
 
     setOpenModal(false);
@@ -122,19 +118,16 @@ export default function ForumPage() {
 
     const token = localStorage.getItem("token");
 
-    await fetch(`${API}/forum/${topicData.Askid}`, {
+    await apiFetch(`${API}/forum/${topicData.Askid}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      
       body: JSON.stringify({
         Asktopic: newTopic,
         Askdetails: newDetails,
       }),
     });
 
-    const reload = await fetch(`${API}/forum/${topicData.Askid}`);
+    const reload = await apiFetch(`${API}/forum/${topicData.Askid}`);
     setSelectedPost(await reload.json());
     await loadList();
   };const onDeleteReply = async (Replyid: number) => {
@@ -143,13 +136,13 @@ export default function ForumPage() {
   const token = localStorage.getItem("token");
   if (!token) return;
 
-  await fetch(`${API}/forum/reply/${Replyid}`, {
+  await apiFetch(`${API}/forum/reply/${Replyid}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    
   });
 
   // reload post
-  const reload = await fetch(`${API}/forum/${selectedPost!.topic.Askid}`);
+  const reload = await apiFetch(`${API}/forum/${selectedPost!.topic.Askid}`);
   setSelectedPost(await reload.json());
 };
 
@@ -159,16 +152,13 @@ export default function ForumPage() {
 
     const token = localStorage.getItem("token");
 
-    await fetch(`${API}/forum/reply/${reply.Replyid}`, {
+    await apiFetch(`${API}/forum/reply/${reply.Replyid}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      
       body: JSON.stringify({ Replydetails: newText }),
     });
 
-    const reload = await fetch(`${API}/forum/${selectedPost!.topic.Askid}`);
+    const reload = await apiFetch(`${API}/forum/${selectedPost!.topic.Askid}`);
     setSelectedPost(await reload.json());
   };
 
@@ -177,7 +167,10 @@ export default function ForumPage() {
     <main className="flex pt-36 flex-col items-center min-h-screen bg-white px-6">
       <div className="w-full max-w-2xl text-black">
 
-        <h1 className="text-2xl font-bold mb-4 text-center">กระทู้ถาม–ตอบ</h1>
+        
+        <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+          กระทู้ถาม–ตอบ
+        </div>
 
         {/* สร้างโพสต์ */}
         <div className="bg-white border rounded-xl shadow-sm p-4 mb-6 flex gap-3 items-center">
