@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { apiFetch } from "@/app/lib/apiFetch";
 
 interface MyBiddingItem {
   Aid: number;
@@ -70,17 +71,20 @@ export default function MyBiddingPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
+       if (!localStorage.getItem('token')) {
+  setLoading(false);
+  return;
+}
 
-        const res = await fetch(`${API}/me/my-bidding`, {
-          headers: { Authorization: `Bearer ${token}` }
+
+        const res = await apiFetch(`${API}/me/my-bidding`, {
+          
         });
 
         const data = await res.json();
 
         if (Array.isArray(data)) {
-          const sorted = data.sort((a, b) => {
+          const sorted = [...data].sort((a, b) => {
             const wa = getSortWeight(a);
             const wb = getSortWeight(b);
 
@@ -104,7 +108,7 @@ export default function MyBiddingPage() {
 
     load();
 
-    // ⭐ รีเฟรชทุก 4 วินาที
+    
     const interval = setInterval(load, 1000);
     return () => clearInterval(interval);
   }, []);

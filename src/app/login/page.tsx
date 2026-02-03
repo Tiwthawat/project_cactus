@@ -128,11 +128,16 @@ interface LoginResponse {
 
 const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
-  if (localStorage.getItem("token")) {
-    alert("ตอนนี้มีผู้ใช้งานล็อกอินอยู่แล้ว กรุณาออกจากระบบก่อน");
-    return;
-  }
-
+  if (isLoggedIn()) {
+  alert("ตอนนี้มีผู้ใช้งานล็อกอินอยู่แล้ว กรุณาออกจากระบบก่อน");
+  return;
+} else {
+  // token เก่าหมดอายุ/พัง ลบทิ้งได้
+  localStorage.removeItem("token");
+  localStorage.removeItem("role");
+  localStorage.removeItem("user");
+  localStorage.removeItem("admin");
+}
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/login`, {
       method: "POST",
@@ -166,6 +171,21 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     alert("เกิดข้อผิดพลาด");
   }
 };
+
+ function isLoggedIn() {
+  const token = localStorage.getItem("token");
+  if (!token) return false;
+
+  try {
+    const payloadPart = token.split(".")[1];
+    const payload = JSON.parse(atob(payloadPart.replace(/-/g, "+").replace(/_/g, "/")));
+    if (!payload?.exp) return true; // ถ้าไม่มี exp ก็ถือว่ามี token
+    return Date.now() < payload.exp * 1000;
+  } catch {
+    return false;
+  }
+}
+
 
 
   // ================================

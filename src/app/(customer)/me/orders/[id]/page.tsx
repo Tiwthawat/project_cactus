@@ -1,6 +1,16 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { apiFetch } from "@/app/lib/apiFetch";
+import { useRouter } from 'next/navigation';
+
+
+
+
+const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
+
+
 
 interface Item {
   Pid: number;
@@ -15,159 +25,182 @@ interface Order {
   Odate: string;
   Oprice: number;
   Ostatus: string;
-  Oslip: string;
+  Oslip: string | null;
   Opayment: string;
   items: Item[];
 }
+
 interface Review {
   stars: number;
   text: string;
 }
 
-
-
-
-
 export default function OrderDetailPage() {
+    const router = useRouter();
   const params = useParams();
   const id = params?.id?.toString();
+
   const [order, setOrder] = useState<Order | null>(null);
+  const [review, setReview] = useState<Review | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [review, setReview] = useState<Review | null>(null);
 
-  const fetchReviewAgain = async () => {
-    if (!id) return;
-    const res = await fetch(`http://localhost:3000/orders/${id}/review`);
-    const data = await res.json();
-    setReview(data);
-  };
-
-  useEffect(() => {
-    if (!id) return;
-    fetch(`http://localhost:3000/orders/${id}`)
-      .then(res => res.json())
-      .then(data => setOrder(data))
-      .catch(err => console.error('โหลดคำสั่งซื้อผิดพลาด:', err))
-      .finally(() => setLoading(false));
-  }, [id]);
-
+  // -----------------------------
+  // Load order + review
+  // -----------------------------
   useEffect(() => {
     if (!id) return;
 
-    fetch(`http://localhost:3000/orders/${id}`)
-      .then(res => res.json())
-      .then(data => setOrder(data))
-      .catch(err => console.error('โหลดคำสั่งซื้อผิดพลาด:', err))
-      .finally(() => setLoading(false));
+    const load = async () => {
+      try {
+        const res = await apiFetch(`${API}/orders/${id}`);
+        const data = await res.json();
+        setOrder(data);
 
-    fetch(`http://localhost:3000/orders/${id}/review`)
-      .then(res => res.json())
-      .then(data => {
-        if (data) setReview(data);
-      });
+        const reviewRes = await apiFetch(`${API}/orders/${id}/review`);
+        const reviewData = await reviewRes.json();
+        if (reviewData) setReview(reviewData);
+      } catch (err) {
+        console.error('โหลดคำสั่งซื้อผิดพลาด:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, [id]);
 
-
+  // -----------------------------
+  // Slip file change
+  // -----------------------------
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    if (file && file.size > 3 * 1024 * 1024) {
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
       alert('ไฟล์ใหญ่เกิน 3MB');
       return;
     }
+
     setSlipFile(file);
+
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result as string);
-    if (!slipFile) {
-      alert('กรุณาเลือกไฟล์ก่อน');
-      return;
-    } const formData = new FormData();
-    formData.append('file', slipFile);
+    reader.readAsDataURL(file);
   };
 
+  // -----------------------------
+  // Upload slip
+  // -----------------------------
   const handleSlipUpload = async () => {
-    if (!slipFile || !id) return alert('กรุณาเลือกสลิปก่อนอัปโหลด');
+    if (!slipFile || !id) {
+      alert('กรุณาเลือกสลิปก่อน');
+      return;
+    }
 
-    const formData = new FormData();
-    formData.append('file', slipFile);
+    try {
+      const formData = new FormData();
+      formData.append('file', slipFile);
 
-    const res = await fetch('http://localhost:3000/upload', {
-      method: 'POST',
-      body: formData,
-    });
+      const uploadRes = await apiFetch(`${API}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
 
-    const { url } = await res.json();
+      const { url } = await uploadRes.json();
 
-    await fetch(`http://localhost:3000/orders/${id}/slip`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slipUrl: url }),
-    });
+      await apiFetch(`${API}/orders/${id}/slip`, {
+        method: 'PATCH',
+        body: JSON.stringify({ slipUrl: url }),
+      });
 
-    const updated = await fetch(`http://localhost:3000/orders/${id}`).then(res => res.json());
-    setOrder(updated);
-    setSlipFile(null);
-    setPreview(null);
-    alert('อัปโหลดสลิปเรียบร้อย');
+      const updated = await apiFetch(`${API}/orders/${id}`).then(res => res.json());
+      setOrder(updated);
+      setSlipFile(null);
+      setPreview(null);
+
+      alert('อัปโหลดสลิปเรียบร้อย');
+    } catch (err) {
+      alert('อัปโหลดสลิปล้มเหลว');
+      console.error(err);
+    }
   };
-  const handleConfirmReceived = async () => {
-    const confirm = window.confirm('ยืนยันว่าคุณได้รับสินค้าแล้ว?');
-    if (!confirm) return;
 
-    await fetch(`http://localhost:3000/orders/${id}/status`, {
+  // -----------------------------
+  // Confirm received
+  // -----------------------------
+  const handleConfirmReceived = async () => {
+    const ok = window.confirm('ยืนยันว่าคุณได้รับสินค้าแล้ว?');
+    if (!ok || !id) return;
+
+    await apiFetch(`${API}/orders/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'delivered' }),
     });
 
-    const updated = await fetch(`http://localhost:3000/orders/${id}`).then(res => res.json());
+    const updated = await apiFetch(`${API}/orders/${id}`).then(res => res.json());
     setOrder(updated);
   };
 
+  // -----------------------------
+  // Review submit
+  // -----------------------------
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
 
-    await fetch(`http://localhost:3000/orders/${id}/review`, {
+    await apiFetch(`${API}/orders/${id}/review`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stars: rating, text: comment }),
     });
 
     alert('ส่งรีวิวสำเร็จ!');
-    await fetchReviewAgain();
+    const reviewRes = await apiFetch(`${API}/orders/${id}/review`);
+    setReview(await reviewRes.json());
   };
+
   const handleDeleteReview = async () => {
-    const confirmDelete = confirm('ต้องการลบรีวิวนี้หรือไม่?');
-    if (!confirmDelete) return;
+    const ok = window.confirm('ต้องการลบรีวิวนี้หรือไม่?');
+    if (!ok || !id) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/review/${id}`, {
+      const res = await apiFetch(`${API}/review/${id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
       });
 
-      if (!res.ok) throw new Error('ลบรีวิวไม่สำเร็จ');
-      setReview(null); // ล้างรีวิวจาก state เพื่อให้แสดงแบบฟอร์มใหม่
-    } catch (err) {
-      alert('เกิดข้อผิดพลาดในการลบรีวิว');
+      if (!res.ok) throw new Error();
+      setReview(null);
+    } catch {
+      alert('ลบรีวิวไม่สำเร็จ');
     }
   };
+  const handleBuyAgain = () => {
+  if (!order) return;
+
+  const newCart = order.items.map(item => ({
+    Pid: item.Pid,
+    Pname: item.Pname,
+    Ppicture: item.Ppicture,
+    Pprice: item.Oprice,
+    quantity: item.Oquantity,
+  }));
+
+  localStorage.setItem('cart', JSON.stringify(newCart));
+  alert('เพิ่มสินค้าเข้าตะกร้าแล้ว');
+  router.push('/cart');
+};
 
 
-
-
-
-
+  // -----------------------------
+  // UI states
+  // -----------------------------
   if (loading) return <p className="p-6 text-center">กำลังโหลดข้อมูล...</p>;
   if (!order) return <p className="p-6 text-center text-red-600">ไม่พบคำสั่งซื้อ</p>;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
       <div className="max-w-4xl mx-auto pt-32 p-6">
@@ -320,6 +353,16 @@ export default function OrderDetailPage() {
             </button>
           </div>
         )}
+
+        {order.Ostatus === 'delivered' && (
+  <button
+    onClick={handleBuyAgain}
+    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold"
+  >
+    🔁 สั่งซื้ออีกครั้ง
+  </button>
+)}
+
 
         {/* Upload Slip */}
         {order.Opayment !== 'cod' && (

@@ -15,6 +15,21 @@ interface Product {
   Pdetail: string;
 }
 
+interface ProductOrderReview {
+  id: number;
+  text: string;
+  stars: number;
+  created_at: string;
+  order_id: number;
+  images?: string[];
+}
+
+interface ReviewSummary {
+  avg_stars: number;
+  total: number;
+}
+
+
 export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
@@ -23,8 +38,54 @@ export default function ProductDetail() {
 
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
 
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+const [reviews, setReviews] = useState<ProductOrderReview[]>([]);
+const [reviewLoading, setReviewLoading] = useState(true);
+
+
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+const fetchReviews = async () => {
+  if (!id) return;
+
+  try {
+    setReviewLoading(true);
+
+    const headers: HeadersInit = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const [sumRes, listRes] = await Promise.all([
+      fetch(`http://localhost:3000/products/${id}/reviews/summary`, { headers }),
+      fetch(`http://localhost:3000/products/${id}/reviews`, { headers }),
+    ]);
+
+    // ถ้า backend ส่ง error message กลับมา (เช่น ไม่มี token) จะไม่ใช่ array → กันไว้
+    const sumJson: any = sumRes.ok ? await sumRes.json() : null;
+    const listJson: any = listRes.ok ? await listRes.json() : null;
+
+    // ถ้าโดน 401/403 ให้โชว์ 0 รีวิวแบบเนียนๆ (หรือจะให้ขึ้นข้อความก็ได้)
+    if (sumRes.status === 401 || sumRes.status === 403 || listRes.status === 401 || listRes.status === 403) {
+      setReviewSummary({ avg_stars: 0, total: 0 });
+      setReviews([]);
+      return;
+    }
+
+    setReviewSummary({
+      avg_stars: Number(sumJson?.avg_stars ?? 0),
+      total: Number(sumJson?.total ?? 0),
+    });
+
+    setReviews(Array.isArray(listJson) ? listJson : []);
+  } catch {
+    setReviewSummary({ avg_stars: 0, total: 0 });
+    setReviews([]);
+  } finally {
+    setReviewLoading(false);
+  }
+};
+
+
 
   // 👉 โหลดสินค้าพร้อมสถานะ favorite
   useEffect(() => {
@@ -54,6 +115,7 @@ export default function ProductDetail() {
 
     fetchProduct();
     fetchFavoriteStatus();
+      fetchReviews();
   }, [id, token]);
 
 
@@ -247,8 +309,95 @@ export default function ProductDetail() {
 
             </div>
           </div>
+          
 
+        </div>{/* ================= รีวิวสินค้า ================= */}
+{/* ================= รีวิวสินค้า (ดึงจากรีวิวออเดอร์) ================= */}
+<div className="mt-16 border-t pt-10">
+  <div className="max-w-6xl mx-auto">
+    <div className="flex items-start justify-between gap-3 mb-2">
+      <h2 className="text-2xl font-bold text-gray-800">⭐ รีวิว</h2>
+      <span className="text-xs px-3 py-1 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">
+        รีวิวการสั่งซื้อ (อาจมีหลายสินค้าในออเดอร์)
+      </span>
+    </div>
+
+    <p className="text-sm text-gray-500 mb-6">
+      * แสดงรีวิวจากคำสั่งซื้อที่มีสินค้านี้อยู่จริง (รีวิว 1 ครั้งต่อออเดอร์)
+    </p>
+
+    {/* Summary */}
+    <div className="bg-gray-50 border rounded-2xl p-6 mb-8">
+      {reviewLoading ? (
+        <p className="text-gray-500">กำลังโหลดสรุปรีวิว...</p>
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="text-5xl font-extrabold text-yellow-500">
+            {(reviewSummary?.avg_stars ?? 0).toFixed(1)}
+          </div>
+          <div>
+            <div className="text-yellow-500 text-sm">
+              {"★".repeat(Math.round(reviewSummary?.avg_stars ?? 0))}
+              {"☆".repeat(5 - Math.round(reviewSummary?.avg_stars ?? 0))}
+            </div>
+            <div className="text-sm text-gray-600">
+              จากทั้งหมด {reviewSummary?.total ?? 0} รีวิว
+            </div>
+          </div>
         </div>
+      )}
+    </div>
+
+    {/* List */}
+    {reviewLoading ? (
+      <p className="text-gray-500">กำลังโหลดรีวิว...</p>
+    ) : reviews.length === 0 ? (
+      <div className="bg-white border rounded-2xl p-8 text-center text-gray-500">
+        ยังไม่มีรีวิวสำหรับสินค้านี้
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {reviews.map((r) => (
+          <div key={r.id} className="bg-white border rounded-xl p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  ออเดอร์ #{r.order_id}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {new Date(r.created_at).toLocaleString("th-TH")}
+                </span>
+              </div>
+
+              <span className="text-yellow-500 text-sm">
+                {"★".repeat(r.stars)}{"☆".repeat(5 - r.stars)}
+              </span>
+            </div>
+
+            <p className="text-sm text-gray-700 bg-gray-50 p-4 rounded-xl">
+              “{r.text}”
+            </p>
+
+            {!!r.images?.length && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {r.images.map((img, i) => (
+                  <img
+                    key={i}
+                    src={`http://localhost:3000${img}`}
+                    alt="review"
+                    className="w-24 h-24 object-cover rounded-lg border"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</div>
+
+
       </div>
     </div>
   );

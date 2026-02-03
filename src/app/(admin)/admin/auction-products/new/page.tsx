@@ -123,131 +123,141 @@ export default function AddAuctionProductPage() {
 
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-lg text-black">
-      <h1 className="text-2xl font-bold mb-6 text-center">เพิ่มสินค้าสำหรับประมูล</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow border">
-        {/* ชื่อสินค้า */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อสินค้า</label>
-          <input
-            type="text"
-            name="PROname"
-            value={form.PROname}
-            onChange={handleChange}
-            required
-            className="w-full bg-white text-gray-800 rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 placeholder-gray-400"
-            placeholder="เช่น Astrophytum superkabuto"
-          />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
+      <div className="w-full max-w-3xl mx-auto p-6 pt-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+            เพิ่มสินค้าประมูล
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            🏺 เพิ่มสินค้าสำหรับประมูล
+          </h1>
         </div>
 
-        {/* ราคา (ของตัวสินค้า—not start_price) */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ราคาอ้างอิง (บาท)</label>
-          <input
-            type="number"
-            name="PROprice"
-            value={form.PROprice}
-            onChange={handleChange}
-            min={0}
-            step="0.01"
-            required
-            className="w-full rounded-md bg-white text-gray-800 border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 placeholder-gray-400"
-            placeholder="เช่น 350.00"
-          />
-        </div>
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 p-8 space-y-6">
+          {/* ชื่อสินค้า */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อสินค้า *</label>
+            <input
+              type="text"
+              name="PROname"
+              value={form.PROname}
+              onChange={handleChange}
+              required
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-800 focus:border-green-400 focus:outline-none transition-colors placeholder-gray-400"
+              placeholder="เช่น Astrophytum superkabuto"
+            />
+          </div>
 
+          {/* ราคาอ้างอิง */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">ราคาอ้างอิง (บาท) *</label>
+            <input
+              type="number"
+              name="PROprice"
+              value={form.PROprice}
+              onChange={handleChange}
+              min={0}
+              step="0.01"
+              required
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-800 focus:border-green-400 focus:outline-none transition-colors placeholder-gray-400"
+              placeholder="เช่น 350.00"
+            />
+          </div>
 
+          {/* รายละเอียด */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">รายละเอียดสินค้า</label>
+            <textarea
+              name="PROdetail"
+              value={form.PROdetail}
+              onChange={handleChange}
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-800 focus:border-green-400 focus:outline-none transition-colors placeholder-gray-400 h-32"
+              placeholder="ใส่ข้อมูลรายละเอียดคร่าวๆ ของสินค้า"
+            />
+          </div>
 
+          {/* อัปโหลดรูป */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">อัปโหลดรูปสินค้า</label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-800 focus:border-green-400 focus:outline-none transition-colors"
+            />
 
-        {/* รายละเอียดสินค้า */}
-        <div>
-          <label className="block  mb-1">รายละเอียดสินค้า</label>
-          <textarea
-            name="PROdetail"
-            value={form.PROdetail}
-            onChange={handleChange}
-            className="border rounded bg-white w-full p-2 h-24"
-            placeholder="ใส่ข้อมูลรายละเอียดคร่าวๆ ของสินค้า"
-          />
-        </div>
-
-
-
-        {/* อัปโหลดรูป */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">อัปโหลดรูปสินค้า</label>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileChange}
-            className="w-full rounded-md bg-white text-gray-800 border-gray-300"
-          />
-
-          {/* รายการไฟล์ที่เลือก (ยังไม่อัปโหลด) */}
-          {selectedFiles.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {selectedFiles.map((f, i) => (
-                <div key={i} className="flex items-center justify-between text-sm text-gray-600">
-                  <span>{f.name}</span>
-                  <button type="button" onClick={() => removeSelectedFile(i)} className="text-red-500 hover:text-red-700">
-                    ❌
-                  </button>
+            {/* รายการไฟล์ที่เลือก */}
+            {selectedFiles.length > 0 && (
+              <div className="mt-4 bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+                <p className="text-sm font-semibold text-blue-700 mb-2">📁 ไฟล์ที่เลือก ({selectedFiles.length})</p>
+                <div className="space-y-2">
+                  {selectedFiles.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm text-gray-700 bg-white p-2 rounded-lg">
+                      <span className="truncate">{f.name}</span>
+                      <button type="button" onClick={() => removeSelectedFile(i)} className="text-red-500 hover:text-red-700 ml-2">
+                        ❌
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={uploadSelectedImages}
-                className="mt-2 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-              >
-                📤 เพิ่มรูปภาพ
-              </button>
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={uploadSelectedImages}
+                  className="mt-3 w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-md hover:shadow-lg"
+                >
+                  📤 อัปโหลดรูปภาพ
+                </button>
+              </div>
+            )}
 
-          {/* แกลเลอรีรูปที่อัปโหลดแล้ว */}
-          {form.PROpicture && (
-            <div className="flex flex-wrap gap-3 mt-4 max-h-64 overflow-auto">
-              {form.PROpicture.split(',').filter(Boolean).map((p, i) => (
-                <div key={i} className="relative w-32 h-32">
-                  <img
-                    src={`${API}${p}`}
-                    alt={`preview-${i}`}
-                    className="w-full h-full object-cover rounded border"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeUploadedImage(i)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full px-1"
-                  >
-                    ×
-                  </button>
+            {/* แกลเลอรีรูปที่อัปโหลดแล้ว */}
+            {form.PROpicture && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">🖼️ รูปที่อัปโหลดแล้ว</p>
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                  {form.PROpicture.split(',').filter(Boolean).map((p, i) => (
+                    <div key={i} className="relative group">
+                      <img
+                        src={`${API}${p}`}
+                        alt={`preview-${i}`}
+                        className="w-full h-32 object-cover rounded-xl border-2 border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeUploadedImage(i)}
+                        className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
 
+          {/* สถานะ */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">สถานะ</label>
+            <input
+              type="text"
+              value="✅ ready (พร้อมเปิดรอบ)"
+              disabled
+              className="w-full p-3 rounded-xl bg-gray-100 text-gray-700 border-2 border-gray-200 font-semibold"
+            />
+          </div>
 
-        {/* สถานะ — ตรึงเป็น ready */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">สถานะ</label>
-          <input
-            type="text"
-            value="ready"
-            disabled
-            className="w-full rounded-md bg-gray-100 text-gray-700 border-gray-300"
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700 transition"
-        >
-          บันทึก “สินค้าประมูล”
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl text-lg"
+          >
+            💾 บันทึกสินค้าประมูล
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

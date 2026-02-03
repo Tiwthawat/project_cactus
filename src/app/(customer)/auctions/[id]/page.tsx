@@ -4,7 +4,7 @@ import AuctionGallery from '@/app/component/auction/AuctionGallery';
 import AuctionInfoBox from '@/app/component/auction/AuctionInfoBox';
 
 import { Auction, Leader } from '@/app/types';
-
+import { apiFetch } from "@/app/lib/apiFetch";
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -58,7 +58,7 @@ export default function AuctionDetailPage() {
     if (!id) return;
     const loadLeader = async () => {
       try {
-        const res = await fetch(`${API}/auction/${id}/leader`);
+        const res = await apiFetch(`${API}/auction/${id}/leader`);
         if (!res.ok) throw new Error('โหลด leader ไม่สำเร็จ');
         const json = await res.json();
         setLeader(json.leader ?? null);
@@ -105,7 +105,7 @@ export default function AuctionDetailPage() {
     let t: any;
     const load = async () => {
       try {
-        const res = await fetch(`${API}/auction/${id}`, {
+        const res = await apiFetch(`${API}/auction/${id}`, {
           // แผน A ไม่ต้องใช้คุกกี้
           // credentials: 'omit',
         });
@@ -176,6 +176,15 @@ export default function AuctionDetailPage() {
       return;
     }
 
+    // ถ้ากำลังเป็นผู้นำอยู่แล้ว → ถามยืนยัน
+if (leader && cid && leader.user_id === cid) {
+  const ok = window.confirm(
+    "คุณเป็นผู้บิดราคาสูงสุดอยู่แล้ว ต้องการบิดซ้ำเพื่อเพิ่มราคาจริงหรือไม่?"
+  );
+  if (!ok) return;
+}
+
+
     const min = cur + step;
     if (Number(amount) < min) {
       setErr(`ต้องบิดอย่างน้อย ${min.toLocaleString('th-TH')} บาท`);
@@ -185,9 +194,9 @@ export default function AuctionDetailPage() {
     try {
       setPosting(true);
       setErr('');
-      const res = await fetch(`${API}/auctions/${data.Aid}/bid`, {
+      const res = await apiFetch(`${API}/auctions/${data.Aid}/bid`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+
         // แผน A ไม่ใช้ cookie/token
         // credentials: 'omit',
         body: JSON.stringify({ amount, Cid: cid }),

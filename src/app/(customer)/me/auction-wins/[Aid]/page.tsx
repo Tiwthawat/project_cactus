@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { apiFetch } from '@/app/lib/apiFetch';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
@@ -21,7 +22,8 @@ interface WinDetail {
 }
 
 export default function AuctionWinDetailPage() {
-  const { Aid } = useParams();
+  const { Aid } = useParams<{ Aid: string }>();
+
   const [data, setData] = useState<WinDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -29,15 +31,9 @@ export default function AuctionWinDetailPage() {
 
   const load = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setMsg('ยังไม่ได้เข้าสู่ระบบ');
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch(`${API}/me/my-auction-wins/${Aid}`, {
-        headers: { Authorization: `Bearer ${token}` },
+     
+      const res = await apiFetch(`/me/my-auction-wins/${Aid}`, {
+        
       });
 
       const json = await res.json();
@@ -56,24 +52,25 @@ export default function AuctionWinDetailPage() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, [Aid]);
+ useEffect(() => {
+  if (!Aid) return;
+  load();
+}, [Aid]);
+
 
   // ---- Upload Slip ----
   const uploadSlip = async () => {
     if (!file) return;
 
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    
 
     const form = new FormData();
     form.append('Aid', String(Aid));
     form.append('slip', file);
 
-    const res = await fetch(`${API}/auction-checkout`, {
+    const res = await apiFetch(`/auction-checkout`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+     
       body: form,
     });
 
@@ -90,13 +87,16 @@ export default function AuctionWinDetailPage() {
 
   // ⭐ ลูกค้ากดยืนยันได้รับสินค้าแล้ว
   const confirmDelivered = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    
 
-    const res = await fetch(`${API}/me/my-auction-wins/${Aid}/delivered`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await apiFetch(
+  `/me/my-auction-wins/${Aid}/received`,
+  {
+    method: 'PATCH',
+    
+  }
+);
+
 
     const json = await res.json();
     if (!res.ok) {

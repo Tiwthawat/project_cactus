@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-
+import { apiFetch } from "@/app/lib/apiFetch";
 interface AuctionWin {
   Aid: number;
   PROid: number;
@@ -29,8 +29,8 @@ export default function AuctionWinsPage() {
           return;
         }
 
-        const res = await fetch(`${API}/me/my-auction-wins`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const res = await apiFetch(`/me/my-auction-wins`, {
+          
         });
         const json = await res.json();
 

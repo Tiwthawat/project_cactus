@@ -2,12 +2,15 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCart } from '../../context/CartContext';
+import { apiFetch } from "@/app/lib/apiFetch";
 
 interface CartItem {
   Pid: number;
   Pname: string;
   Ppicture: string;
   Pprice: number;
+  Pnumproduct: number;
+  Prenume: number;
   quantity: number;
 }
 
@@ -25,21 +28,33 @@ interface AuctionOrderLite {
 
 const API = process.env.NEXT_PUBLIC_API_BASE as string;
 
-
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const router = useRouter();
   const { refreshCart } = useCart();
-  // ใน component CartPage
+
+  // ใน component CartPage (ของเก่าอยู่ครบ ถึงแม้ UI จะตัดไปแล้ว)
   const [auctionOrders, setAuctionOrders] = useState<AuctionOrderLite[]>([]);
   const [loadingAuctions, setLoadingAuctions] = useState<boolean>(true);
 
+  const getFirstPic = (pic?: string) => {
+  const first = (pic ?? "").split(",")[0]?.trim() ?? "";
+  if (!first) return ""; // หรือใส่รูป placeholder ก็ได้
+
+  // ถ้าเป็นลิงก์เต็มอยู่แล้ว
+  if (/^https?:\/\//i.test(first)) return first;
+
+  // ถ้าเป็น path ในระบบ -> เติม API + บังคับให้มี /
+  return `${API}${first.startsWith("/") ? "" : "/"}${first}`;
+};
+
+
   useEffect(() => {
-    // โหลดออเดอร์ประมูลที่ยังไม่ชำระของผู้ใช้ที่ล็อกอิน
+    // โหลดออเดอร์ประมูลที่ยังไม่ชำระของผู้ใช้ที่ล็อกอิน (ของเก่าอยู่ครบ)
     const loadAuctionOrders = async () => {
       try {
         setLoadingAuctions(true);
-        const res = await fetch(`${API}/my/auction-orders?status=pending`, { cache: 'no-store', credentials: 'include' });
+        const res = await apiFetch(`${API}/my/auction-orders?status=pending`, { cache: 'no-store', credentials: 'include' });
         if (!res.ok) throw new Error('load auction orders failed');
         const rows: AuctionOrderLite[] = await res.json();
         setAuctionOrders(Array.isArray(rows) ? rows : []);
@@ -52,11 +67,80 @@ export default function CartPage() {
     loadAuctionOrders();
   }, []);
 
+  useEffect(() => {
+    const syncStockFromDB = async () => {
+      if (cartItems.length === 0) return;
+
+      try {
+        const results = await Promise.all(
+          cartItems.map(async (it) => {
+            const res = await fetch(`${API}/product/${it.Pid}`, { cache: "no-store" });
+            if (!res.ok) return { Pid: it.Pid, stock: it.Pnumproduct };
+            const data = await res.json();
+            return { Pid: it.Pid, stock: Number(data?.Pnumproduct) };
+          })
+        );
+
+        const stockMap = new Map(results.map(r => [r.Pid, r.stock]));
+
+        setCartItems(prev => {
+          const next = prev.map(it => {
+            const stock = stockMap.get(it.Pid);
+            if (!Number.isFinite(stock)) return it;
+
+            // ✅ ทับ stock ให้ตรง DB + clamp จำนวนในตะกร้าไม่ให้เกิน
+            return {
+              ...it,
+              Pnumproduct: stock as number,
+              quantity: Math.min(it.quantity, stock as number),
+            };
+          });
+
+          localStorage.setItem("cart", JSON.stringify(next));
+          refreshCart();
+          return next;
+        });
+      } catch {
+        // เงียบไว้ได้
+      }
+    };
+
+    syncStockFromDB();
+    // ให้รันเมื่อ Pid ในตะกร้าเปลี่ยน (กัน loop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems.map(x => x.Pid).join(","), refreshCart]);
 
   useEffect(() => {
-    const storedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-    setCartItems(storedCart);
-  }, []);
+    let raw: unknown = [];
+    try {
+      raw = JSON.parse(localStorage.getItem("cart") || "[]");
+    } catch {
+      raw = [];
+    }
+
+    const arr = Array.isArray(raw) ? raw : [];
+
+    const normalized: CartItem[] = arr.map((it: any) => {
+      const qty = Number(it.quantity);
+      const price = Number(it.Pprice);
+      const stock = Number(it.Pnumproduct);
+
+      return {
+        Pid: Number(it.Pid),
+        Pname: String(it.Pname ?? ""),
+        Ppicture: String(it.Ppicture ?? ""),
+        Pprice: Number.isFinite(price) ? price : 0,
+        // ✅ ถ้าไม่มี stock ให้ตั้งเพดานอย่างน้อย = qty (กัน clamp เป็น NaN)
+        Pnumproduct: Number.isFinite(stock) ? stock : (Number.isFinite(qty) && qty > 0 ? qty : 1),
+        Prenume: Number(it.Prenume) || 0,
+        quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+      };
+    });
+
+    setCartItems(normalized);
+    localStorage.setItem("cart", JSON.stringify(normalized));
+    refreshCart();
+  }, [refreshCart]);
 
   const removeItem = (Pid: number) => {
     const newCart = cartItems.filter(item => item.Pid !== Pid);
@@ -65,15 +149,46 @@ export default function CartPage() {
     refreshCart();
   };
 
+  // ✅ ของเดิม: +/- clamp ตาม stock
   const updateQuantity = (Pid: number, delta: number) => {
-    const newCart = cartItems.map(item =>
-      item.Pid === Pid
-        ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-        : item
-    );
-    setCartItems(newCart);
-    localStorage.setItem('cart', JSON.stringify(newCart));
-    refreshCart();
+    setCartItems(prev => {
+      const next = prev.map(item => {
+        if (item.Pid !== Pid) return item;
+
+        const max = item.Pnumproduct; // ✅ stock
+        const nextQty = item.quantity + delta;
+
+        return {
+          ...item,
+          quantity: Math.max(1, Math.min(nextQty, max)),
+        };
+      });
+
+      localStorage.setItem("cart", JSON.stringify(next));
+      refreshCart();
+      return next;
+    });
+  };
+
+  // ✅ เพิ่มใหม่: กรอกจำนวนเอง (clamp 1..stock)
+  const setQuantityDirect = (Pid: number, value: number) => {
+    setCartItems(prev => {
+      const next = prev.map(item => {
+        if (item.Pid !== Pid) return item;
+
+        const max = item.Pnumproduct;
+        const v = Number.isFinite(value) ? value : 1;
+
+        return {
+          ...item,
+          quantity: Math.max(1, Math.min(v, max)),
+        };
+      });
+
+      localStorage.setItem("cart", JSON.stringify(next));
+      refreshCart();
+      return next;
+    });
   };
 
   const totalPrice = cartItems.reduce((sum, item) => sum + item.Pprice * item.quantity, 0);
@@ -81,10 +196,9 @@ export default function CartPage() {
   const handleCheckout = () => {
     router.push('/checkout');
   };
-  // เพิ่มก่อน return
+
   const shippingFee = totalPrice >= 1000 ? 0 : 50;
   const grandTotal = totalPrice + shippingFee;
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
@@ -111,71 +225,6 @@ export default function CartPage() {
             </div>
           </div>
         </div>{/* กล่อง: คุณมีรายการประมูลที่ค้างชำระ */}
-        {/* Auction Orders Section */}
-        <div className="bg-white rounded-2xl shadow-lg border-2 border-indigo-200 p-6 mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-2xl shadow-md">
-              🔔
-            </div>
-            <h2 className="text-xl font-bold text-gray-800">
-              รายการประมูลที่ยังไม่ได้ชำระ
-            </h2>
-          </div>
-
-          {loadingAuctions ? (
-            <p className="text-sm text-gray-600">กำลังโหลด...</p>
-          ) : auctionOrders.length === 0 ? (
-            <p className="text-sm text-gray-600">ไม่มีรายการค้างชำระจากประมูล</p>
-          ) : (
-            <div className="space-y-4">
-              {auctionOrders.map(o => (
-                <div key={o.orderId} className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 rounded-xl p-4 hover:border-indigo-300 hover:shadow-md transition-all duration-300">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={`${API}${o.productPicture?.startsWith('/') ? '' : '/'}${o.productPicture}`}
-                      alt={o.productName}
-                      className="w-16 h-16 object-cover rounded-lg shadow-sm"
-                    />
-                    <div>
-                      <div className="font-medium">{o.productName}</div>
-                      <div className="text-sm text-gray-600">
-                        ราคาปิด: {o.finalPrice.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        เลขออเดอร์ #{o.orderId} • รอบ #{o.auctionId}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 border border-amber-200">
-                      รอชำระเงิน
-                    </span>
-                    <button
-                      onClick={() => {
-                        // ไปหน้า payment/checkout เดิม พร้อมระบุ order
-                        // เลือกใช้ตามระบบที่มีอยู่: /payment?order= หรือ /orders/[id]
-                        // ตัวอย่าง:
-                        router.push(`/payment?order=${o.orderId}`);
-                      }}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded"
-                    >
-                      ไปชำระเงิน
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* หมายเหตุเล็ก ๆ เพื่อความชัดเจนว่าไม่รวมกับตะกร้า */}
-          <p className="text-sm text-gray-600 mt-4 bg-gray-50 p-3 rounded-lg">
-            💡 ยอดจากประมูลจะแยกชำระต่างหาก และไม่รวมกับยอดในตะกร้าสินค้าทั่วไป
-          </p>
-        </div>
-
-
-
 
 
         {cartItems.length === 0 ? (
@@ -199,23 +248,54 @@ export default function CartPage() {
                   <div key={item.Pid} className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200 rounded-xl p-4 hover:border-green-300 hover:shadow-md transition-all duration-300">
                     {/* ภาพ + ชื่อ */}
                     <div className="flex items-center gap-4 flex-1">
-                      <img
-                        src={`http://localhost:3000${item.Ppicture}`}
-                        className="w-24 h-24 object-cover rounded-xl shadow-sm"
-                        alt={item.Pname}
-                      />
+                     <img
+  src={getFirstPic(item.Ppicture)}
+  className="w-24 h-24 object-cover rounded-xl shadow-sm"
+  alt={item.Pname}
+/>
+
                       <div>
                         <p className="font-bold text-gray-800 text-lg">{item.Pname}</p>
                         <p className="text-green-600 font-semibold">{item.Pprice} บาท</p>
                       </div>
+                      <span className="text-sm text-gray-500">
+                        เหลือสินค้า {item.Pnumproduct} ชิ้น
+                      </span>
                     </div>
 
                     {/* จำนวน */}
                     <div className="flex items-center gap-3">
                       <div className="flex items-center border-2 border-gray-300 rounded-lg">
-                        <button onClick={() => updateQuantity(item.Pid, -1)} className="px-3 py-2 hover:bg-gray-100 transition-colors">-</button>
-                        <span className="px-4 font-semibold border-x-2 border-gray-300">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.Pid, 1)} className="px-3 py-2 hover:bg-gray-100 transition-colors">+</button>
+                        <button
+                          onClick={() => updateQuantity(item.Pid, -1)}
+                          disabled={item.quantity <= 1}
+                          className="px-3 py-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          -
+                        </button>
+
+                        {/* ✅ เพิ่มใหม่: input แก้จำนวนเองได้ */}
+                        <input
+                          type="number"
+                          min={1}
+                          max={item.Pnumproduct}
+                          value={item.quantity}
+                          onChange={(e) => {
+                            let v = parseInt(e.target.value, 10);
+                            if (Number.isNaN(v)) v = 1;
+                            setQuantityDirect(item.Pid, v);
+                          }}
+                          className="w-16 bg-white text-center font-semibold border-x-2 border-gray-300 outline-none"
+                        />
+
+                        <button
+                          onClick={() => updateQuantity(item.Pid, 1)}
+                          disabled={item.quantity >= item.Pnumproduct}
+                          className="px-3 py-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          +
+                        </button>
+
                       </div>
                     </div>
 
@@ -233,11 +313,6 @@ export default function CartPage() {
                 ))}
               </div>
             </div>
-
-
-
-
-
 
             {/* Summary */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200">
@@ -269,6 +344,5 @@ export default function CartPage() {
         )}
       </div>
     </div>
-
   );
 }

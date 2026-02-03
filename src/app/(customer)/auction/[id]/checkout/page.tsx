@@ -2,7 +2,7 @@
 
 import { useEffect, useState, FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-
+import { apiFetch } from "@/app/lib/apiFetch";
 interface AuctionWinDetail {
   Aid: number;
   PROid: number;
@@ -49,8 +49,8 @@ export default function AuctionCheckoutPage() {
           return;
         }
 
-        const res = await fetch(`${API}/me/my-auction-wins/${params.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const res = await apiFetch(`/me/my-auction-wins/${params.id}`, {
+         
         });
 
         const json = await res.json();
@@ -73,7 +73,7 @@ export default function AuctionCheckoutPage() {
 
   // โหลดบัญชีธนาคาร
   useEffect(() => {
-    fetch(`${API}/transfer`)
+    apiFetch(`/transfer`)
       .then((res) => res.json())
       .then((data: Transfer[]) => setTransfers(data))
       .catch(() => setTransfers([]));
@@ -128,11 +128,8 @@ export default function AuctionCheckoutPage() {
       form.append('Payprice', String(win.current_price));
       form.append('slip', slip);
 
-      const res = await fetch(`${API}/auction-checkout`, {
+      const res = await apiFetch(`/auction-checkout`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: form,
       });
 

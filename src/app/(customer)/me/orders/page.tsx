@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { apiFetch } from "@/app/lib/apiFetch";
 
 // ✅ กำหนด type สำหรับ User และ Order
 interface User {
@@ -21,7 +22,7 @@ interface Order {
   Ostatus: string;
   Opayment: string;
 }
-
+const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 export default function MyOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -31,14 +32,20 @@ export default function MyOrdersPage() {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}') as User;
     setUser(storedUser);
 
-    if (!storedUser?.Cid) return;
+    if (!storedUser?.Cid) {
+  setLoading(false);
+  return;
+}
+
 
     const fetchOrders = async () => {
       try {
-        const res = await fetch(`http://localhost:3000/orders?Cid=${storedUser.Cid}`);
-        const data = await res.json();
+        const res = await apiFetch(`${API}/orders?Cid=${storedUser.Cid}`);
+const data = await res.json();
 
-        const sorted = data.sort((a: Order, b: Order) => b.Oid - a.Oid); // ✅ เรียงใหม่ตรงนี้
+
+        const sorted = [...data].sort((a: Order, b: Order) => b.Oid - a.Oid);
+
         setOrders(sorted);
       } catch (err) {
         console.error('โหลดคำสั่งซื้อผิดพลาด:', err);
@@ -55,9 +62,8 @@ export default function MyOrdersPage() {
     if (!confirm('ต้องการยกเลิกคำสั่งซื้อนี้ใช่หรือไม่?')) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/orders/${orderId}/cancel`, {
-        method: 'PATCH',
-      });
+      const res = await apiFetch(`${API}/orders/${orderId}/cancel`, { method: "PATCH" })
+      ;
 
       if (!res.ok) throw new Error('ยกเลิกไม่สำเร็จ');
 

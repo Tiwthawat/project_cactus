@@ -12,6 +12,7 @@ interface CartItem {
   Ppicture: string;
   Pprice: number;
   quantity: number;
+  Pnumproduct: number;
 }
 
 interface User {
@@ -106,6 +107,8 @@ export default function CheckoutPage() {
               Ppicture: pic,
               Pprice: Number(product.Pprice) || 0,
               quantity: data.qty || 1,
+              Pnumproduct: Number(product.Pnumproduct) || 0,
+
             },
           ]);
         } else {
@@ -121,6 +124,44 @@ export default function CheckoutPage() {
     loadItems();
   }, [isBuyNow]);
 
+  useEffect(() => {
+    const syncStockFromDB = async () => {
+      if (cartItems.length === 0) return;
+
+      try {
+        const results = await Promise.all(
+          cartItems.map(async (it) => {
+            const res = await apiFetch(`${API}/product/${it.Pid}`, { cache: "no-store" });
+            if (!res.ok) return { Pid: it.Pid, stock: it.Pnumproduct ?? 0 };
+            const data = await res.json();
+            return { Pid: it.Pid, stock: Number(data?.Pnumproduct) || 0 };
+          })
+        );
+
+        const stockMap = new Map(results.map(r => [r.Pid, r.stock]));
+
+        setCartItems(prev =>
+          prev.map(it => {
+            const stock = stockMap.get(it.Pid);
+            if (!Number.isFinite(stock)) return it;
+
+            return {
+              ...it,
+              Pnumproduct: stock as number,
+              quantity: Math.min(it.quantity, stock as number) || 1,
+            };
+          })
+        );
+      } catch {
+        // เงียบได้
+      }
+    };
+
+    syncStockFromDB();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems.map(x => x.Pid).join(",")]);
+
+
   // -------------------------------
   // Update LocalStorage (cart only)
   // -------------------------------
@@ -135,9 +176,14 @@ export default function CheckoutPage() {
   // Increase / Decrease / Delete
   // -------------------------------
   const increaseQty = (pid: number) => {
-    const updated = cartItems.map((item) => (item.Pid === pid ? { ...item, quantity: item.quantity + 1 } : item));
+    const updated = cartItems.map((item) => {
+      if (item.Pid !== pid) return item;
+      const max = item.Pnumproduct ?? Infinity;
+      return { ...item, quantity: Math.min(item.quantity + 1, max) };
+    });
     updateCartLS(updated);
   };
+
 
   const decreaseQty = (pid: number) => {
     const updated = cartItems.map((item) =>
@@ -151,7 +197,7 @@ export default function CheckoutPage() {
     updateCartLS(updated);
 
     if (updated.length === 0) {
-      router.push('/cart');
+      router.push('/');
     }
   };
 
@@ -344,22 +390,28 @@ export default function CheckoutPage() {
 
                     <button
                       onClick={() => increaseQty(item.Pid)}
-                      className="w-8 h-8 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                      disabled={item.quantity >= item.Pnumproduct}
+                      className="w-8 h-8 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       +
                     </button>
+
 
                     <button
                       onClick={() => deleteItem(item.Pid)}
                       className="ml-4 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1 rounded-lg font-semibold transition-colors"
                     >
                       ลบ
-                    </button>
+                    </button><p className="text-sm text-gray-500 mt-1">
+                      เหลือสินค้า {item.Pnumproduct} ชิ้น
+                    </p>
                   </div>
                 </div>
 
                 <div className="text-right">
                   <p className="text-sm text-gray-500">ยอดรวม</p>
+
+
                   <p className="text-xl font-bold text-green-600">{item.Pprice * item.quantity} บาท</p>
                 </div>
               </div>

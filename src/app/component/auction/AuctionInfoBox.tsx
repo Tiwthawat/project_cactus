@@ -118,6 +118,7 @@ export default function AuctionInfoBox({
                   step={step}
                   required
                   value={amount}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => {
                     const v = Math.floor(Number(e.target.value));
                     if (Number.isNaN(v)) setAmount('');
