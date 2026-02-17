@@ -3,9 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TbBellRingingFilled } from 'react-icons/tb';
 import Link from 'next/link';
-import { FaHeart, FaShoppingCart } from 'react-icons/fa';
+import { FaHeart, FaShoppingCart, FaSearch, FaUser } from 'react-icons/fa';
 import { usePathname } from 'next/navigation';
 import { useCart } from '../context/CartContext';
+import Sidebar from './Sidebar';
 
 
 interface CategoryEventDetail {
@@ -25,6 +26,15 @@ const Navbar = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const { cartCount } = useCart();
+
+  // Sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<'user' | 'categories' | 'search' | 'cart' | 'menu' | null>(null);
+
+  const openSidebar = (mode: 'user' | 'categories' | 'search' | 'cart' | 'menu') => {
+    setSidebarMode(mode);
+    setIsSidebarOpen(true);
+  };
 
 
 
@@ -102,87 +112,17 @@ const Navbar = () => {
   return (
     <div className="navbar bg-white shadow-sm fixed top-0 left-0 w-full z-50 text-sm">
       <div className="navbar-start">
-        <div className="dropdown">
-          <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden btn-sm">
+        <div>
+          <button
+            onClick={() => openSidebar('menu')}
+            className="btn btn-ghost lg:hidden btn-sm"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
               viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                 d="M4 6h16M4 12h8m-8 6h16" />
             </svg>
-          </div>
-          <ul
-            tabIndex={0}
-            className="menu menu-sm dropdown-content bg-white rounded-box mt-3 w-52 p-2 shadow text-xs">
-            <li>
-              <a className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}>
-                หมวดหมู่สินค้า
-              </a>
-              <div className="flex flex-col items-start gap-4 text-sm font-medium pl-4">
-                {/* หมวด 1: หนามสั้น */}
-                <button
-                  onClick={() => emitCategory({ typeid: 1, subtypeid: null })}
-                  className="hover:text-green-600"
-                >
-                  หนามสั้น
-                </button>
-
-                {/* หมวด 2: หนามยาว */}
-                <button
-                  onClick={() => emitCategory({ typeid: 2, subtypeid: null })}
-                  className="hover:text-green-600"
-                >
-                  หนามยาว
-                </button>
-
-                {/* หมวด 3: ไม้อวบน้ำ */}
-                <button
-                  onClick={() => emitCategory({ typeid: 3, subtypeid: null })}
-                  className="hover:text-green-600"
-                >
-                  ไม้อวบน้ำ
-                </button>
-
-                {/* หมวด 4: ของตกแต่งกระถาง */}
-                <button
-                  onClick={() => emitCategory({ typeid: 4, subtypeid: null })}
-                  className="hover:text-green-600"
-                >
-                  ของตกแต่ง
-                </button>
-
-                {/* หมวดพิเศษ: แสดงทั้งหมด */}
-                <button
-                  onClick={() => emitCategory({ typeid: null, subtypeid: null })}
-                  className="hover:text-green-600"
-                >
-                  สินค้าทั้งหมด
-                </button>
-              </div>
-
-            </li>
-            <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
-            <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
-            <li><Link href="/FAQ" className={`${isActive('/FAQ') ? activeClass : inactiveClass}`}>คำถามที่พบบ่อย</Link></li>
-            <li>
-              <Link href="/forum" className={`${isActive('/forum') ? activeClass : inactiveClass}`}>
-                กระทู้
-              </Link>
-            </li>
-
-            <li><Link href="/Insurance" className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}>การรับประกันสินค้า</Link></li>
-            <li><Link href="/About" className={`${isActive('/About') ? activeClass : inactiveClass}`}>รีวิวเกี่ยวกับเรา</Link></li>
-            {/* {username ? (
-              <>
-                <li><Link href="/me" className={`${isActive('/me') ? activeClass : inactiveClass}`}>{username}</Link></li>
-                <li><button onClick={handleLogout} className={inactiveClass}>ออกจากระบบ</button></li>
-              </>
-            ) : (
-              <>
-                <li><Link href="/login" className={`${isActive('/login') ? activeClass : inactiveClass}`}>เข้าสู่ระบบ</Link></li>
-                <li><Link href="/register" className={`${isActive('/register') ? activeClass : inactiveClass}`}>สมัครสมาชิก</Link></li>
-              </>
-            )} */}
-          </ul>
+          </button>
         </div>
         <Link href="/" className="btn btn-ghost btn-sm hover:bg-green-50">
           <img src="/favicon.png" className="w-8 h-8 rounded-full" />
@@ -192,62 +132,12 @@ const Navbar = () => {
       <div className="navbar-center hidden lg:flex">
         <ul className="menu menu-horizontal px-1 text-xs">
           <li>
-            <details>
-              <summary className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}>
-                หมวดหมู่สินค้า
-              </summary>
-              <ul className="p-2 bg-white shadow rounded-box text-xs">
-
-                <li>
-                  <button
-                    onClick={() => emitCategory({ typeid: 1, subtypeid: null })}
-                    className="w-full text-left hover:text-green-600"
-                  >
-                    แคคตัสหนามสั้น
-                  </button>
-                </li>
-
-                <li>
-                  <button
-                    onClick={() => emitCategory({ typeid: 2, subtypeid: null })}
-                    className="w-full text-left hover:text-green-600"
-                  >
-                    แคคตัสหนามยาว
-                  </button>
-                </li>
-
-                <li>
-                  <button
-                    onClick={() => emitCategory({ typeid: 3, subtypeid: null })}
-                    className="w-full text-left hover:text-green-600"
-                  >
-                    ไม้อวบน้ำ
-                  </button>
-                </li>
-
-                <li>
-                  <button
-                    onClick={() => emitCategory({ typeid: 4, subtypeid: null })}
-                    className="w-full text-left hover:text-green-600"
-                  >
-                    ของตกแต่งกระถาง
-                  </button>
-                </li>
-
-                {/* ปุ่มดูทั้งหมด */}
-                <li>
-                  <button
-                    onClick={() => emitCategory({ typeid: null, subtypeid: null })}
-                    className="w-full text-left hover:text-green-600"
-                  >
-                    สินค้าทั้งหมด
-                  </button>
-                </li>
-
-              </ul>
-
-
-            </details>
+            <button
+              onClick={() => openSidebar('categories')}
+              className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}
+            >
+              หมวดหมู่สินค้า
+            </button>
           </li>
           <li><Link href="/auctions" className={`${isActive('/auctions') ? activeClass : inactiveClass}`}>สินค้าประมูล</Link></li>
           <li><Link href="/auctionguide" className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}>ขั้นตอนการประมูล</Link></li>
@@ -268,54 +158,19 @@ const Navbar = () => {
 
           {/* ปุ่มค้นหา */}
           <button
-            onClick={() => setShowSearch(prev => !prev)}
+            onClick={() => openSidebar('search')}
             className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
-              viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <FaSearch className="text-base" />
           </button>
-
-          {/* popup ค้นหา */}
-          {showSearch && (
-            <div className="absolute right-0 top-10 w-52 bg-white p-3 rounded-lg shadow-lg z-50">
-              <input
-                type="text"
-                placeholder="ค้นหา..."
-                value={searchKeyword}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSearchKeyword(val);
-
-                  window.dispatchEvent(
-                    new CustomEvent("do-search", { detail: val })
-                  );
-                }}
-                className="w-full border p-2 rounded-lg text-sm"
-              />
-
-
-
-              <button
-                onClick={() => {
-                  window.dispatchEvent(
-                    new CustomEvent("do-search", { detail: searchKeyword })
-                  );
-                  setShowSearch(false);
-                }}
-                className="mt-2 w-full bg-green-600 text-white py-1 rounded-lg text-sm"
-              >
-                ค้นหา
-              </button>
-            </div>
-          )}
 
         </div>
 
 
-        <Link href="/cart" className={`btn btn-ghost btn-circle btn-sm ${isActive('/cart') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}>
+        <button
+          onClick={() => openSidebar('cart')}
+          className={`btn btn-ghost btn-circle btn-sm ${isActive('/cart') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}
+        >
           <div className="indicator">
             <FaShoppingCart className="text-base" />
             {cartCount > 0 && (
@@ -324,7 +179,7 @@ const Navbar = () => {
               </span>
             )}
           </div>
-        </Link>
+        </button>
         <Link
           href="#"
           onClick={(e) => {
@@ -345,54 +200,18 @@ const Navbar = () => {
         </button>
 
         {username ? (
-          <div className="dropdown dropdown-end">
-            <label
-              tabIndex={0}
-              className={`btn btn-ghost btn-sm text-xs px-3 py-2 rounded-lg 
+          <button
+            onClick={() => openSidebar('user')}
+            className={`btn btn-ghost btn-sm text-xs px-3 rounded-lg flex items-center gap-2
       ${isActive('/me')
-                  ? 'bg-green-100 text-green-600 shadow-sm'
-                  : 'hover:bg-green-50 hover:text-green-600'}`}
-            >
-              {username}
-            </label>
-
-            <ul
-              tabIndex={0}
-              className="
-        dropdown-content 
-        mt-2 
-        bg-white 
-        rounded-xl 
-        shadow-lg 
-        w-44 
-        p-2 
-        text-sm 
-        space-y-1
-        border border-gray-100
-      "
-            >
-              <li>
-                <Link
-                  href="/me"
-                  className={`${isActive('/me')
-                    ? 'text-green-600 font-medium rounded-lg px-3 py-2'
-                    : 'hover:bg-gray-100 rounded-lg px-3 py-2'
-                    }`}
-                >
-                  โปรไฟล์
-                </Link>
-              </li>
-
-              <li>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left hover:bg-red-50 text-red-600 rounded-lg px-3 py-2"
-                >
-                  ออกจากระบบ
-                </button>
-              </li>
-            </ul>
-          </div>
+                ? 'bg-green-100 text-green-600 shadow-sm'
+                : 'hover:bg-green-50 hover:text-green-600'}`}
+          >
+            <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
+              {username.charAt(0).toUpperCase()}
+            </div>
+            {username}
+          </button>
         ) : (
           <Link
             href="/login"
@@ -407,6 +226,15 @@ const Navbar = () => {
           </Link>
         )}
       </div>
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        mode={sidebarMode}
+        setMode={setSidebarMode}
+        username={username}
+        cartCount={cartCount}
+        handleLogout={handleLogout}
+      />
     </div>
   );
 };
