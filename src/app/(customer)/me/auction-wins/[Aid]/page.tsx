@@ -6,19 +6,28 @@ import { apiFetch } from '@/app/lib/apiFetch';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
+interface TransferInfo {
+  Tname: string;
+  Tnum: string;
+  Taccount: string;
+  Tbranch: string;
+  Tqr: string;
+}
+
 interface WinDetail {
   Aid: number;
   PROid: number;
   PROname: string;
   PROpicture: string;
   PROstatus: 'pending_payment' | 'payment_review' | 'paid';
-  payment_status: 'pending_payment' | 'paid';
+  payment_status: 'pending_payment' | 'payment_review' | 'paid';
   current_price: number;
   end_time: string;
 
   shipping_company?: string | null;
   tracking_number?: string | null;
   shipping_status?: 'pending' | 'shipping' | 'delivered' | null;
+  transfer?: TransferInfo | null;
 }
 
 export default function AuctionWinDetailPage() {
@@ -28,19 +37,16 @@ export default function AuctionWinDetailPage() {
   const [loading, setLoading] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [msg, setMsg] = useState('');
+  const [showQr, setShowQr] = useState(false);
+
 
   const load = async () => {
     try {
-     
-      const res = await apiFetch(`/me/my-auction-wins/${Aid}`, {
-        
-      });
-
+      const res = await apiFetch(`/me/my-auction-wins/${Aid}`);
       const json = await res.json();
 
       if (!res.ok) {
         setMsg(json.message || 'เกิดข้อผิดพลาด');
-        setLoading(false);
         return;
       }
 
@@ -52,17 +58,13 @@ export default function AuctionWinDetailPage() {
     }
   };
 
- useEffect(() => {
-  if (!Aid) return;
-  load();
-}, [Aid]);
+  useEffect(() => {
+    if (!Aid) return;
+    load();
+  }, [Aid]);
 
-
-  // ---- Upload Slip ----
   const uploadSlip = async () => {
     if (!file) return;
-
-    
 
     const form = new FormData();
     form.append('Aid', String(Aid));
@@ -70,7 +72,6 @@ export default function AuctionWinDetailPage() {
 
     const res = await apiFetch(`/auction-checkout`, {
       method: 'POST',
-     
       body: form,
     });
 
@@ -85,18 +86,11 @@ export default function AuctionWinDetailPage() {
     load();
   };
 
-  // ⭐ ลูกค้ากดยืนยันได้รับสินค้าแล้ว
   const confirmDelivered = async () => {
-    
-
     const res = await apiFetch(
-  `/me/my-auction-wins/${Aid}/received`,
-  {
-    method: 'PATCH',
-    
-  }
-);
-
+      `/me/my-auction-wins/${Aid}/received`,
+      { method: 'PATCH' }
+    );
 
     const json = await res.json();
     if (!res.ok) {
@@ -109,64 +103,65 @@ export default function AuctionWinDetailPage() {
   };
 
   if (loading)
-    return <p className="p-6 text-center text-lg">กำลังโหลดข้อมูล…</p>;
+    return <p className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล…</p>;
 
   if (!data)
-    return <p className="p-6 text-center text-red-500">{msg}</p>;
+    return <p className="p-10 text-center text-red-500">{msg}</p>;
 
   const img = data.PROpicture?.split(',')[0] || '';
 
-  return (
-    <div className="p-6 max-w-3xl mx-auto text-black">
+  const paymentBadge = () => {
+    if (data.payment_status === 'pending_payment')
+      return 'bg-orange-100 text-orange-600';
+    if (data.payment_status === 'payment_review')
+      return 'bg-blue-100 text-blue-600';
+    return 'bg-green-100 text-green-600';
+  };
 
-      <h1 className="text-2xl font-bold mb-6 text-center">
+  const paymentLabel = () => {
+    if (data.payment_status === 'pending_payment') return 'รอชำระเงิน';
+    if (data.payment_status === 'payment_review') return 'รอตรวจสอบ';
+    return 'ชำระเงินแล้ว';
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+
+      <h1 className="text-3xl font-bold text-center">
         รายละเอียดการประมูล #{data.Aid}
       </h1>
 
-      {/* กล่องรายละเอียด */}
-      <div className="bg-white p-5 rounded-xl shadow border mb-6 space-y-2">
-        <div className="flex gap-2 text-lg">
-          <span className="font-semibold">สถานะการชำระ:</span>
-          <span
-            className={
-              data.PROstatus === 'pending_payment'
-                ? 'text-orange-500'
-                : data.PROstatus === 'payment_review'
-                ? 'text-blue-600'
-                : 'text-green-600'
-            }
-          >
-            {data.PROstatus === 'pending_payment'
-              ? 'รอชำระเงิน'
-              : data.PROstatus === 'payment_review'
-              ? 'รอตรวจสอบ'
-              : 'ชำระเงินแล้ว'}
+      {/* Payment Summary */}
+      <div className="bg-white rounded-xl shadow-md p-6 border space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="font-semibold text-lg">สถานะการชำระเงิน</span>
+          <span className={`px-4 py-1 rounded-full text-sm font-medium ${paymentBadge()}`}>
+            {paymentLabel()}
           </span>
         </div>
 
-        <p className="text-lg">
+        <p>
           <span className="font-semibold">ราคาที่ชนะ:</span>{' '}
           {data.current_price.toLocaleString()} บาท
         </p>
 
-        <p className="text-lg">
-          <span className="font-semibold">ปิดประมูลวันที่:</span>{' '}
+        <p>
+          <span className="font-semibold">ปิดประมูล:</span>{' '}
           {new Date(data.end_time).toLocaleDateString('th-TH')}
         </p>
       </div>
 
-      {/* สินค้า */}
-      <div className="bg-white p-5 rounded-xl shadow border mb-6">
-        <h2 className="font-semibold text-xl mb-4">สินค้า</h2>
+      {/* Product Section */}
+      <div className="bg-white rounded-xl shadow-md p-6 border">
+        <h2 className="text-xl font-semibold mb-4">ข้อมูลสินค้า</h2>
 
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-5 items-center">
           <img
             src={`${API}${img}`}
-            className="w-28 h-28 rounded-lg border object-cover"
+            className="w-32 h-32 rounded-lg border object-cover"
           />
-          <div>
-            <p className="font-semibold text-lg">{data.PROname}</p>
-            <p className="text-gray-600">จำนวน: 1</p>
+          <div className="space-y-1">
+            <p className="text-lg font-semibold">{data.PROname}</p>
             <p className="text-gray-600">
               ราคา: {data.current_price.toLocaleString()} บาท
             </p>
@@ -174,48 +169,111 @@ export default function AuctionWinDetailPage() {
         </div>
       </div>
 
-      {/* อัปโหลดสลิป */}
-      {data.PROstatus === 'pending_payment' && (
-        <div className="bg-white p-5 rounded-xl shadow border mb-6">
-          <h2 className="font-semibold text-xl mb-4">แนบสลิปโอนเงิน</h2>
+     {/* Transfer Info */}
+{data.payment_status === 'pending_payment' && data.transfer && (
+  <div className="bg-white rounded-2xl shadow-lg border p-6 space-y-6">
+
+    <h2 className="text-2xl font-bold text-green-700">
+      💳 ชำระเงินผ่านบัญชีธนาคาร
+    </h2>
+
+    {/* Bank Info */}
+    <div className="bg-green-50 rounded-xl p-5 border space-y-4">
+
+      <div>
+        <p className="text-sm text-gray-500">ธนาคาร</p>
+        <p className="font-semibold text-lg">{data.transfer.Tname}</p>
+      </div>
+
+      <div>
+        <p className="text-sm text-gray-500">ชื่อบัญชี</p>
+        <p className="font-medium">{data.transfer.Taccount}</p>
+      </div>
+
+      <div>
+        <p className="text-sm text-gray-500">เลขบัญชี</p>
+        <div className="flex items-center gap-3">
+          <p className="text-2xl font-bold tracking-widest text-green-800">
+            {data.transfer.Tnum}
+          </p>
+
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(data.transfer!.Tnum);
+              alert("คัดลอกเลขบัญชีแล้ว");
+            }}
+            className="text-sm bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition"
+          >
+            คัดลอก
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm text-gray-500">สาขา</p>
+        <p>{data.transfer.Tbranch || '-'}</p>
+      </div>
+
+    </div>
+
+    {data.transfer.Tqr && (
+  <div className="text-center space-y-3">
+
+    <p className="text-sm text-gray-500">
+      แตะ QR เพื่อขยาย
+    </p>
+
+    <img
+      src={`${API}${data.transfer.Tqr}`}
+      alt="QR Code"
+      className="mx-auto w-52 rounded-xl border shadow-md cursor-pointer hover:scale-105 transition"
+      onClick={() => setShowQr(true)}
+    />
+
+  </div>
+)}
+
+  </div>
+)}
+
+
+      {/* Upload Slip */}
+      {data.payment_status === 'pending_payment' && (
+        <div className="bg-white rounded-xl shadow-md p-6 border space-y-4">
+
+          <h2 className="text-xl font-semibold">แนบสลิปการโอนเงิน</h2>
 
           <input
             type="file"
             accept="image/*"
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border rounded-lg p-2"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
 
           <button
             onClick={uploadSlip}
-            className="bg-green-600 hover:bg-green-700 text-white w-full py-2 rounded-lg"
+            className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
           >
             อัปโหลดสลิป
           </button>
 
           {msg && (
-            <p className="mt-3 text-center text-sm text-green-700">{msg}</p>
+            <p className="text-center text-sm text-green-600">{msg}</p>
           )}
         </div>
       )}
 
-      {/* รอตรวจสอบ */}
-      {data.PROstatus === 'payment_review' && (
-        <p className="text-center text-blue-600 font-semibold text-lg">
-          ✔ รอตรวจสอบการชำระเงินจากผู้ดูแลระบบ
-        </p>
-      )}
+      {/* Shipping Section */}
+      {data.payment_status === 'paid' && (
+        <div className="bg-white rounded-xl shadow-md p-6 border space-y-4">
 
-      {/* โชว์จัดส่ง */}
-      {data.PROstatus === 'paid' && (
-        <div className="bg-white p-5 rounded-xl shadow border mb-6 text-lg">
-          <h2 className="font-semibold text-xl mb-4">การจัดส่งสินค้า</h2>
+          <h2 className="text-xl font-semibold">การจัดส่งสินค้า</h2>
 
-          <p>ขนส่ง: <b>{data.shipping_company || "—"}</b></p>
-          <p>เลขพัสดุ: <b>{data.tracking_number || "—"}</b></p>
+          <p>ขนส่ง: <b>{data.shipping_company || '—'}</b></p>
+          <p>เลขพัสดุ: <b>{data.tracking_number || '—'}</b></p>
 
-          <p className="mt-2">
-            สถานะจัดส่ง:{' '}
+          <p>
+            สถานะ:{' '}
             <span className={
               data.shipping_status === 'shipping'
                 ? 'text-blue-600'
@@ -233,29 +291,35 @@ export default function AuctionWinDetailPage() {
             </span>
           </p>
 
-          {/* ⭐ ลูกค้ากดยืนยันได้รับสินค้า */}
           {data.shipping_status === 'shipping' && (
             <button
               onClick={confirmDelivered}
-              className="mt-4 bg-green-700 text-white px-4 py-2 rounded-lg w-full hover:bg-green-800"
+              className="w-full bg-green-700 text-white py-2 rounded-lg hover:bg-green-800 transition"
             >
               ✔ ยืนยันได้รับสินค้าแล้ว
             </button>
           )}
 
           {data.shipping_status === 'delivered' && (
-            <p className="mt-4 text-green-600 font-semibold text-center">
-              ✔ คุณได้ยืนยันการรับสินค้าแล้ว
+            <p className="text-green-600 font-semibold text-center">
+              ✔ คุณยืนยันการรับสินค้าแล้ว
             </p>
           )}
         </div>
       )}
+      {showQr && (
+  <div
+    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+    onClick={() => setShowQr(false)}
+  >
+    <img
+      src={`${API}${data.transfer?.Tqr}`}
+      alt="QR Full"
+      className="max-w-[90%] max-h-[90%] rounded-xl shadow-2xl"
+    />
+  </div>
+)}
 
-      {data.PROstatus === 'paid' && !data.shipping_company && (
-        <p className="text-center text-gray-500">
-          * ระบบกำลังรอผู้ขายจัดส่งสินค้า
-        </p>
-      )}
     </div>
   );
 }
