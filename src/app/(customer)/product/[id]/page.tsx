@@ -486,6 +486,7 @@ export default function ProductDetail() {
               >
                 ปิด
               </button>
+              
             </div>
           </div>
         )}
