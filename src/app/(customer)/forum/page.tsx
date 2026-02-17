@@ -164,65 +164,73 @@ export default function ForumPage() {
 
 
   return (
-    <main className="flex pt-36 flex-col items-center min-h-screen bg-white px-6">
-      <div className="w-full max-w-2xl text-black">
-
-        
-        <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
+  <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-white to-white pt-32 px-4">
+    <div className="mx-auto w-full max-w-3xl text-black">
+      {/* header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur border border-emerald-100 text-emerald-700 px-5 py-2 rounded-full text-sm font-semibold shadow-sm">
           กระทู้ถาม–ตอบ
+          <span className="text-xs font-normal text-emerald-600/70">community</span>
         </div>
-
-        {/* สร้างโพสต์ */}
-        <div className="bg-white border rounded-xl shadow-sm p-4 mb-6 flex gap-3 items-center">
-          <img
-            src={getProfileUrl(user?.Cprofile || null, user?.Cname)}
-            className="w-10 h-10 rounded-full object-cover"
-          />
-          <button
-            onClick={() => user && setShowModal(true)}
-            className="flex-1 text-left bg-gray-100 px-4 py-2 rounded-full text-gray-600 hover:bg-gray-200"
-          >
-            {user ? `คุณคิดอะไรอยู่ ${user.Cname}` : "เข้าสู่ระบบเพื่อโพสต์กระทู้"}
-          </button>
-        </div>
-
-        <PostList
-          questions={questions}
-          loading={loading}
-          openPost={openPost}
-        />
-
-        {openModal && (
-  <PostModal
-    selectedPost={selectedPost}
-    replyText={replyText}
-    setReplyText={setReplyText}
-    submitReply={submitReply}
-    onClose={async () => {
-      setOpenModal(false);
-      await loadList(); // รีโหลดรายการเมื่อปิด modal
-    }}
-    user={user}
-    onDeletePost={onDeletePost}
-    onEditPost={onEditPost}
-    onDeleteReply={onDeleteReply}
-    onEditReply={onEditReply}
-  />
-)}
-
-
-
-        <CreatePostModal
-          show={showModal}
-          user={user}
-          topic={topic}
-          details={details}
-          setTopic={setTopic}
-          setDetails={setDetails}
-          submitPost={submitPost}
-          onClose={() => setShowModal(false)}
-        />
       </div>
-    </main>
-  );
+
+      {/* create post */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 mb-6 flex gap-3 items-center">
+        <img
+          src={getProfileUrl(user?.Cprofile || null, user?.Cname)}
+          className="w-11 h-11 rounded-full object-cover ring-2 ring-emerald-100"
+        />
+
+        <button
+          onClick={() => user && setShowModal(true)}
+          className="flex-1 text-left bg-white border border-gray-200 px-4 py-3 rounded-full text-gray-700
+                     hover:bg-emerald-50 hover:border-emerald-200 transition
+                     focus:outline-none focus:ring-4 focus:ring-emerald-200"
+        >
+          {user ? (
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-gray-700">คุณคิดอะไรอยู่ {user.Cname}</span>
+              <span className="text-xs text-gray-400">เขียนโพสต์…</span>
+            </span>
+          ) : (
+            "เข้าสู่ระบบเพื่อโพสต์กระทู้"
+          )}
+        </button>
+      </div>
+
+      <PostList questions={questions} loading={loading} openPost={openPost} />
+
+      {openModal && (
+        <PostModal
+          selectedPost={selectedPost}
+          replyText={replyText}
+          setReplyText={setReplyText}
+          submitReply={submitReply}
+          onClose={async () => {
+            setOpenModal(false);
+            await loadList();
+          }}
+          user={user}
+          onDeletePost={onDeletePost}
+          onEditPost={onEditPost}
+          onDeleteReply={onDeleteReply}
+          onEditReply={onEditReply}
+        />
+      )}
+
+      <CreatePostModal
+        show={showModal}
+        user={user}
+        topic={topic}
+        details={details}
+        setTopic={setTopic}
+        setDetails={setDetails}
+        submitPost={submitPost}
+        onClose={() => setShowModal(false)}
+      />
+    </div>
+  </main>
+);
+
+
 }

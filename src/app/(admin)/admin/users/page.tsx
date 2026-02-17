@@ -55,20 +55,20 @@ export default function AdminUsersPage() {
   };
 
   const toggleBan = async (id: number, status: UserStatus) => {
-    const newStatus: UserStatus = status === 'banned' ? 'user' : 'banned';
+  const newStatus: UserStatus = status === 'banned' ? 'user' : 'banned';
 
-    const res = await fetch(`http://localhost:3000/customers/${id}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Cstatus: newStatus }),
-    });
+  const res = await apiFetch(`http://localhost:3000/customers/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ Cstatus: newStatus }),
+  });
 
-    if (res.ok) {
-      setUsers(prev => prev.map(u => u.Cid === id ? { ...u, Cstatus: newStatus } : u));
-    } else {
-      alert('เปลี่ยนสถานะไม่สำเร็จ');
-    }
-  };
+  if (res.ok) {
+    setUsers(prev => prev.map(u => u.Cid === id ? { ...u, Cstatus: newStatus } : u));
+  } else {
+    const data = await res.json().catch(() => null);
+    alert(data?.message || 'เปลี่ยนสถานะไม่สำเร็จ');
+  }
+};
 
   const handleViewOrders = (id: number) => {
     router.push(`/admin/users/${id}/orders`);

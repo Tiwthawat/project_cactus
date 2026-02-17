@@ -203,7 +203,7 @@ export default function NewAuctionPage() {
             <div className="relative">
               <input
                 type="number"
-                step="0.01"
+                step="1"
                 min={0}
                 className="w-full p-3 pl-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none transition-colors text-gray-800 font-semibold"
                 value={startPrice}

@@ -18,7 +18,7 @@ interface WinDetail {
 
   shipping_company?: string | null;
   tracking_number?: string | null;
-  shipping_status?: 'pending' | 'shipped' | 'delivered' | null;
+  shipping_status?: 'pending' | 'shipping' | 'delivered' | null;
 }
 
 export default function AuctionWinDetailPage() {
@@ -217,7 +217,7 @@ export default function AuctionWinDetailPage() {
           <p className="mt-2">
             สถานะจัดส่ง:{' '}
             <span className={
-              data.shipping_status === 'shipped'
+              data.shipping_status === 'shipping'
                 ? 'text-blue-600'
                 : data.shipping_status === 'delivered'
                 ? 'text-green-600'
@@ -225,7 +225,7 @@ export default function AuctionWinDetailPage() {
             }>
               {data.shipping_status === 'pending'
                 ? 'รอจัดส่ง'
-                : data.shipping_status === 'shipped'
+                : data.shipping_status === 'shipping'
                 ? 'กำลังจัดส่ง'
                 : data.shipping_status === 'delivered'
                 ? 'จัดส่งสำเร็จแล้ว'
@@ -234,7 +234,7 @@ export default function AuctionWinDetailPage() {
           </p>
 
           {/* ⭐ ลูกค้ากดยืนยันได้รับสินค้า */}
-          {data.shipping_status === 'shipped' && (
+          {data.shipping_status === 'shipping' && (
             <button
               onClick={confirmDelivered}
               className="mt-4 bg-green-700 text-white px-4 py-2 rounded-lg w-full hover:bg-green-800"

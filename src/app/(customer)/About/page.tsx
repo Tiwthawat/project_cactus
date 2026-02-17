@@ -1,13 +1,25 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { FaStar, FaRegStar, FaPaperPlane, FaQuoteLeft, FaUserCircle } from 'react-icons/fa';
+
+import { apiFetch } from '@/app/lib/apiFetch';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  FaStar,
+  FaRegStar,
+  FaPaperPlane,
+  FaQuoteLeft,
+  FaUserCircle,
+} from 'react-icons/fa';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
 
 interface ReviewItem {
   id: number;
   text: string;
   stars: number;
+  Cname?: string;
+  images?: string[];
+  created_at?: string;
 }
 
 interface ReviewsErrorResponse {
@@ -15,94 +27,133 @@ interface ReviewsErrorResponse {
   error?: string;
 }
 
-function isReviewArray(data: unknown): data is ReviewItem[] {
-  if (!Array.isArray(data)) return false;
-  return data.every((x) => {
-    if (typeof x !== 'object' || x === null) return false;
-    const obj = x as Record<string, unknown>;
-    return (
-      typeof obj.id === 'number' &&
-      typeof obj.text === 'string' &&
-      typeof obj.stars === 'number'
-    );
-  });
+function safeParseImages(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((x) => typeof x === "string") as string[];
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === "string") as string[];
+      return [];
+    } catch {
+      return raw.startsWith("/") ? [raw] : [];
+    }
+  }
+  return [];
 }
+
+function toReviewItem(x: unknown): ReviewItem | null {
+  if (typeof x !== "object" || x === null) return null;
+  const o = x as Record<string, unknown>;
+
+  const id = typeof o.id === "number" ? o.id : null;
+  const text = typeof o.text === "string" ? o.text : null;
+  const stars = typeof o.stars === "number" ? o.stars : null;
+
+  if (id === null || text === null || stars === null) return null;
+
+  const Cname = typeof o.Cname === "string" ? o.Cname : undefined;
+  const images = safeParseImages(o.images);
+  const created_at = typeof o.created_at === "string" ? o.created_at : undefined;
+
+  return { id, text, stars, Cname, images, created_at };
+}
+
+const maskCustomerName = (full?: string) => {
+  if (!full) return "ผู้ใช้";
+  const parts = full.trim().split(/\s+/);
+
+  if (parts.length === 1) {
+    return parts[0][0] + "xxx";
+  }
+
+  const first = parts[0];
+  const last = parts[1];
+  return `${first[0]}xxx ${last[0]}x`;
+};
+
+function toPublicImgUrl(path: string) {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return `${API}${path}`;
+}
+
 
 export default function About() {
   const [review, setReview] = useState('');
   const [rating, setRating] = useState(0);
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [hoverRating, setHoverRating] = useState(0);
 
-  function toReviewItem(x: unknown): ReviewItem | null {
-  if (typeof x !== "object" || x === null) return null;
-  const o = x as Record<string, unknown>;
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
 
-  // รองรับหลายชื่อคอลัมน์ที่พบบ่อย
-  const id =
-    (typeof o.id === "number" ? o.id :
-    typeof o.Reviewid === "number" ? o.Reviewid :
-    typeof o.Rid === "number" ? o.Rid :
-    typeof o.Payid === "number" ? o.Payid : null);
+  // ✅ รูปที่ผู้ใช้เลือกจะอัปโหลด
+  const [images, setImages] = useState<File[]>([]);
 
-  const text =
-    (typeof o.text === "string" ? o.text :
-    typeof o.Reviewdetails === "string" ? o.Reviewdetails :
-    typeof o.comment === "string" ? o.comment :
-    typeof o.message === "string" ? o.message : null);
+  // ✅ modal ดูรูปใหญ่
+  const [openImg, setOpenImg] = useState<string | null>(null);
 
-  const stars =
-    (typeof o.stars === "number" ? o.stars :
-    typeof o.rating === "number" ? o.rating :
-    typeof o.score === "number" ? o.score : null);
+  const loadReviews = async () => {
+    try {
+      const res = await apiFetch('/reviews/store');
+      const data: unknown = await res.json();
 
-  if (id === null || text === null || stars === null) return null;
+      if (!res.ok || !Array.isArray(data)) {
+        setReviews([]);
+        return;
+      }
 
-  return { id, text, stars };
-}
+      const normalized = data
+        .map(toReviewItem)
+        .filter((x): x is ReviewItem => x !== null);
 
-const loadReviews = async () => {
-  try {
-    const token = localStorage.getItem("token"); // เผื่อ API ต้องใช้สิทธิ์
-    const headers: HeadersInit = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
-
-    const res = await fetch(`${API}/reviews/store`, { headers });
-    const data: unknown = await res.json();
-
-    console.log("GET /reviews =>", data); // ✅ ดูใน console ว่า API ส่งอะไรมา
-
-    if (!res.ok) {
+      setReviews(normalized);
+    } catch (err) {
+      console.error('โหลดรีวิวผิด:', err);
       setReviews([]);
-      return;
     }
-
-    if (!Array.isArray(data)) {
-      setReviews([]);
-      return;
-    }
-
-    const normalized = data.map(toReviewItem).filter((x): x is ReviewItem => x !== null);
-    setReviews(normalized);
-  } catch (err) {
-    console.error("โหลดรีวิวผิด:", err);
-    setReviews([]);
-  }
-};
-
+  };
 
   useEffect(() => {
     loadReviews();
   }, []);
 
+  const onPickImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(e.target.files ?? []);
+
+  setImages((prev) => [...prev, ...files].slice(0, 5));
+
+  // reset input ให้เลือกไฟล์เดิมซ้ำได้
+  e.target.value = '';
+};
+
+
+  const previews = useMemo(() => {
+    const urls = images.map((f) => URL.createObjectURL(f));
+    return urls;
+  }, [images]);
+
+  useEffect(() => {
+    // cleanup preview urls
+    return () => {
+      previews.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [previews]);
+
   const handleSubmit = async () => {
+    if (!localStorage.getItem('token')) {
+      alert('กรุณาเข้าสู่ระบบก่อนส่งรีวิว');
+      return;
+    }
     if (review.trim() === '' || rating < 1 || rating > 5) return;
 
     try {
-      const res = await fetch(`${API}/reviews`, {
+      const fd = new FormData();
+      fd.append('text', review);
+      fd.append('stars', String(rating));
+      images.forEach((f) => fd.append('images', f)); // ✅ รูปสูงสุด 5
+
+      const res = await apiFetch('/reviews/store', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: review, stars: rating }),
+        body: fd,
       });
 
       const data: unknown = await res.json();
@@ -116,6 +167,7 @@ const loadReviews = async () => {
       setReview('');
       setRating(0);
       setHoverRating(0);
+      setImages([]);
 
       await loadReviews();
     } catch (err) {
@@ -124,7 +176,13 @@ const loadReviews = async () => {
     }
   };
 
-  const StarRating = ({ count, interactive = false }: { count: number; interactive?: boolean }) => {
+  const StarRating = ({
+    count,
+    interactive = false,
+  }: {
+    count: number;
+    interactive?: boolean;
+  }) => {
     return (
       <div className="flex space-x-1">
         {[1, 2, 3, 4, 5].map((star) => (
@@ -134,12 +192,11 @@ const loadReviews = async () => {
             onClick={interactive ? () => setRating(star) : undefined}
             onMouseEnter={interactive ? () => setHoverRating(star) : undefined}
             onMouseLeave={interactive ? () => setHoverRating(0) : undefined}
-            className={`text-3xl focus:outline-none transition-all duration-200 ${
-              interactive ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
-            }`}
+            className={`text-3xl focus:outline-none transition-all duration-200 ${interactive ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
+              }`}
             disabled={!interactive}
           >
-            {star <= (interactive ? (hoverRating || rating) : count) ? (
+            {star <= (interactive ? hoverRating || rating : count) ? (
               <FaStar className="text-yellow-400" />
             ) : (
               <FaRegStar className="text-gray-300" />
@@ -149,6 +206,22 @@ const loadReviews = async () => {
       </div>
     );
   };
+
+  const maskFullName = (full?: string) => {
+    if (!full) return "ผู้ใช้";
+
+    const parts = full.trim().split(/\s+/);
+    if (parts.length === 1) {
+      // ชื่อเดียว
+      return parts[0][0] + "xxx";
+    }
+
+    const first = parts[0];
+    const last = parts[1];
+
+    return `${first[0]}xxx ${last[0]}x`;
+  };
+
 
   return (
     <main className="mt-16 min-h-screen bg-white px-4 py-16">
@@ -176,7 +249,9 @@ const loadReviews = async () => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 text-lg font-semibold mb-3">ความคิดเห็น</label>
+            <label className="block text-gray-700 text-lg font-semibold mb-3">
+              ความคิดเห็น
+            </label>
             <div className="relative">
               <textarea
                 value={review}
@@ -186,12 +261,48 @@ const loadReviews = async () => {
               />
               <FaQuoteLeft className="absolute top-3 right-3 text-green-200 text-2xl" />
             </div>
+
+            {/* ✅ อัปโหลดรูป */}
+            <div className="mt-4">
+              <label className="block text-gray-700 text-base font-semibold mb-2">
+                เพิ่มรูป (สูงสุด 5 รูป)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={onPickImages}
+                className="block w-full text-sm text-gray-600"
+              />
+
+              {images.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {previews.map((src, idx) => (
+                    <div
+                      key={idx}
+                      className="w-20 h-20 rounded-xl overflow-hidden border bg-white"
+                      title="พรีวิว"
+                    >
+                      <img
+                        src={src}
+                        alt="preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mb-8">
-            <label className="block text-gray-700 text-lg font-semibold mb-3">ให้คะแนน</label>
+            <label className="block text-gray-700 text-lg font-semibold mb-3">
+              ให้คะแนน
+            </label>
             <StarRating count={rating} interactive />
-            {rating > 0 && <p className="mt-2 text-green-600 font-medium">คุณให้ {rating} ดาว</p>}
+            {rating > 0 && (
+              <p className="mt-2 text-green-600 font-medium">คุณให้ {rating} ดาว</p>
+            )}
           </div>
 
           <button
@@ -220,7 +331,9 @@ const loadReviews = async () => {
                   <FaStar className="text-gray-300 text-3xl" />
                 </div>
                 <p className="text-gray-400 text-lg">ยังไม่มีรีวิว</p>
-                <p className="text-gray-400 text-sm mt-2">เป็นคนแรกที่แบ่งปันประสบการณ์ของคุณ!</p>
+                <p className="text-gray-400 text-sm mt-2">
+                  เป็นคนแรกที่แบ่งปันประสบการณ์ของคุณ!
+                </p>
               </div>
             ) : (
               reviews.map((r) => (
@@ -229,24 +342,71 @@ const loadReviews = async () => {
                   className="bg-white rounded-2xl p-6 shadow-lg border-2 border-gray-100 hover:border-green-200 hover:shadow-xl transition-all duration-300"
                 >
                   <div className="flex items-start gap-4">
+                    {/* avatar */}
                     <div className="flex-shrink-0">
                       <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
                         <FaUserCircle className="text-white text-2xl" />
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex space-x-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <FaStar
-                              key={star}
-                              className={`text-xl ${star <= r.stars ? 'text-yellow-400' : 'text-gray-200'}`}
-                            />
-                          ))}
+
+                    {/* content + right images */}
+                    <div className="flex-1 w-full">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* left: name + stars + text */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-semibold text-gray-700">
+                              {maskCustomerName(r.Cname)}
+
+                            </div>
+
+                            <span className="text-sm text-gray-400 font-medium">
+                              {r.stars}/5
+                            </span>
+                          </div>
+
+                          <div className="flex space-x-1 mb-3">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <FaStar
+                                key={star}
+                                className={`text-xl ${star <= r.stars ? 'text-yellow-400' : 'text-gray-200'
+                                  }`}
+                              />
+                            ))}
+                          </div>
+
+                          <p className="text-gray-700 text-base leading-relaxed">
+                            &quot;{r.text}&quot;
+                          </p>
                         </div>
-                        <span className="text-sm text-gray-400 font-medium">{r.stars}/5</span>
+
+                        {/* right: images */}
+                        {r.images && r.images.length > 0 && (
+                          <div className="flex flex-col gap-2 items-end">
+                            {r.images.slice(0, 3).map((img, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setOpenImg(img)}
+                                className="w-16 h-16 rounded-xl overflow-hidden border bg-gray-50"
+                                title="กดดูรูป"
+                              >
+                                <img
+                                  src={toPublicImgUrl(img)}
+                                  alt="review"
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            ))}
+
+                            {r.images.length > 3 && (
+                              <div className="text-xs text-gray-400">
+                                +{r.images.length - 3} รูป
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <p className="text-gray-700 text-base leading-relaxed">"{r.text}"</p>
                     </div>
                   </div>
                 </div>
@@ -279,6 +439,28 @@ const loadReviews = async () => {
           </div>
         )}
       </div>
+
+      {/* ✅ modal ดูรูปใหญ่ */}
+      {openImg && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setOpenImg(null)}
+        >
+          <div className="max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={toPublicImgUrl(openImg)}
+              alt="full"
+              className="w-full max-h-[80vh] object-contain rounded-2xl bg-white"
+            />
+            <button
+              className="mt-3 w-full bg-white rounded-xl py-2 font-semibold"
+              onClick={() => setOpenImg(null)}
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

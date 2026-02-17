@@ -259,7 +259,14 @@ export default function Register() {
                 >
                   {showPassword ? <FaEyeSlash /> : <FaEye />}
                 </span>
-              </div>
+              </div><p className="mt-1 text-xs text-gray-400">
+                ตัวอย่าง:  รหัสผ่านต้องมีอย่างน้อย 6 ตัว
+                รหัสผ่านต้องมีตัวอักษรภาษาอังกฤษ
+                รหัสผ่านต้องมีตัวเลข
+                รหัสผ่านห้ามมีอักษรภาษาไทย
+
+              </p>
+
             </div>
 
             {/* Confirm Password */}

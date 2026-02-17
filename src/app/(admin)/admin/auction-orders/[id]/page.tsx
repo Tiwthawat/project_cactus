@@ -24,7 +24,7 @@ const makeCode = (prefix: string, id: number) =>
   `${prefix}:${String(id).padStart(4, "0")}`;
 
 type PaymentStatus = "pending_payment" | "payment_review" | "paid";
-type ShipStatus = "" | "pending" | "shipped" | "delivered";
+type ShipStatus = "" | "pending" | "shipping" | "delivered";
 
 const payBadge = (s: PaymentStatus) => {
   const map: Record<PaymentStatus, { cls: string; label: string }> = {
@@ -51,7 +51,7 @@ const shipBadge = (s: ShipStatus) => {
       cls: "bg-gray-100 text-gray-800 border-gray-200",
       label: "รอจัดส่ง",
     },
-    shipped: {
+    shipping: {
       cls: "bg-blue-100 text-blue-800 border-blue-200",
       label: "กำลังจัดส่ง",
     },
@@ -135,7 +135,7 @@ export default function AuctionOrderDetailPage() {
 
   const shippingStatus: ShipStatus = useMemo(() => {
     const s = data?.shipping_status ?? "";
-    if (s === "pending" || s === "shipped" || s === "delivered") return s;
+    if (s === "pending" || s === "shipping" || s === "delivered") return s;
     return "";
   }, [data]);
 
@@ -147,7 +147,7 @@ export default function AuctionOrderDetailPage() {
   const canCreateShippingNow = paymentStatus === "paid";
   const canShowShippingForm = canCreateShippingNow && !hasShippingInfo;
   const canEditShipping = hasShippingInfo && shippingStatus !== "delivered";
-  const canMarkDelivered = shippingStatus === "shipped";
+  const canMarkDelivered = shippingStatus === "shipping";
 
   const updatePaymentStatus = async (next: PaymentStatus) => {
     if (!data) return;
@@ -185,7 +185,7 @@ export default function AuctionOrderDetailPage() {
       body: JSON.stringify({
         shipping_company: shipComp,
         tracking_number: trackNo,
-        shipping_status: "shipped",
+        shipping_status: "shipping",
       }),
     });
 
@@ -196,7 +196,7 @@ export default function AuctionOrderDetailPage() {
       ...data,
       shipping_company: shipComp,
       tracking_number: trackNo,
-      shipping_status: "shipped",
+      shipping_status: "shipping",
     });
     setEditShip(false);
   };

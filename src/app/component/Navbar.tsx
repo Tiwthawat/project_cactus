@@ -99,8 +99,19 @@ const Navbar = () => {
   const activeClass = "!bg-green-100 !text-green-600 font-semibold";
   const inactiveClass = "hover:!bg-green-50 hover:!text-green-600 active:!bg-green-100 focus:!bg-green-100 focus:!text-green-600";
 
+  // ใน Navbar
+const goHome = (e: React.MouseEvent) => {
+  e.preventDefault();
+  window.dispatchEvent(new Event("go-home")); // สั่ง reset state หน้า home
+  router.push("/"); // เผื่อกรณีไม่ได้อยู่หน้า /
+};
+
+
+
+
   return (
-    <div className="navbar bg-white shadow-sm fixed top-0 left-0 w-full z-50 text-sm">
+    <div className="navbar bg-white shadow-sm fixed top-0 left-0 w-full z-[9999] text-sm">
+
       <div className="navbar-start">
         <div className="dropdown">
           <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden btn-sm">
@@ -184,9 +195,9 @@ const Navbar = () => {
             )} */}
           </ul>
         </div>
-        <Link href="/" className="btn btn-ghost btn-sm hover:bg-green-50">
-          <img src="/favicon.png" className="w-8 h-8 rounded-full" />
-        </Link>
+        <Link href="/" onClick={goHome} className="btn btn-ghost btn-sm hover:bg-green-50">
+  <img src="/favicon.png" className="w-8 h-8 rounded-full" />
+</Link>
       </div>
 
       <div className="navbar-center hidden lg:flex">
@@ -280,7 +291,7 @@ const Navbar = () => {
 
           {/* popup ค้นหา */}
           {showSearch && (
-            <div className="absolute right-0 top-10 w-52 bg-white p-3 rounded-lg shadow-lg z-50">
+            <div className="absolute right-0 top-10 w-52 bg-white p-3 rounded-lg shadow-lg z-[1000]">
               <input
                 type="text"
                 placeholder="ค้นหา..."
@@ -325,16 +336,13 @@ const Navbar = () => {
             )}
           </div>
         </Link>
-        <Link
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            window.dispatchEvent(new CustomEvent("show-favorites"));
-          }}
-          className={`btn btn-ghost btn-circle btn-sm ${isActive('/favorites') ? 'bg-green-100 text-green-600' : 'hover:bg-green-50 hover:text-green-600'}`}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("show-favorites"))}
+          className="btn btn-ghost btn-circle btn-sm ..."
         >
           <FaHeart className="text-base" />
-        </Link>
+        </button>
+
 
 
         <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">

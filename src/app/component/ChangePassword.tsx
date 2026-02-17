@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { apiFetch } from '../lib/apiFetch';
 
 export default function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [oldPassword, setOldPassword] = useState('');
@@ -9,13 +10,9 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
   const [showNew, setShowNew] = useState(false);
 
   const handleSubmit = async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch('http://localhost:3000/change-password', {
+    
+    const res = await apiFetch('http://localhost:3000/change-password', {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify({ oldPassword, newPassword }),
     });
 

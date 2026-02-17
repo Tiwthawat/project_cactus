@@ -7,13 +7,52 @@ import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
-const getImageUrl = (path: string | null) => {
+/** --------------------------
+ *  Image helpers (รองรับหลายรูป)
+ * -------------------------- */
+type PictureLike = string | string[] | null | undefined;
+
+const getImageUrl = (path: string | null | undefined) => {
   if (!path) return "/no-image.png";
-  const clean = path.trim();
+  const clean = String(path).trim();
+  if (!clean) return "/no-image.png";
   if (clean.startsWith("http")) return clean;
   if (clean.startsWith("/")) return `${API}${clean}`;
   return `${API}/${clean}`;
 };
+
+const toPictures = (raw: PictureLike): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter((x) => typeof x === "string" && x.trim());
+
+  const s = String(raw).trim();
+  if (!s) return [];
+
+  // JSON string เช่น '["/a.png","/b.png"]'
+  if (s.startsWith("[")) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) {
+        return arr.filter((x) => typeof x === "string" && x.trim());
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // เผื่อเก็บเป็น "a.jpg,b.jpg"
+  if (s.includes(",")) {
+    return s
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  // รูปเดี่ยว
+  return [s];
+};
+
+const firstPicture = (raw: PictureLike) => toPictures(raw)[0] ?? null;
 
 const makeCode = (prefix: string, id: number) =>
   `${prefix}:${String(id).padStart(4, "0")}`;
@@ -68,7 +107,7 @@ interface OrderItem {
   Pname: string;
   Oquantity: number;
   Oprice: number;
-  Ppicture: string;
+  Ppicture: string | string[] | null; // ✅ รองรับหลายรูป
 }
 
 interface FullOrder {
@@ -210,11 +249,11 @@ export default function OrderDetailPage() {
     setOrder((prev) =>
       prev
         ? {
-          ...prev,
-          Oshipping: shipComp,
-          Otracking: trackNo,
-          Ostatus: "shipping",
-        }
+            ...prev,
+            Oshipping: shipComp,
+            Otracking: trackNo,
+            Ostatus: "shipping",
+          }
         : prev
     );
     setEditShip(false);
@@ -239,8 +278,6 @@ export default function OrderDetailPage() {
   };
 
   const copyShippingAddress = async () => {
-    if (!order) return;
-
     const text = `ชื่อ: ${order.Cname}
 โทร: ${order.Cphone}
 ที่อยู่: ${order.Caddress}`;
@@ -252,7 +289,6 @@ export default function OrderDetailPage() {
       alert("ไม่สามารถคัดลอกได้");
     }
   };
-
 
   return (
     <div className="p-6 max-w-7xl mx-auto text-black">
@@ -282,19 +318,15 @@ export default function OrderDetailPage() {
               <p className="md:col-span-2">
                 <b>ที่อยู่:</b> {order.Caddress}
               </p>
+
               <div className="md:col-span-2 mt-2">
                 <button
                   onClick={copyShippingAddress}
-                  className="inline-flex items-center gap-2 px-3 py-1.5
-      rounded-lg border border-gray-300 bg-white
-      hover:bg-gray-100 text-sm font-semibold"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-sm font-semibold"
                 >
                   📋 คัดลอกข้อมูลจัดส่ง
                 </button>
-
-
               </div>
-
 
               <p>
                 <b>วิธีชำระเงิน:</b>{" "}
@@ -319,27 +351,53 @@ export default function OrderDetailPage() {
           <div className="bg-white p-6 rounded-xl shadow border">
             <h2 className="text-xl font-semibold mb-4">รายการสินค้า</h2>
 
-            {order.items.map((item) => (
-              <div
-                key={item.Oiid}
-                className="flex gap-4 border-b py-4 last:border-b-0"
-              >
-                <img
-                  src={getImageUrl(item.Ppicture)}
-                  className="w-20 h-20 rounded object-cover border"
-                  alt={item.Pname}
-                />
-                <div className="flex-1">
-                  <p className="font-medium">{item.Pname}</p>
-                  <p className="text-sm text-gray-600">
-                    จำนวน {item.Oquantity} × {fmtBaht(item.Oprice)} บาท
-                  </p>
+            {order.items.map((item) => {
+              const pics = toPictures(item.Ppicture);
+              const main = firstPicture(item.Ppicture);
+
+              return (
+                <div
+                  key={item.Oiid}
+                  className="border-b py-4 last:border-b-0"
+                >
+                  <div className="flex gap-4">
+                    <img
+                      src={getImageUrl(main)}
+                      className="w-20 h-20 rounded object-cover border"
+                      alt={item.Pname}
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium">{item.Pname}</p>
+                      <p className="text-sm text-gray-600">
+                        จำนวน {item.Oquantity} × {fmtBaht(item.Oprice)} บาท
+                      </p>
+                    </div>
+                    <div className="font-semibold text-right">
+                      {fmtBaht(item.Oquantity * item.Oprice)} บาท
+                    </div>
+                  </div>
+
+                  {/* ✅ ถ้ามีหลายรูป โชว์ thumbnail */}
+                  {pics.length > 1 && (
+                    <div className="mt-3 ml-[96px] flex gap-2 flex-wrap">
+                      {pics.slice(0, 6).map((p, idx) => (
+                        <img
+                          key={idx}
+                          src={getImageUrl(p)}
+                          className="w-10 h-10 rounded border object-cover"
+                          alt={`${item.Pname}-${idx + 1}`}
+                        />
+                      ))}
+                      {pics.length > 6 && (
+                        <span className="text-xs text-gray-500 self-center">
+                          +{pics.length - 6}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="font-semibold text-right">
-                  {fmtBaht(item.Oquantity * item.Oprice)} บาท
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* สรุปราคา */}
@@ -356,7 +414,6 @@ export default function OrderDetailPage() {
           {/* การดำเนินการ */}
           <div className="bg-white p-6 rounded-xl shadow border">
             <h2 className="text-xl font-semibold mb-4">การดำเนินการ</h2>
-            
 
             {/* โอน: ไปตรวจสลิป */}
             {canGoPaymentReview && (
@@ -396,14 +453,12 @@ export default function OrderDetailPage() {
           </div>
 
           <Link
-  href={`/admin/orders/${order.Oid}/receipt`}
-  target="_blank"
-  className="block w-full text-center bg-indigo-600 text-white py-2 rounded
-             hover:bg-indigo-700 font-semibold mb-2"
->
-  🧾 พิมพ์ใบเสร็จ
-</Link>
-
+            href={`/admin/orders/${order.Oid}/receipt`}
+            target="_blank"
+            className="block w-full text-center bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-semibold mb-2"
+          >
+            🧾 พิมพ์ใบเสร็จ
+          </Link>
 
           {/* สลิป (ถ้ามี) */}
           {order.Oslip && (
@@ -418,12 +473,11 @@ export default function OrderDetailPage() {
           )}
 
           {/* จัดส่ง */}
-          {/* จัดส่ง */}
           <div className="bg-white p-6 rounded-xl shadow border">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">ข้อมูลจัดส่ง</h3>
 
-              {canEditShipping && (
+              {hasShippingInfo && order.Ostatus !== "delivered" && (
                 <button
                   onClick={() => setEditShip((v) => !v)}
                   className="text-blue-600 hover:underline font-semibold text-xs"
@@ -473,16 +527,21 @@ export default function OrderDetailPage() {
             {/* แสดงข้อมูลจัดส่ง + โหมดแก้ไข */}
             {hasShippingInfo && (
               <div className="text-sm space-y-2">
-                {/* Badge สถานะจัดส่ง */}
                 <span
-                  className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${order.Ostatus === "delivered"
+                  className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
+                    order.Ostatus === "delivered"
                       ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                       : order.Ostatus === "shipping"
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : "bg-gray-100 text-gray-800 border-gray-200"
-                    }`}
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : "bg-gray-100 text-gray-800 border-gray-200"
+                  }`}
                 >
-                  🚚 {order.Ostatus === "delivered" ? "จัดส่งสำเร็จ" : order.Ostatus === "shipping" ? "กำลังจัดส่ง" : "—"}
+                  🚚{" "}
+                  {order.Ostatus === "delivered"
+                    ? "จัดส่งสำเร็จ"
+                    : order.Ostatus === "shipping"
+                    ? "กำลังจัดส่ง"
+                    : "—"}
                 </span>
 
                 {!editShip ? (
@@ -557,7 +616,6 @@ export default function OrderDetailPage() {
               </p>
             )}
           </div>
-
         </div>
       </div>
     </div>

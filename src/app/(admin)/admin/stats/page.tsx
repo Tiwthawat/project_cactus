@@ -1,7 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/app/lib/apiFetch';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ResponsiveContainer,
@@ -21,33 +21,33 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-type PaymentKey = 'bank' | 'cod' | 'auction';
+type SeriesMode = 'day' | 'month' | 'year';
+type RangeMode = 'year' | 'yearRange' | 'dateRange';
 
-interface MethodRow {
-  key: PaymentKey;
-  label: string;
-  value: number;
-  percent: number;
-}
-
-/** ---------- NEW report rows ---------- */
-
-interface TopProductRow {
-  product_id: number;
-  name: string;
-  category?: string | null;
-  qty: number;
+/** ---------- report rows ---------- */
+interface CategoryRevenueByTypeRow {
+  type?: string | null;
   revenue: number;
+  qty: number;
 }
 
 interface CategoryRevenueRow {
-  category: string;
+  type?: string | null;
+  subtype?: string | null;
   revenue: number;
   qty: number;
 }
 
+interface StockByTypeRow {
+  type?: string | null;
+  total_products: number;
+  total_stock: number;
+  low_stock: number;
+}
+
 interface StockCategoryRow {
-  category: string;
+  type?: string | null;
+  subtype?: string | null;
   total_products: number;
   total_stock: number;
   low_stock: number;
@@ -56,7 +56,8 @@ interface StockCategoryRow {
 interface LowStockRow {
   product_id: number;
   name: string;
-  category?: string | null;
+  type?: string | null;
+  subtype?: string | null;
   stock: number;
 }
 
@@ -66,24 +67,6 @@ interface TopCustomerRow {
   orders: number;
   total_spent: number;
   avg_order: number;
-}
-
-interface OrderStatusRow {
-  status:
-    | 'pending_payment'
-    | 'payment_review'
-    | 'paid'
-    | 'shipping'
-    | 'delivered'
-    | 'cancelled'
-    | 'failed'
-    | string;
-  count: number;
-}
-
-interface SalesDailyRow {
-  date: string; // 'YYYY-MM-DD'
-  revenue: number;
 }
 
 /** ---------- Main stats ---------- */
@@ -97,10 +80,7 @@ interface FullStats {
   orderMonth: number;
 
   // Auctions
-  totalAuctions: number;
   auctionSales: number;
-  soldAuctionCount: number;
-  unsoldAuctionCount: number;
 
   // Payment channels
   bankSales: number;
@@ -109,76 +89,120 @@ interface FullStats {
   // Total
   totalSales: number;
 
-  // NEW datasets (optional)
-  topProducts?: TopProductRow[];
+  // datasets
+  categoryRevenueByType?: CategoryRevenueByTypeRow[];
   categoryRevenue?: CategoryRevenueRow[];
+
+  stockByType?: StockByTypeRow[];
   stockByCategory?: StockCategoryRow[];
+
   lowStockProducts?: LowStockRow[];
   topCustomers?: TopCustomerRow[];
-  orderStatusOverview?: OrderStatusRow[];
-  salesDaily?: SalesDailyRow[];
-
-  // optional auction performance
-  auctionParticipationAvg?: number;
-  auctionClosedRate?: number;
 }
 
-/** ---------- helpers ---------- */
-const COLORS = ['#0ea5e9', '#f97316', '#22c55e']; // bank / cod / auction
+/** ---------- Sales series ---------- */
+type SalesSeriesRow = {
+  k: string;
+  transfer: number;
+  cod: number;
+  auction: number;
+  total: number;
+};
 
+type SalesSeriesResponse = {
+  mode: SeriesMode;
+  rangeMode?: string;
+  year?: number;
+  yearStart?: number | null;
+  yearEnd?: number | null;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  series: SalesSeriesRow[];
+};
+
+/** ---------- helpers ---------- */
 const toNum = (n: unknown): number => {
   const v = Number(n);
   return Number.isFinite(v) ? v : 0;
 };
 
 const fmtBaht = (n: unknown): string =>
-  toNum(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  toNum(n).toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-const fmtInt = (n: unknown): string =>
-  toNum(n).toLocaleString('th-TH', { maximumFractionDigits: 0 });
+const fmtInt = (n: unknown): string => toNum(n).toLocaleString('th-TH', { maximumFractionDigits: 0 });
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const ymd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 2022;
 const MAX_YEAR = CURRENT_YEAR;
 
+const LOW_STOCK_THRESHOLD = 10; // ✅ ใกล้หมด <= 10
+
+const clampYear = (y: number) => {
+  if (!Number.isFinite(y)) return CURRENT_YEAR;
+  if (y < MIN_YEAR) return MIN_YEAR;
+  if (y > MAX_YEAR) return MAX_YEAR;
+  return y;
+};
+
+const parseYearParam = (raw: string | null) => {
+  const y = Number(raw);
+  if (!Number.isFinite(y) || y < 1000) return null;
+  return y;
+};
+
+function normalizeText(x: unknown) {
+  const s = (x ?? '').toString().trim();
+  return s.length ? s : null;
+}
+
+function typeName(type?: string | null) {
+  return normalizeText(type) ?? 'ไม่ระบุหมวด';
+}
+
+function subtypeName(subtype?: string | null) {
+  return normalizeText(subtype) ?? 'ไม่ระบุหมวดย่อย';
+}
+
+function pathLabel(type?: string | null, subtype?: string | null) {
+  return `${typeName(type)} > ${subtypeName(subtype)}`;
+}
+
 /** ---------- Tabs ---------- */
-type TabKey =
-  | 'overview'
-  | 'payments'
-  | 'trend'
-  | 'products'
-  | 'categories'
-  | 'stock'
-  | 'orders'
-  | 'auction';
-
-
-
-
+type TabKey = 'overview' | 'payments' | 'trend' | 'insights' | 'stock';
 
 const TAB_LIST: { key: TabKey; label: string; icon: string; desc: string }[] = [
-  { key: 'overview', label: 'ภาพรวม', icon: '🧭', desc: 'สรุปยอดขาย + ตัวเลขหลักทั้งหมด' },
+  { key: 'overview', label: 'ภาพรวม', icon: '🧭', desc: 'ยอดขาย + ตัวเลขหลัก' },
   { key: 'payments', label: 'ช่องทางรายได้', icon: '💳', desc: 'โอน / COD / ประมูล (Pie + ตาราง + bar)' },
-  { key: 'trend', label: 'แนวโน้ม', icon: '📈', desc: 'ยอดขายรายวัน (ถ้ามีข้อมูล)' },
-  { key: 'products', label: 'สินค้าขายดี', icon: '🏆', desc: 'Top Products + Top Customers' },
-  { key: 'categories', label: 'หมวดหมู่ทำเงิน', icon: '🗂️', desc: 'ยอดขายตามหมวด (ตาราง + กราฟ)' },
-  { key: 'stock', label: 'สต็อก', icon: '📦', desc: 'สต็อกรวม + ใกล้หมด' },
-  { key: 'orders', label: 'สถานะออเดอร์', icon: '🧾', desc: 'ภาพรวมสถานะ + กราฟ' },
-  { key: 'auction', label: 'ประมูล', icon: '🔨', desc: 'ตัวชี้วัดประมูล + สรุปผู้บริหาร' },
+  { key: 'trend', label: 'แนวโน้ม', icon: '📈', desc: 'ยอดขายรายวัน/เดือน/ปี + เลือกช่วงเอง' },
+  { key: 'insights', label: 'หมวดทำเงิน', icon: '🏷️', desc: 'หมวดหลักก่อน แล้วค่อยแจกแจงหมวดย่อย' },
+  { key: 'stock', label: 'สต็อก', icon: '📦', desc: 'หมวดหลักก่อน + เจาะหมวดย่อย + ใกล้หมด' },
 ];
 
- const LS_TAB_KEY = 'admin_stats_tab';
+const LS_TAB_KEY = 'admin_stats_tab';
 const LS_YEAR_KEY = 'admin_stats_year';
-
-
-
-
-
-
 
 function isTabKey(x: string | null): x is TabKey {
   return !!x && TAB_LIST.some((t) => t.key === x);
 }
+
+/** ---------- colors ---------- */
+const COLOR_BANK = '#0ea5e9';
+const COLOR_COD = '#f97316';
+const COLOR_AUCTION = '#22c55e';
+
+const COLOR_SALES = '#22c55e';
+const COLOR_TOTAL = '#111827';
+
+const COLOR_STOCK = '#0ea5e9';
+const COLOR_LOW = '#ef4444';
+
+const PIE_COLORS = [COLOR_BANK, COLOR_COD, COLOR_AUCTION];
 
 export default function AdminStatsPage() {
   const router = useRouter();
@@ -187,45 +211,94 @@ export default function AdminStatsPage() {
   const [stats, setStats] = useState<FullStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errMsg, setErrMsg] = useState<string>('');
+
   const [year, setYear] = useState<number>(() => {
-  if (typeof window === 'undefined') return CURRENT_YEAR;
-  const saved = localStorage.getItem(LS_YEAR_KEY);
-  const y = Number(saved);
-  return Number.isFinite(y) ? y : CURRENT_YEAR;
-});
+    if (typeof window === 'undefined') return CURRENT_YEAR;
 
-const [tab, setTab] = useState<TabKey>(() => {
-  if (typeof window === 'undefined') return 'overview';
-  const saved = localStorage.getItem(LS_TAB_KEY) as TabKey | null;
-  return saved && TAB_LIST.some(t => t.key === saved) ? saved : 'overview';
-});
+    const urlYear = parseYearParam(new URLSearchParams(window.location.search).get('year'));
+    if (urlYear != null) return clampYear(urlYear);
 
+    const saved = Number(localStorage.getItem(LS_YEAR_KEY));
+    return clampYear(saved);
+  });
 
-useEffect(() => {
-  const urlTab = searchParams.get('tab');
+  const [tab, setTab] = useState<TabKey>(() => {
+    if (typeof window === 'undefined') return 'overview';
+    const saved = localStorage.getItem(LS_TAB_KEY) as TabKey | null;
+    return saved && TAB_LIST.some((t) => t.key === saved) ? saved : 'overview';
+  });
 
-  if (isTabKey(urlTab)) {
-    setTab(urlTab);
-    localStorage.setItem(LS_TAB_KEY, urlTab); // กันกลับมาแล้วลืม
-  } else {
-    // ถ้าเข้ามาแบบไม่มี ?tab= ให้ "เขียน URL" ตามแท็บที่จำไว้
+  /** ---------- Trend state (sales-series) ---------- */
+  const [seriesMode, setSeriesMode] = useState<SeriesMode>('day');
+  const [rangeMode, setRangeMode] = useState<RangeMode>('year');
+  const [yearStart, setYearStart] = useState<number>(clampYear(CURRENT_YEAR - 1));
+  const [yearEnd, setYearEnd] = useState<number>(clampYear(CURRENT_YEAR));
+  const [startDate, setStartDate] = useState<string>(() => ymd(new Date()));
+  const [endDate, setEndDate] = useState<string>(() => ymd(new Date()));
+  const [seriesLoading, setSeriesLoading] = useState<boolean>(false);
+  const [seriesErr, setSeriesErr] = useState<string>('');
+  const [seriesData, setSeriesData] = useState<SalesSeriesResponse | null>(null);
+
+  /** ---------- category expand states ---------- */
+  const [openTypesRevenue, setOpenTypesRevenue] = useState<Record<string, boolean>>({});
+  const [openTypesStock, setOpenTypesStock] = useState<Record<string, boolean>>({});
+
+  /** ----- ensure URL has tab + year ----- */
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    const urlYearRaw = searchParams.get('year');
+    const urlYear = parseYearParam(urlYearRaw);
+
     const params = new URLSearchParams(searchParams.toString());
+    let changed = false;
+
+    if (isTabKey(urlTab)) {
+      if (urlTab !== tab) setTab(urlTab);
+      localStorage.setItem(LS_TAB_KEY, urlTab);
+    } else {
+      params.set('tab', tab);
+      changed = true;
+    }
+
+    if (urlYear != null) {
+      const cy = clampYear(urlYear);
+      if (cy !== year) {
+        setYear(cy);
+        localStorage.setItem(LS_YEAR_KEY, String(cy));
+      }
+    } else {
+      params.set('year', String(year));
+      changed = true;
+    }
+
+    if (changed) router.replace(`/admin/stats?${params.toString()}`);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const setYearAndPersist = (nextYear: number) => {
+    const y = clampYear(nextYear);
+    setYear(y);
+
+    if (typeof window !== 'undefined') localStorage.setItem(LS_YEAR_KEY, String(y));
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('year', String(y));
     params.set('tab', tab);
-    router.replace(`/admin/stats?${params.toString()}`);
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [searchParams]);
-
-
-
-
-  const setTabAndUrl = (next: TabKey) => {
-    setTab(next);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', next);
     router.replace(`/admin/stats?${params.toString()}`);
   };
 
+  const setTabAndUrl = (next: TabKey) => {
+    setTab(next);
+    if (typeof window !== 'undefined') localStorage.setItem(LS_TAB_KEY, next);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', next);
+    params.set('year', String(year));
+    router.replace(`/admin/stats?${params.toString()}`);
+  };
+
+  /** ---------- load /stats/full ---------- */
   useEffect(() => {
     let mounted = true;
 
@@ -250,6 +323,10 @@ useEffect(() => {
         const data: FullStats = await res.json();
         if (!mounted) return;
         setStats(data);
+
+        // reset expand maps (กันค้างข้ามปีจนงง)
+        setOpenTypesRevenue({});
+        setOpenTypesStock({});
       } catch (e) {
         if (!mounted) return;
         setErrMsg(e instanceof Error ? e.message : 'โหลดสถิติไม่สำเร็จ');
@@ -266,8 +343,68 @@ useEffect(() => {
     };
   }, [router, year]);
 
+  /** ---------- load /stats/sales-series ---------- */
+  const buildSeriesUrl = () => {
+    const params = new URLSearchParams();
+    params.set('mode', seriesMode);
+
+    if (rangeMode === 'year') {
+      params.set('year', String(year));
+    } else if (rangeMode === 'yearRange') {
+      params.set('mode', 'year');
+      params.set('yearStart', String(clampYear(yearStart)));
+      params.set('yearEnd', String(clampYear(yearEnd)));
+    } else {
+      params.set('start', startDate);
+      params.set('end', endDate);
+    }
+
+    return `${API}/stats/sales-series?${params.toString()}`;
+  };
+
+  const loadSeries = async () => {
+    setSeriesLoading(true);
+    setSeriesErr('');
+    try {
+      const url = buildSeriesUrl();
+      const res = await apiFetch(url);
+
+      if (res.status === 401 || res.status === 403) {
+        router.replace('/');
+        return;
+      }
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(t || `โหลดกราฟไม่สำเร็จ (HTTP ${res.status})`);
+      }
+
+      const data: SalesSeriesResponse = await res.json();
+      setSeriesData(data);
+    } catch (e) {
+      setSeriesData(null);
+      setSeriesErr(e instanceof Error ? e.message : 'โหลดกราฟไม่สำเร็จ');
+    } finally {
+      setSeriesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab !== 'trend') return;
+
+    if (rangeMode === 'dateRange' && (!startDate || !endDate)) {
+      const today = new Date();
+      const start = new Date();
+      start.setDate(today.getDate() - 6);
+      setStartDate(ymd(start));
+      setEndDate(ymd(today));
+    }
+
+    loadSeries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, year]);
+
   /** ----- Payment method report ----- */
-  const methodRows: MethodRow[] = useMemo(() => {
+  const methodRows = useMemo(() => {
     if (!stats) return [];
     const bank = toNum(stats.bankSales);
     const cod = toNum(stats.codSales);
@@ -276,9 +413,9 @@ useEffect(() => {
     const safeTotal = total <= 0 ? 1 : total;
 
     return [
-      { key: 'bank', label: 'โอน (Bank / โอนผ่านบัญชี)', value: bank, percent: (bank / safeTotal) * 100 },
-      { key: 'cod', label: 'ปลายทาง (COD)', value: cod, percent: (cod / safeTotal) * 100 },
-      { key: 'auction', label: 'ประมูล', value: auction, percent: (auction / safeTotal) * 100 },
+      { key: 'bank' as const, label: 'โอน (Bank / Transfer)', value: bank, percent: (bank / safeTotal) * 100 },
+      { key: 'cod' as const, label: 'ปลายทาง (COD)', value: cod, percent: (cod / safeTotal) * 100 },
+      { key: 'auction' as const, label: 'ประมูล', value: auction, percent: (auction / safeTotal) * 100 },
     ];
   }, [stats]);
 
@@ -296,50 +433,104 @@ useEffect(() => {
     ];
   }, [stats]);
 
-  /** ----- New reports: safe fallbacks ----- */
-  const topProducts = stats?.topProducts ?? [];
+  /** ----- datasets fallbacks ----- */
+  const categoryRevenueByType = stats?.categoryRevenueByType ?? [];
   const categoryRevenue = stats?.categoryRevenue ?? [];
+  const stockByType = stats?.stockByType ?? [];
   const stockByCategory = stats?.stockByCategory ?? [];
   const lowStockProducts = stats?.lowStockProducts ?? [];
   const topCustomers = stats?.topCustomers ?? [];
-  const orderStatusOverview = stats?.orderStatusOverview ?? [];
-  const salesDaily = stats?.salesDaily ?? [];
 
   const hasAnySales =
     !!stats && (toNum(stats.totalSales) > 0 || toNum(stats.orderSales) > 0 || toNum(stats.auctionSales) > 0);
 
-  /** chart data transforms */
-  const categoryBarData = useMemo(() => {
-    return categoryRevenue.map((c) => ({
-      name: c.category,
-      revenue: toNum(c.revenue),
-      qty: toNum(c.qty),
+  /** ---------- transform chart data (TYPE-first) ---------- */
+  const categoryTypeBarData = useMemo(() => {
+    return categoryRevenueByType.map((r) => ({
+      name: typeName(r.type),
+      revenue: toNum(r.revenue),
+      qty: toNum(r.qty),
     }));
+  }, [categoryRevenueByType]);
+
+  const stockTypeBarData = useMemo(() => {
+    return stockByType.map((r) => ({
+      name: typeName(r.type),
+      stock: toNum(r.total_stock),
+      low: toNum(r.low_stock),
+      products: toNum(r.total_products),
+    }));
+  }, [stockByType]);
+
+  /** ---------- trend chart ---------- */
+  const seriesChartData = useMemo(() => {
+    const s = seriesData?.series ?? [];
+    return s.map((r) => ({
+      k: r.k,
+      transfer: toNum(r.transfer),
+      cod: toNum(r.cod),
+      auction: toNum(r.auction),
+      total: toNum(r.total),
+    }));
+  }, [seriesData]);
+
+  /** ---------- build grouped maps (TYPE -> SUBTYPE rows) ---------- */
+  const revenueSubsByType = useMemo(() => {
+    const m = new Map<string, CategoryRevenueRow[]>();
+    for (const r of categoryRevenue) {
+      const t = typeName(r.type);
+      const arr = m.get(t) ?? [];
+      arr.push(r);
+      m.set(t, arr);
+    }
+    for (const [k, arr] of Array.from(m.entries())) {
+      arr.sort((a, b) => toNum(b.revenue) - toNum(a.revenue));
+      m.set(k, arr);
+    }
+    return m;
   }, [categoryRevenue]);
 
-  const stockBarData = useMemo(() => {
-    return stockByCategory.map((c) => ({
-      name: c.category,
-      stock: toNum(c.total_stock),
-      low: toNum(c.low_stock),
-      products: toNum(c.total_products),
-    }));
+  const stockSubsByType = useMemo(() => {
+    const m = new Map<string, StockCategoryRow[]>();
+    for (const r of stockByCategory) {
+      const t = typeName(r.type);
+      const arr = m.get(t) ?? [];
+      arr.push(r);
+      m.set(t, arr);
+    }
+    for (const [k, arr] of Array.from(m.entries())) {
+      arr.sort((a, b) => toNum(b.total_stock) - toNum(a.total_stock));
+      m.set(k, arr);
+    }
+    return m;
   }, [stockByCategory]);
 
-  const orderStatusBarData = useMemo(() => {
-    return orderStatusOverview.map((r) => ({
-      name: r.status,
-      count: toNum(r.count),
-    }));
-  }, [orderStatusOverview]);
+  /** ✅ NEW: map สินค้าใกล้หมดแยกตาม (Type + Subtype) เพื่อโชว์ใต้หมวดย่อย */
+  const lowStockMap = useMemo(() => {
+    const m = new Map<string, LowStockRow[]>();
+    for (const p of lowStockProducts) {
+      const t = typeName(p.type);
+      const s = subtypeName(p.subtype);
+      const key = `${t}||${s}`;
+      const arr = m.get(key) ?? [];
+      arr.push(p);
+      m.set(key, arr);
+    }
+    for (const [k, arr] of Array.from(m.entries())) {
+      arr.sort((a, b) => toNum(a.stock) - toNum(b.stock)); // เหลือน้อยขึ้นก่อน
+      m.set(k, arr);
+    }
+    return m;
+  }, [lowStockProducts]);
 
-  const dailyLineData = useMemo(() => {
-    return salesDaily.map((d) => ({
-      date: d.date,
-      revenue: toNum(d.revenue),
-    }));
-  }, [salesDaily]);
+  const toggleRevenueType = (t: string) => {
+    setOpenTypesRevenue((prev) => ({ ...prev, [t]: !prev[t] }));
+  };
+  const toggleStockType = (t: string) => {
+    setOpenTypesStock((prev) => ({ ...prev, [t]: !prev[t] }));
+  };
 
+  /** ---------- UI states ---------- */
   if (loading) {
     return (
       <div className="p-6">
@@ -390,7 +581,7 @@ useEffect(() => {
         </h1>
 
         <p className="text-sm text-gray-500">
-          Dashboard สำหรับเจ้าของร้าน: ยอดขาย, สต็อก, สินค้าขายดี, ลูกค้าประจำ, สถานะออเดอร์ และประสิทธิภาพประมูล
+          Dashboard สำหรับเจ้าของร้าน: ยอดขาย, แนวโน้ม, สต็อก, และหมวดทำเงิน (แบบ Type → Subtype)
         </p>
 
         {/* ===== Year Switcher ===== */}
@@ -398,7 +589,7 @@ useEffect(() => {
           <button
             type="button"
             disabled={year <= MIN_YEAR}
-            onClick={() => setYear((y) => y - 1)}
+            onClick={() => setYearAndPersist(year - 1)}
             className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ◀
@@ -411,7 +602,7 @@ useEffect(() => {
           <button
             type="button"
             disabled={year >= MAX_YEAR}
-            onClick={() => setYear((y) => y + 1)}
+            onClick={() => setYearAndPersist(year + 1)}
             className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ▶
@@ -451,7 +642,6 @@ useEffect(() => {
       {/* ===================== TAB CONTENTS ===================== */}
       {tab === 'overview' && (
         <>
-          {/* Summary Cards (ของเก่า) */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <StatCard
               title="รายได้รวมทั้งหมด"
@@ -467,62 +657,33 @@ useEffect(() => {
             />
             <StatCard
               title="รายได้จากการประมูล"
-              subtitle="รายการประมูลที่ปิดและชำระแล้ว"
+              subtitle="สรุปยอดขายฝั่งประมูล"
               value={`${fmtBaht(stats.auctionSales)} บาท`}
               accent="from-orange-400/80 to-orange-600/90"
             />
           </section>
 
-          {/* Mini Cards (ของเก่า) */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <MiniCard label="ยอดขายแบบโอน (Bank)" value={`${fmtBaht(stats.bankSales)} บาท`} tag="ช่องทางโอน" />
             <MiniCard label="ยอดขายแบบเก็บปลายทาง (COD)" value={`${fmtBaht(stats.codSales)} บาท`} tag="ชำระหน้าบ้าน" />
             <MiniCard
-              label="ประมูล: ขายแล้ว / ตกประมูล"
-              value={`${fmtInt(stats.soldAuctionCount)} / ${fmtInt(stats.unsoldAuctionCount)} รายการ`}
-              tag="สรุปผลประมูล"
+              label="ยกเลิก / ล้มเหลว"
+              value={`${fmtInt(stats.cancelledOrders)} / ${fmtInt(stats.failedOrders)}`}
+              tag="คุณภาพออเดอร์"
             />
           </section>
 
-          {/* Orders Snapshot (ของเก่า) */}
           <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <MiniCard label="ออเดอร์ทั้งหมด (ขายปกติ)" value={`${fmtInt(stats.totalOrders)} รายการ`} tag="Orders" />
-            <MiniCard label="ออเดอร์วันนี้" value={`${fmtInt(stats.orderToday)} รายการ`} tag="Today" />
-            <MiniCard label="ออเดอร์เดือนนี้" value={`${fmtInt(stats.orderMonth)} รายการ`} tag="This month" />
-            <MiniCard
-              label="ยกเลิก / ล้มเหลว"
-              value={`${fmtInt(stats.cancelledOrders)} / ${fmtInt(stats.failedOrders)} รายการ`}
-              tag="Quality"
-            />
+            <MiniCard label="ออเดอร์วันนี้ (รายได้)" value={`${fmtBaht(stats.orderToday)} บาท`} tag="Today revenue" />
+            <MiniCard label="ออเดอร์เดือนนี้ (รายได้)" value={`${fmtBaht(stats.orderMonth)} บาท`} tag="Month revenue" />
+            <MiniCard label="ยอดขายรวม (ย้ำอีกที)" value={`${fmtBaht(stats.totalSales)} บาท`} tag="Total" />
           </section>
-
-          {/* สรุปแบบผู้บริหาร (เอามาจากของเก่า ไม่ลบ) */}
-          <CardShell>
-            <CardTitle icon="📝" title="สรุปภาพรวม (สำหรับนำเสนอ)" subtitle="มองภาพรวมเร็ว ๆ ว่าระบบรายงานทำอะไรได้" />
-            <ul className="text-sm text-gray-700 space-y-2 list-disc pl-5">
-              <li>
-                เห็น <b>ยอดขายรวม</b> แยกช่องทาง (โอน/COD/ประมูล) เพื่อช่วยตัดสินใจเรื่องโปรโมชันและการลงสินค้า
-              </li>
-              <li>
-                มี <b>สินค้าขายดี</b> และ <b>หมวดหมู่ทำเงิน</b> เพื่อวางแผนสต็อกและนำเข้าสินค้า
-              </li>
-              <li>
-                มี <b>สต็อกคงเหลือ</b> และ <b>สินค้าใกล้หมด</b> ลดโอกาสเสียยอดขายจากของหมด
-              </li>
-              <li>
-                มี <b>ลูกค้าประจำ</b> ช่วยทำการตลาดเฉพาะกลุ่ม (VIP/ส่วนลด/แจ้งเตือน)
-              </li>
-              <li>
-                มี <b>สถานะออเดอร์</b> ให้แอดมินเห็นคอขวดงานและจัดการ flow ได้
-              </li>
-            </ul>
-          </CardShell>
         </>
       )}
 
       {tab === 'payments' && (
         <>
-          {/* Payment Pie + Table (ของเก่า) */}
           <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
             <CardShell className="lg:col-span-2">
               <CardTitle icon="🍰" title="สัดส่วนรายได้ตามประเภท" subtitle="โอน / COD / ประมูล" />
@@ -534,7 +695,7 @@ useEffect(() => {
                     <PieChart>
                       <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="80%" paddingAngle={4}>
                         {pieData.map((entry, index) => (
-                          <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                          <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip
@@ -564,7 +725,7 @@ useEffect(() => {
                   id: row.key,
                   type: (
                     <span className="inline-flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[idx] }} />
                       {row.label}
                     </span>
                   ),
@@ -576,10 +737,9 @@ useEffect(() => {
             </CardShell>
           </section>
 
-          {/* Compare sales bar (ของเก่า) */}
           <CardShell>
             <CardTitle icon="📦" title="เปรียบเทียบยอดขาย (โอน / COD / ประมูล)" subtitle="กราฟแท่งภาพรวม" />
-            <div className="h-72">
+            <div className="h-72 min-h-[288px]">
               {!hasAnySales ? (
                 <EmptyState text="ยังไม่มีข้อมูลยอดขาย" />
               ) : (
@@ -597,9 +757,9 @@ useEffect(() => {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="bank" name="โอน (Bank)" radius={[10, 10, 0, 0]} fill={COLORS[0]} />
-                    <Bar dataKey="cod" name="ปลายทาง (COD)" radius={[10, 10, 0, 0]} fill={COLORS[1]} />
-                    <Bar dataKey="auction" name="ประมูล" radius={[10, 10, 0, 0]} fill={COLORS[2]} />
+                    <Bar dataKey="bank" name="โอน (Bank)" radius={[10, 10, 0, 0]} fill={COLOR_BANK} />
+                    <Bar dataKey="cod" name="ปลายทาง (COD)" radius={[10, 10, 0, 0]} fill={COLOR_COD} />
+                    <Bar dataKey="auction" name="ประมูล" radius={[10, 10, 0, 0]} fill={COLOR_AUCTION} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -610,57 +770,287 @@ useEffect(() => {
 
       {tab === 'trend' && (
         <CardShell>
-          <CardTitle icon="📈" title="แนวโน้มยอดขายรายวัน (ถ้ามีข้อมูล)" subtitle="ช่วยดูช่วงพีค/ตก" />
-          <div className="h-72">
-            {dailyLineData.length === 0 ? (
-              <EmptyState text="ยังไม่มีข้อมูลแนวโน้ม (salesDaily)" />
+          <CardTitle icon="📈" title="แนวโน้มยอดขาย" subtitle="รายวัน / รายเดือน / รายปี + เลือกช่วงเองได้" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-gray-100 bg-white p-4">
+              <div className="text-xs font-semibold text-gray-500 mb-2">ความละเอียด</div>
+              <div className="flex gap-2">
+                {(['day', 'month', 'year'] as SeriesMode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setSeriesMode(m)}
+                    className={[
+                      'px-3 py-2 rounded-lg border text-sm font-semibold transition',
+                      seriesMode === m
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50',
+                    ].join(' ')}
+                  >
+                    {m === 'day' ? 'รายวัน' : m === 'month' ? 'รายเดือน' : 'รายปี'}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-gray-500">ถ้าเลือก “ช่วงปีหลายปี” ระบบจะสรุปเป็นรายปีให้อัตโนมัติ</p>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white p-4">
+              <div className="text-xs font-semibold text-gray-500 mb-2">ช่วงข้อมูล</div>
+              <div className="flex gap-2 flex-wrap">
+                {(['year', 'dateRange', 'yearRange'] as RangeMode[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRangeMode(r)}
+                    className={[
+                      'px-3 py-2 rounded-lg border text-sm font-semibold transition',
+                      rangeMode === r
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50',
+                    ].join(' ')}
+                  >
+                    {r === 'year' ? 'ทั้งปีที่เลือก' : r === 'dateRange' ? 'เลือกช่วงวันที่' : 'เลือกช่วงปี'}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-gray-500">ใช้ปีบนหัวหน้าเป็นค่าเริ่มต้นสำหรับ “ทั้งปีที่เลือก”</p>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white p-4">
+              <div className="text-xs font-semibold text-gray-500 mb-2">ตั้งค่าเพิ่มเติม</div>
+
+              {rangeMode === 'year' && (
+                <div className="text-sm text-gray-700">
+                  ดูข้อมูลทั้งปี: <b>{year}</b>
+                </div>
+              )}
+
+              {rangeMode === 'yearRange' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">ปีเริ่ม</div>
+                    <input
+                      value={yearStart}
+                      onChange={(e) => setYearStart(Number(e.target.value))}
+                      type="number"
+                      min={MIN_YEAR}
+                      max={MAX_YEAR}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">ปีจบ</div>
+                    <input
+                      value={yearEnd}
+                      onChange={(e) => setYearEnd(Number(e.target.value))}
+                      type="number"
+                      min={MIN_YEAR}
+                      max={MAX_YEAR}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <p className="col-span-2 text-xs text-gray-500">* ระบบจะสรุปเป็น “รายปี” ให้อัตโนมัติ</p>
+                </div>
+              )}
+
+              {rangeMode === 'dateRange' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">เริ่ม</div>
+                    <input
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      type="date"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">ถึง</div>
+                    <input
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      type="date"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <p className="col-span-2 text-xs text-gray-500">* ช่วงวันที่ใช้แบบ inclusive (เริ่ม..ถึง)</p>
+                </div>
+              )}
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={loadSeries}
+                  className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800"
+                >
+                  โหลดกราฟ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeriesMode('day');
+                    setRangeMode('year');
+                    setYearStart(clampYear(CURRENT_YEAR - 1));
+                    setYearEnd(clampYear(CURRENT_YEAR));
+                    const today = new Date();
+                    const start = new Date();
+                    start.setDate(today.getDate() - 6);
+                    setStartDate(ymd(start));
+                    setEndDate(ymd(today));
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-800 border border-gray-200 hover:bg-gray-50"
+                >
+                  รีเซ็ต
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            {seriesLoading ? (
+              <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-gray-500">⏳ กำลังโหลดกราฟ...</div>
+            ) : seriesErr ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-6">
+                <div className="font-semibold text-rose-700">โหลดกราฟไม่สำเร็จ</div>
+                <div className="mt-2 text-sm text-rose-700/90 break-words">{seriesErr}</div>
+              </div>
+            ) : seriesChartData.length === 0 ? (
+              <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-gray-400">ยังไม่มีข้อมูลในช่วงนี้</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyLineData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
-                  <Tooltip
-                    formatter={(value) => `${fmtBaht(value)} บาท`}
-                    contentStyle={{
-                      borderRadius: 12,
-                      borderColor: '#e5e7eb',
-                      boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
-                    }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="revenue" name="ยอดขาย" stroke="#0ea5e9" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="h-[340px] rounded-xl border border-gray-100 bg-white p-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={seriesChartData} margin={{ left: 8, right: 12, top: 6, bottom: 6 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="k" tick={{ fontSize: 12 }} />
+                    <YAxis tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
+                    <Tooltip formatter={(value) => `${fmtBaht(value)} บาท`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="total" name="รวม" stroke={COLOR_TOTAL} strokeWidth={2.5} dot={false} />
+                    <Line type="monotone" dataKey="transfer" name="โอน" stroke={COLOR_BANK} dot={false} />
+                    <Line type="monotone" dataKey="cod" name="COD" stroke={COLOR_COD} dot={false} />
+                    <Line type="monotone" dataKey="auction" name="ประมูล" stroke={COLOR_AUCTION} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             )}
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <MiniCard label="ช่วงข้อมูล" value={`${seriesData?.start ?? '-'} → ${seriesData?.end ?? '-'}`} tag="Range" />
+              <MiniCard label="โหมด" value={seriesMode === 'day' ? 'รายวัน' : seriesMode === 'month' ? 'รายเดือน' : 'รายปี'} tag="Mode" />
+              <MiniCard
+                label="รวมในช่วงนี้ (ประมาณ)"
+                value={`${fmtBaht(seriesChartData.reduce((s, r) => s + toNum(r.total), 0))} บาท`}
+                tag="Sum"
+              />
+              <MiniCard
+                label="จุดสูงสุด (Total)"
+                value={`${fmtBaht(Math.max(0, ...seriesChartData.map((r) => toNum(r.total))))} บาท`}
+                tag="Peak"
+              />
+            </div>
           </div>
         </CardShell>
       )}
 
-      {tab === 'products' && (
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <CardShell>
-            <CardTitle icon="🏆" title="สินค้าขายดี (Top Products)" subtitle="ตามจำนวนขาย + ยอดเงิน" />
-            <DataTable
-              columns={[
-                { key: 'name', header: 'สินค้า', align: 'left' },
-                { key: 'category', header: 'หมวด', align: 'left' },
-                { key: 'qty', header: 'จำนวน', align: 'right' },
-                { key: 'revenue', header: 'ยอดเงิน', align: 'right' },
-              ]}
-              rows={topProducts.slice(0, 10).map((p) => ({
-                id: p.product_id,
-                name: p.name,
-                category: p.category || '-',
-                qty: fmtInt(p.qty),
-                revenue: `${fmtBaht(p.revenue)} บาท`,
-              }))}
-              emptyText="ยังไม่มีข้อมูลสินค้าขายดี"
-            />
+      {/* ===== INSIGHTS: Type-first + expand Subtypes ===== */}
+      {tab === 'insights' && (
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <CardShell className="lg:col-span-2">
+            <CardTitle icon="🏷️" title="หมวดทำเงิน (Type → Subtype)" subtitle="หมวดหลักก่อน แล้วค่อยกดดูหมวดย่อย" />
+
+            {categoryRevenueByType.length === 0 ? (
+              <EmptyState text="ยังไม่มีข้อมูลหมวดทำเงิน" />
+            ) : (
+              <div className="space-y-2">
+                {categoryRevenueByType.slice(0, 20).map((tRow, idx) => {
+                  const t = typeName(tRow.type);
+                  const opened = !!openTypesRevenue[t];
+                  const subs = revenueSubsByType.get(t) ?? [];
+                  return (
+                    <div key={`${t}-${idx}`} className="rounded-xl border border-gray-100 bg-white">
+                      <button
+                        type="button"
+                        onClick={() => toggleRevenueType(t)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 rounded-xl"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-gray-900 truncate">{t}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            ยอดขาย: <b className="text-gray-900">{fmtBaht(tRow.revenue)}</b> บาท · จำนวนขาย:{' '}
+                            <b className="text-gray-900">{fmtInt(tRow.qty)}</b>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-sm text-gray-500">{opened ? 'ซ่อน ▲' : 'ดูย่อย ▼'}</div>
+                      </button>
+
+                      {opened && (
+                        <div className="px-4 pb-3">
+                          {subs.length === 0 ? (
+                            <div className="text-sm text-gray-400 py-2">ไม่มีข้อมูลหมวดย่อย</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full text-sm">
+                                <thead>
+                                  <tr className="text-gray-600 bg-gray-50">
+                                    <th className="text-left px-2 py-2">หมวดย่อย</th>
+                                    <th className="text-right px-2 py-2">จำนวนขาย</th>
+                                    <th className="text-right px-2 py-2">ยอดขาย</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {subs.slice(0, 12).map((sRow, sIdx) => (
+                                    <tr key={`${t}-${sIdx}`} className={sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                                      <td className="px-2 py-2">{subtypeName(sRow.subtype)}</td>
+                                      <td className="px-2 py-2 text-right">{fmtInt(sRow.qty)}</td>
+                                      <td className="px-2 py-2 text-right">{fmtBaht(sRow.revenue)} บาท</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+
+                              {subs.length > 12 && (
+                                <div className="text-xs text-gray-400 mt-2">* แสดงแค่ 12 หมวดย่อยแรก (เรียงตามยอดขาย)</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardShell>
 
-          <CardShell>
-            <CardTitle icon="👑" title="ลูกค้าประจำ (Top Customers)" subtitle="ซื้อบ่อย / ยอดรวมสูง" />
+          <CardShell className="lg:col-span-3">
+            <CardTitle icon="📊" title="กราฟหมวดทำเงิน (หมวดหลัก)" subtitle="แนวนอน อ่านง่าย ไม่มั่วแล้ว" />
+
+            <div className="h-[520px] min-h-[520px]">
+              {categoryTypeBarData.length === 0 ? (
+                <EmptyState text="ยังไม่มีข้อมูล categoryRevenueByType" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={categoryTypeBarData}
+                    layout="vertical"
+                    margin={{ top: 8, right: 16, left: 16, bottom: 8 }}
+                    barCategoryGap={10}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
+                    <YAxis type="category" dataKey="name" width={240} tick={{ fontSize: 12 }} />
+                    <Tooltip content={<TypeRevenueTooltip />} />
+                    <Legend />
+                    <Bar dataKey="revenue" name="ยอดขาย" radius={[10, 10, 10, 10]} fill={COLOR_SALES} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardShell>
+
+          <CardShell className="lg:col-span-5">
+            <CardTitle icon="👑" title="ลูกค้าประจำ (Top Customers)" subtitle="ซื้อบ่อย / ยอดรวมสูง (ยัง useful อยู่)" />
             <DataTable
               columns={[
                 { key: 'name', header: 'ลูกค้า', align: 'left' },
@@ -681,160 +1071,218 @@ useEffect(() => {
         </section>
       )}
 
-      {tab === 'categories' && (
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <CardShell className="lg:col-span-2">
-            <CardTitle icon="🗂️" title="หมวดหมู่ทำเงิน" subtitle="ยอดขายตามหมวด" />
-            <DataTable
-              columns={[
-                { key: 'category', header: 'หมวดหมู่', align: 'left' },
-                { key: 'qty', header: 'จำนวนขาย', align: 'right' },
-                { key: 'revenue', header: 'ยอดขาย', align: 'right' },
-              ]}
-              rows={categoryRevenue.slice(0, 10).map((r) => ({
-                id: r.category,
-                category: r.category,
-                qty: fmtInt(r.qty),
-                revenue: `${fmtBaht(r.revenue)} บาท`,
-              }))}
-              emptyText="ยังไม่มีข้อมูลหมวดหมู่"
-            />
-          </CardShell>
-
-          <CardShell className="lg:col-span-3">
-            <CardTitle icon="📊" title="กราฟยอดขายตามหมวดหมู่" subtitle="ดูหมวดที่ควรลงของเพิ่ม" />
-            <div className="h-72">
-              {categoryBarData.length === 0 ? (
-                <EmptyState text="ยังไม่มีข้อมูล categoryRevenue" />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryBarData} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
-                    <Tooltip formatter={(value) => `${fmtBaht(value)} บาท`} />
-                    <Legend />
-                    <Bar dataKey="revenue" name="ยอดขาย" radius={[10, 10, 0, 0]} fill="#22c55e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </CardShell>
-        </section>
-      )}
-
+      {/* ===== STOCK: Type-first + expand Subtypes + show product names for low stock ===== */}
       {tab === 'stock' && (
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <CardShell>
-            <CardTitle icon="📦" title="สต็อกคงเหลือตามหมวดหมู่" subtitle="รวมสต็อก + จำนวนสินค้าใกล้หมด" />
-            <div className="h-72">
-              {stockBarData.length === 0 ? (
-                <EmptyState text="ยังไม่มีข้อมูล stockByCategory" />
+            <CardTitle
+              icon="📦"
+              title="สต็อกคงเหลือตามหมวด (หมวดหลักก่อน)"
+              subtitle={`กราฟแนวนอน: สต็อกรวม + ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD})`}
+            />
+
+            <div className="h-[520px] min-h-[520px]">
+              {stockTypeBarData.length === 0 ? (
+                <EmptyState text="ยังไม่มีข้อมูล stockByType" />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stockBarData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
-                    <Tooltip />
+                  <BarChart
+                    data={stockTypeBarData}
+                    layout="vertical"
+                    margin={{ top: 8, right: 16, left: 16, bottom: 8 }}
+                    barCategoryGap={10}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
+                    <YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 12 }} />
+                    <Tooltip content={<StockTooltip />} />
                     <Legend />
-                    <Bar dataKey="stock" name="สต็อกรวม" radius={[10, 10, 0, 0]} fill="#0ea5e9" />
-                    <Bar dataKey="low" name="ใกล้หมด" radius={[10, 10, 0, 0]} fill="#ef4444" />
+                    <Bar dataKey="stock" name="สต็อกรวม" radius={[10, 10, 10, 10]} fill={COLOR_STOCK} />
+                    <Bar dataKey="low" name={`ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD})`} radius={[10, 10, 10, 10]} fill={COLOR_LOW} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
+
+            <p className="mt-3 text-xs text-gray-500">
+              * เกณฑ์: ใกล้หมด = stock ≤ {LOW_STOCK_THRESHOLD} · หมดแล้ว = stock = 0 (ตัวแดง)
+            </p>
           </CardShell>
 
           <CardShell>
-            <CardTitle icon="⚠️" title="สินค้าใกล้หมด (Low Stock)" subtitle="ควรเติมของก่อนขายหมด" />
-            <DataTable
-              columns={[
-                { key: 'name', header: 'สินค้า', align: 'left' },
-                { key: 'category', header: 'หมวด', align: 'left' },
-                { key: 'stock', header: 'คงเหลือ', align: 'right' },
-              ]}
-              rows={lowStockProducts.slice(0, 12).map((p) => ({
-                id: p.product_id,
-                name: p.name,
-                category: p.category || '-',
-                stock: fmtInt(p.stock),
-              }))}
-              emptyText="ไม่มีสินค้าใกล้หมด / ยังไม่มีข้อมูล"
-            />
-            <p className="mt-3 text-xs text-gray-500">* threshold (เช่น ต่ำกว่า 5 ชิ้น) กำหนดฝั่ง backend ได้</p>
-          </CardShell>
-        </section>
-      )}
+            <CardTitle icon="🧩" title="เจาะหมวดย่อย (Type → Subtype)" subtitle="กดหมวดหลักเพื่อดูหมวดย่อย + รายชื่อสินค้าใกล้หมด" />
 
-      {tab === 'orders' && (
-        <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <CardShell className="lg:col-span-2">
-            <CardTitle icon="🧾" title="สถานะออเดอร์ (ภาพรวม)" subtitle="รู้คอขวดงานทันที" />
-            <DataTable
-              columns={[
-                { key: 'status', header: 'สถานะ', align: 'left' },
-                { key: 'count', header: 'จำนวน', align: 'right' },
-              ]}
-              rows={orderStatusOverview.map((r) => ({
-                id: r.status,
-                status: <StatusBadge status={r.status} />,
-                count: fmtInt(r.count),
-              }))}
-              emptyText="ยังไม่มีข้อมูลสถานะออเดอร์"
-            />
-          </CardShell>
+            {stockByType.length === 0 ? (
+              <EmptyState text="ยังไม่มีข้อมูลสต๊อก" />
+            ) : (
+              <div className="space-y-2">
+                {stockByType.slice(0, 30).map((tRow, idx) => {
+                  const t = typeName(tRow.type);
+                  const opened = !!openTypesStock[t];
+                  const subs = stockSubsByType.get(t) ?? [];
 
-          <CardShell className="lg:col-span-3">
-            <CardTitle icon="🧩" title="กราฟสถานะออเดอร์" subtitle="ช่วยเห็นว่า pending/ค้างเยอะไหม" />
-            <div className="h-72">
-              {orderStatusBarData.length === 0 ? (
-                <EmptyState text="ยังไม่มีข้อมูล orderStatusOverview" />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={orderStatusBarData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(v: number) => toNum(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="count" name="จำนวนออเดอร์" radius={[10, 10, 0, 0]} fill="#a855f7" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </CardShell>
-        </section>
-      )}
+                  return (
+                    <div key={`${t}-${idx}`} className="rounded-xl border border-gray-100 bg-white">
+                      <button
+                        type="button"
+                        onClick={() => toggleStockType(t)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 rounded-xl"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-gray-900 truncate">{t}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            สต๊อกรวม:{' '}
+                            <b
+                              className={[
+                                toNum(tRow.total_stock) === 0
+                                  ? 'text-red-600'
+                                  : toNum(tRow.total_stock) <= LOW_STOCK_THRESHOLD
+                                  ? 'text-orange-600'
+                                  : 'text-gray-900',
+                              ].join(' ')}
+                            >
+                              {fmtInt(tRow.total_stock)}
+                            </b>{' '}
+                            · ใกล้หมด:{' '}
+                            <b className={toNum(tRow.low_stock) > 0 ? 'text-rose-600' : 'text-gray-900'}>{fmtInt(tRow.low_stock)}</b> · สินค้า:{' '}
+                            <b className="text-gray-900">{fmtInt(tRow.total_products)}</b>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-sm text-gray-500">{opened ? 'ซ่อน ▲' : 'ดูย่อย ▼'}</div>
+                      </button>
 
-      {tab === 'auction' && (
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <CardShell>
-            <CardTitle icon="🎯" title="ประสิทธิภาพประมูล" subtitle="ตัวชี้วัดที่เจ้าของควรรู้" />
-            <div className="space-y-3">
-              <KeyValueRow label="จำนวนรอบประมูลทั้งหมด" value={`${fmtInt(stats.totalAuctions)} รอบ`} />
-              <KeyValueRow label="ขายได้" value={`${fmtInt(stats.soldAuctionCount)} รอบ`} />
-              <KeyValueRow label="ตกประมูล" value={`${fmtInt(stats.unsoldAuctionCount)} รอบ`} />
-              <KeyValueRow
-                label="อัตราปิดขาย (ถ้ามี)"
-                value={stats.auctionClosedRate == null ? '-' : `${toNum(stats.auctionClosedRate).toFixed(1)} %`}
+                      {opened && (
+                        <div className="px-4 pb-3">
+                          {subs.length === 0 ? (
+                            <div className="text-sm text-gray-400 py-2">ไม่มีข้อมูลหมวดย่อย</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full text-sm">
+                                <thead>
+                                  <tr className="text-gray-600 bg-gray-50">
+                                    <th className="text-left px-2 py-2">หมวดย่อย</th>
+                                    <th className="text-right px-2 py-2">สินค้า</th>
+                                    <th className="text-right px-2 py-2">สต๊อก</th>
+                                    <th className="text-right px-2 py-2">ใกล้หมด</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {subs.slice(0, 12).map((sRow, sIdx) => {
+                                    const sub = subtypeName(sRow.subtype);
+                                    const key = `${t}||${sub}`;
+                                    const lowItems = lowStockMap.get(key) ?? [];
+
+                                    return (
+                                      <React.Fragment key={`${t}-${sub}-${sIdx}`}>
+                                        <tr className={sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                                          <td className="px-2 py-2">{sub}</td>
+                                          <td className="px-2 py-2 text-right">{fmtInt(sRow.total_products)}</td>
+
+                                          {/* ✅ stock สีตามเกณฑ์ */}
+                                          <td
+                                            className={[
+                                              'px-2 py-2 text-right font-semibold',
+                                              toNum(sRow.total_stock) === 0
+                                                ? 'text-red-600'
+                                                : toNum(sRow.total_stock) <= LOW_STOCK_THRESHOLD
+                                                ? 'text-orange-600'
+                                                : 'text-gray-900',
+                                            ].join(' ')}
+                                          >
+                                            {fmtInt(sRow.total_stock)}
+                                          </td>
+
+                                          {/* ✅ low count สีชมพู */}
+                                          <td className={['px-2 py-2 text-right font-semibold', toNum(sRow.low_stock) > 0 ? 'text-rose-600' : 'text-gray-900'].join(' ')}>
+                                            {fmtInt(sRow.low_stock)}
+                                          </td>
+                                        </tr>
+
+                                        {/* ✅ แสดงชื่อสินค้าใกล้หมดใต้หมวดย่อย (แก้ปัญหา "รู้ว่ามี แต่ไม่รู้ตัวไหน") */}
+                                        {lowItems.length > 0 && (
+                                          <tr className={sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                                            <td colSpan={4} className="px-3 py-2">
+                                              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+                                                <div className="text-[11px] font-semibold text-rose-700 mb-2">
+                                                  ⚠ สินค้าใกล้หมดในหมวดย่อยนี้ (≤ {LOW_STOCK_THRESHOLD}) / หมดแล้ว (0)
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                  {lowItems.map((item) => (
+                                                    <div key={item.product_id} className="flex items-center justify-between gap-3">
+                                                      <div className="min-w-0">
+                                                        <div className="text-sm font-medium text-gray-900 truncate">
+                                                          {item.name}
+                                                        </div>
+                                                        <div className="text-[11px] text-gray-500">ID: {item.product_id}</div>
+                                                      </div>
+
+                                                      <span
+                                                        className={[
+                                                          'shrink-0 rounded-full px-3 py-1 text-xs font-semibold',
+                                                          toNum(item.stock) === 0
+                                                            ? 'bg-red-100 text-red-700'
+                                                            : 'bg-orange-100 text-orange-700',
+                                                        ].join(' ')}
+                                                      >
+                                                        {toNum(item.stock) === 0 ? 'หมดแล้ว (0)' : `เหลือ ${fmtInt(item.stock)}`}
+                                                      </span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+
+                              {subs.length > 12 && (
+                                <div className="text-xs text-gray-400 mt-2">* แสดงแค่ 12 หมวดย่อยแรก (เรียงตามสต๊อก)</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-6">
+              <CardTitle
+                icon="⚠️"
+                title="สินค้าใกล้หมด (Low Stock)"
+                subtitle={`รวมทุกหมวด: ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD}) + หมดแล้ว (0 แดง)`}
               />
-              <KeyValueRow
-                label="ผู้เข้าร่วมเฉลี่ย/รอบ (ถ้ามี)"
-                value={stats.auctionParticipationAvg == null ? '-' : `${toNum(stats.auctionParticipationAvg).toFixed(1)} คน`}
+              <DataTable
+                columns={[
+                  { key: 'name', header: 'สินค้า', align: 'left' },
+                  { key: 'category', header: 'หมวด', align: 'left' },
+                  { key: 'stock', header: 'คงเหลือ', align: 'right' },
+                ]}
+                rows={lowStockProducts.slice(0, 30).map((p) => ({
+                  id: p.product_id,
+                  name: p.name,
+                  category: pathLabel(p.type ?? null, p.subtype ?? null),
+                  stock: (
+                    <span
+                      className={[
+                        'font-semibold',
+                        toNum(p.stock) === 0 ? 'text-red-600' : 'text-orange-600',
+                      ].join(' ')}
+                    >
+                      {fmtInt(p.stock)}
+                    </span>
+                  ),
+                }))}
+                emptyText="ไม่มีสินค้าใกล้หมด / ยังไม่มีข้อมูล"
               />
             </div>
-          </CardShell>
-
-          <CardShell className="lg:col-span-2">
-            <CardTitle icon="📝" title="สรุปผู้บริหาร" subtitle="ข้อความใช้พูดกับอาจารย์/กรรมการได้เลย" />
-            <ul className="text-sm text-gray-700 space-y-2 list-disc pl-5">
-              <li>แสดงยอดขายรวมแยกช่องทาง (โอน/COD/ประมูล) เพื่อช่วยตัดสินใจด้านราคาและโปรโมชัน</li>
-              <li>มีรายงานสินค้าขายดีและลูกค้าประจำเพื่อสนับสนุนการตลาดและการจัดสต็อก</li>
-              <li>ติดตามสต็อกและสินค้าใกล้หมด ลดโอกาสเสียยอดขายจากของหมด</li>
-              <li>ภาพรวมสถานะออเดอร์ช่วยให้แอดมินเห็นคอขวดงานและจัดการได้ทันที</li>
-              <li>รายงานประมูลมีตัวชี้วัดจำนวนรอบ ขายได้/ตกประมูล และตัวชี้วัดเสริมถ้ามีข้อมูล</li>
-            </ul>
           </CardShell>
         </section>
       )}
@@ -892,40 +1340,9 @@ function MiniCard(props: { label: string; value: string; tag: string }) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white/80 shadow-sm p-4 flex flex-col justify-between">
       <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className="text-xl font-semibold text-gray-900 mb-2">{value}</div>
+      <div className="text-xl font-semibold text-gray-900 mb-2 break-words">{value}</div>
       <span className="inline-flex w-fit rounded-full bg-gray-100 px-3 py-0.5 text-[11px] text-gray-500">{tag}</span>
     </div>
-  );
-}
-
-function KeyValueRow(props: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="text-sm text-gray-600">{props.label}</div>
-      <div className="text-sm font-semibold text-gray-900">{props.value}</div>
-    </div>
-  );
-}
-
-function StatusBadge(props: { status: string }) {
-  const s = props.status;
-
-  const map: Record<string, string> = {
-    pending_payment: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    payment_review: 'bg-blue-100 text-blue-800 border-blue-200',
-    paid: 'bg-green-100 text-green-800 border-green-200',
-    shipping: 'bg-purple-100 text-purple-800 border-purple-200',
-    delivered: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    cancelled: 'bg-gray-100 text-gray-700 border-gray-200',
-    failed: 'bg-rose-100 text-rose-800 border-rose-200',
-  };
-
-  const cls = map[s] || 'bg-gray-100 text-gray-700 border-gray-200';
-
-  return (
-    <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-[12px] ${cls}`}>
-      {s}
-    </span>
   );
 }
 
@@ -971,7 +1388,7 @@ function DataTable(props: {
                   <td
                     key={c.key}
                     className={[
-                      'px-3 py-2',
+                      'px-3 py-2 align-top',
                       c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left',
                     ].join(' ')}
                   >
@@ -984,5 +1401,61 @@ function DataTable(props: {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** ---------- Tooltip cards ---------- */
+function TooltipCard(props: { title: string; lines: { label: string; value: string; color: string }[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg">
+      <div className="font-semibold text-gray-900">{props.title}</div>
+      <div className="mt-2 space-y-1 text-sm">
+        {props.lines.map((l, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+            <span className="text-gray-600">{l.label}:</span>
+            <span className="font-semibold" style={{ color: l.color }}>
+              {l.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TypeRevenueTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0]?.payload;
+  const title = String(p?.name ?? '-');
+  const revenue = fmtBaht(p?.revenue ?? 0);
+  const qty = fmtInt(p?.qty ?? 0);
+
+  return (
+    <TooltipCard
+      title={title}
+      lines={[
+        { label: 'ยอดขาย', value: `${revenue} บาท`, color: COLOR_SALES },
+        { label: 'จำนวนขาย', value: qty, color: COLOR_SALES },
+      ]}
+    />
+  );
+}
+
+function StockTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0]?.payload;
+  const title = String(p?.name ?? '-');
+  const stock = fmtInt(p?.stock ?? 0);
+  const low = fmtInt(p?.low ?? 0);
+
+  return (
+    <TooltipCard
+      title={title}
+      lines={[
+        { label: 'สต็อกรวม', value: stock, color: COLOR_STOCK },
+        { label: `ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD})`, value: low, color: COLOR_LOW },
+      ]}
+    />
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../lib/apiFetch';
 
 interface UserInfo {
   Csubdistrict: string;
@@ -89,11 +90,8 @@ export default function EditProfileModal({ user, onClose }: Props) {
 
     if (profileFile) form.append("profile", profileFile);
 
-    const res = await fetch("http://localhost:3000/update", {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
+    const res = await apiFetch("/update", { method:"PATCH", body: form });
+
 
     if (res.ok) {
       alert("อัปเดตสำเร็จ");

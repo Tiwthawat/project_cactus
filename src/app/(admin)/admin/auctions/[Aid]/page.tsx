@@ -169,20 +169,23 @@ export default function AdminAuctionDetailPage() {
               </div>
 
               {data.status === "closed" && (
-                <div className="flex justify-between border-b py-2">
-                  <span className="text-gray-600">ผู้ชนะ</span>
-                  {data.winner_id && (
-  <button
-    onClick={() => router.push(`/admin/auction-orders/${data.Aid}`)}
-    className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-  >
-    ดูออเดอร์ประมูล
-  </button>
+  <>
+    <div className="flex justify-between border-b py-2">
+      <span className="text-gray-600">ผู้ชนะ</span>
+      <b>{data.winnerName || "—"}</b>
+    </div>
+
+    {data.winner_id && (
+      <button
+        onClick={() => router.push(`/admin/auction-orders/${data.Aid}`)}
+        className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+      >
+        ดูออเดอร์ประมูล
+      </button>
+    )}
+  </>
 )}
 
-                  <b>{data.winnerName || "—"}</b>
-                </div>
-              )}
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">

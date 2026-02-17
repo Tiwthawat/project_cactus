@@ -58,7 +58,7 @@ export default function OrdersOfUserPage() {
           <option value="waiting">รอตรวจสอบ</option>
           <option value="pending">รอชำระ</option>
           <option value="cancelled">ยกเลิกแล้ว</option>
-          <option value="shipped">จัดส่งแล้ว</option>
+          <option value="shipping">จัดส่งแล้ว</option>
         </select>
       </div>
 

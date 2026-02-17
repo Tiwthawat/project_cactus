@@ -33,23 +33,29 @@ const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props
   const [hoveredProduct, setHoveredProduct] = useState<number | null>(null);
   const [showAlert, setShowAlert] = useState(false);
   const router = useRouter();
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const [token, setToken] = useState<string | null>(null);
+useEffect(() => {
+  setToken(localStorage.getItem("token"));
+}, []);
   const { addToCart: contextAddToCart } = useCart();
+  
 
   // โหลดข้อมูลสินค้า
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        let url = "http://localhost:3000/Product";
-        const params = new URLSearchParams();
+        let url = "http://localhost:3000/product";
 
-        if (type === "latest") params.append("latest", "1");
-        if (typeid) params.append("typeid", String(typeid));
-        if (search && search.trim()) params.append("search", search.trim());
-        if (subtypeid) params.append("subtypeid", String(subtypeid));
+        if (type === "latest") {
+          url = "http://localhost:3000/product/latest";
+        } else {
+          const params = new URLSearchParams();
+          if (typeid) params.append("typeid", String(typeid));
+          if (subtypeid) params.append("subtypeid", String(subtypeid));
+          if (search && search.trim()) params.append("search", search.trim());
+          if (params.toString()) url += "?" + params.toString();
+        }
 
-
-        if (params.toString()) url += "?" + params.toString();
 
         const res = await fetch(url);
         const data = await res.json();
@@ -84,18 +90,20 @@ const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props
     fetchProducts();
 
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed?.Cid) {
-          fetchFavorites(); // ⭐ ดึงรายการโปรดได้เลย
-        }
-      } catch (err) {
-        console.error("อ่าน user ไม่ได้:", err);
-      }
+if (storedUser) {
+  try {
+    const parsed = JSON.parse(storedUser);
+    if (parsed?.Cid && token) {
+      fetchFavorites(); // ⭐ ดึงรายการโปรด เฉพาะตอนมี token จริง ๆ
     }
+  } catch (err) {
+    console.error("อ่าน user ไม่ได้:", err);
+  }
+}
+
 
   }, [type, typeid, subtypeid, search, token]);
+  
 
 
 
@@ -150,7 +158,7 @@ const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props
       {showAlert && (
         <div
           role="alert"
-          className="fixed top-5 right-5 z-50 p-4 rounded-lg bg-green-100 text-green-800 shadow-md"
+          className="fixed top-5 right-5 z-[9999] p-4 rounded-lg bg-green-100 text-green-800 shadow-md"
         >
           <span>เพิ่มลงตะกร้าแล้ว!</span>
         </div>
@@ -198,10 +206,11 @@ const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props
                   {/* POPUP: หยิบใส่ตะกร้าเร็ว! */}
                   {product.Pnumproduct !== undefined && product.Pnumproduct > 0 && (
                     <div
-                      className={`absolute inset-0 bg-black/20 transition-opacity duration-300 
-  pointer-events-none
-  ${hoveredProduct === product.Pid ? "opacity-100" : "opacity-0"}
-`}>
+                      className={`absolute inset-0 bg-black/20 transition-opacity duration-300 pointer-events-none
+                       ${hoveredProduct === product.Pid ? "opacity-100" : "opacity-0"}
+                       `}
+                    >
+
 
                       <span className="bg-green-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold">
                         🛒ดูรายละเอียด
@@ -222,9 +231,9 @@ const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props
 
                   {/* Overlay Hover */}
                   {!isOut && (
-                    <div className={`absolute inset-0 bg-black/20 transition-opacity duration-300 
-                    ${hoveredProduct === product.Pid ? "opacity-100" : "opacity-0"}
-                  `}>
+                    <div className={`absolute inset-0 bg-black/20 transition-opacity duration-300 pointer-events-none
+    ${hoveredProduct === product.Pid ? "opacity-100" : "opacity-0"}
+  `}>
                       <div className="absolute inset-0 flex items-center justify-center">
                         <span className="bg-white text-gray-800 px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
                           ดูรายละเอียด →
@@ -232,6 +241,7 @@ const CactusItems = ({ type, typeid, subtypeid, search, filterFavorites }: Props
                       </div>
                     </div>
                   )}
+
 
                   {/* ป้ายสินค้าหมด */}
                   {isOut && (

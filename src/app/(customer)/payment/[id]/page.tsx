@@ -46,6 +46,19 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
+  // ✅ เพิ่ม: state สำหรับขยาย QR
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+
+  // ✅ เพิ่ม: กด ESC ปิด modal
+  useEffect(() => {
+    if (!zoomUrl) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZoomUrl(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [zoomUrl]);
+
   // โหลด order + transfers
   useEffect(() => {
     if (!id) return;
@@ -63,7 +76,6 @@ export default function PaymentPage() {
           setPageError('ไม่พบคำสั่งซื้อ หรือไม่มีสิทธิ์เข้าถึง');
         } else {
           const od = await orderRes.json();
-          // บาง route ของเธออาจคืน { ...order, items } ก็ยัง ok เพราะเราดึงเฉพาะฟิลด์นี้
           setOrder({
             Oid: Number(od.Oid),
             Oprice: Number(od.Oprice),
@@ -125,7 +137,7 @@ export default function PaymentPage() {
 
       const res = await apiFetch(`${API}/payment`, {
         method: 'POST',
-        body: formData, // ✅ ต้องเป็น FormData
+        body: formData,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -182,13 +194,19 @@ export default function PaymentPage() {
             ส่งสลิปการโอน
           </h1>
           <p className="text-gray-600">
-            ออเดอร์ #{order.Oid} • ยอดที่ต้องชำระ <span className="font-semibold text-green-700">{order.Oprice}</span> บาท
+            ออเดอร์ #{order.Oid} • ยอดที่ต้องชำระ{' '}
+            <span className="font-semibold text-green-700">{order.Oprice}</span> บาท
           </p>
         </div>
 
         {/* เลือกบัญชีโอน */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">เลือกบัญชีสำหรับโอน</h2>
+          <div className="flex items-end justify-between gap-4 mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">เลือกบัญชีสำหรับโอน</h2>
+            <p className="text-xs text-gray-500">
+              ทิป: กดที่รูป QR เพื่อขยายสแกนง่ายขึ้น
+            </p>
+          </div>
 
           {transfers.length === 0 ? (
             <p className="text-gray-500">ยังไม่มีบัญชีโอน</p>
@@ -196,6 +214,8 @@ export default function PaymentPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {transfers.map((t) => {
                 const active = selectedTid === t.Tid;
+                const qrUrl = getImageUrl(t.Tqr);
+
                 return (
                   <button
                     key={t.Tid}
@@ -207,14 +227,29 @@ export default function PaymentPage() {
                     type="button"
                   >
                     <div className="flex items-start gap-4">
-                      <img
-                        src={getImageUrl(t.Tqr)}
-                        alt="QR"
-                        className="w-24 h-24 object-cover rounded-xl border"
-                      />
+                      {/* ✅ QR กดขยายได้ */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation(); // กันไปเลือกบัญชีทับ
+                          setZoomUrl(qrUrl);
+                        }}
+                        className="shrink-0"
+                        aria-label="ขยาย QR"
+                        title="กดเพื่อขยาย"
+                      >
+                        <img
+                          src={qrUrl}
+                          alt="QR"
+                          className="w-24 h-24 object-cover rounded-xl border cursor-zoom-in hover:scale-105 transition"
+                        />
+                      </button>
+
                       <div className="flex-1">
                         <p className="font-bold text-gray-800">{t.Tname}</p>
-                        <p className="text-gray-700">เลขบัญชี: <span className="font-semibold">{t.Tnum}</span></p>
+                        <p className="text-gray-700">
+                          เลขบัญชี: <span className="font-semibold">{t.Tnum}</span>
+                        </p>
                         <p className="text-gray-700">ชื่อบัญชี: {t.Taccount}</p>
                         <p className="text-gray-700">สาขา: {t.Tbranch}</p>
                       </div>
@@ -260,6 +295,43 @@ export default function PaymentPage() {
           {loading ? 'กำลังส่ง...' : 'ยืนยันส่งสลิป'}
         </button>
       </div>
+
+      {/* ✅ Modal ขยาย QR */}
+      {zoomUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setZoomUrl(null)}
+        >
+          <div
+            className="relative max-w-md w-full bg-white rounded-2xl p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setZoomUrl(null)}
+              className="absolute -top-3 -right-3 bg-white rounded-full w-10 h-10 shadow flex items-center justify-center text-xl"
+              aria-label="ปิด"
+              title="ปิด (Esc)"
+            >
+              ✕
+            </button>
+
+            <p className="text-sm text-gray-600 mb-3 text-center">
+              ขยาย QR เพื่อสแกนง่ายขึ้น (กด Esc เพื่อปิด)
+            </p>
+
+            <img
+              src={zoomUrl}
+              alt="QR ขยาย"
+              className="w-full h-auto rounded-xl border"
+            />
+
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              มือถือ: ซูมด้วยสองนิ้วได้อีก
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

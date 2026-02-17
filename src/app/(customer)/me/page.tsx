@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import EditProfileModal from '../../component/EditProfileModal';
 import ChangePasswordModal from '../../component/ChangePassword';
 import Link from 'next/link';
+import { apiFetch } from '@/app/lib/apiFetch';
 
 interface UserInfo {
   Cid: number;
@@ -47,11 +48,8 @@ export default function MePage() {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+        const res = await apiFetch('http://localhost:3000/me', {
+          
         });
 
         if (!res.ok) throw new Error('Unauthorized');

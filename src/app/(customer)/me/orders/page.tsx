@@ -33,15 +33,15 @@ export default function MyOrdersPage() {
     setUser(storedUser);
 
     if (!storedUser?.Cid) {
-  setLoading(false);
-  return;
-}
+      setLoading(false);
+      return;
+    }
 
 
     const fetchOrders = async () => {
       try {
         const res = await apiFetch(`${API}/orders?Cid=${storedUser.Cid}`);
-const data = await res.json();
+        const data = await res.json();
 
 
         const sorted = [...data].sort((a: Order, b: Order) => b.Oid - a.Oid);
@@ -63,7 +63,7 @@ const data = await res.json();
 
     try {
       const res = await apiFetch(`${API}/orders/${orderId}/cancel`, { method: "PATCH" })
-      ;
+        ;
 
       if (!res.ok) throw new Error('ยกเลิกไม่สำเร็จ');
 
@@ -89,6 +89,24 @@ const data = await res.json();
   if (loading) return <p className="p-6 text-center">กำลังโหลดข้อมูล...</p>;
   if (!user) return <p className="p-6 text-center text-red-600">ไม่พบข้อมูลผู้ใช้</p>;
 
+  const statusButtons = [
+    { v: 'all', label: '📦 ทั้งหมด' },
+    { v: 'pending_payment', label: '💰 รอชำระเงิน' },
+    { v: 'payment_review', label: '⌛ รอตรวจสอบ' },
+    { v: 'paid', label: '✅ ชำระแล้ว' },
+    { v: 'shipping', label: '📮 จัดส่งแล้ว' },
+    { v: 'delivered', label: '📬 ได้รับแล้ว' },
+    { v: 'cancelled', label: '❌ ยกเลิก' },
+  ].map(s => ({
+    ...s,
+    count:
+      s.v === 'all'
+        ? orders.length
+        : orders.filter(o => o.Ostatus === s.v).length,
+  }));
+
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
       <div className="max-w-5xl mx-auto pt-32 p-6">
@@ -110,19 +128,44 @@ const data = await res.json();
             </div>
             <h2 className="text-2xl font-bold text-gray-800">กรองรายการ</h2>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors text-lg font-semibold"
-          >
-            <option value="all">📦 ทั้งหมด</option>
-            <option value="pending_payment">💰 รอชำระเงิน</option>
-            <option value="payment_review">⌛ รอตรวจสอบ</option>
-            <option value="paid">✅ ชำระแล้ว</option>
-            <option value="shipped">📮 จัดส่งแล้ว</option>
-            <option value="delivered">📬 ได้รับแล้ว</option>
-            <option value="cancelled">❌ ยกเลิก</option>
-          </select>
+
+          <div className="flex flex-wrap items-center gap-3">
+
+            {statusButtons.map((x) => {
+              const isActive = statusFilter === x.v; // ✅ แก้ตรงนี้
+              return (
+                <button
+                  key={x.v}
+                  type="button"
+                  onClick={() => setStatusFilter(x.v)}
+                  className={`
+    flex items-center gap-2
+    h-10 px-4
+    rounded-full
+    text-sm font-semibold
+    border transition whitespace-nowrap
+    ${isActive
+                      ? 'bg-green-600 text-white border-green-600 shadow'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}
+  `}
+                >
+                  <span>{x.label}</span>
+                  <span
+                    className={`
+      min-w-[20px] text-center
+      text-xs font-bold px-2 py-0.5 rounded-full
+      ${isActive
+                        ? 'bg-white text-green-700'
+                        : 'bg-gray-200 text-gray-700'}
+    `}
+                  >
+                    {x.count}
+                  </span>
+                </button>
+
+              );
+            })}
+          </div>
         </div>
 
         {/* Orders List */}
@@ -172,12 +215,12 @@ const data = await res.json();
                   {/* Status Badge */}
                   <div className={`px-4 py-2 rounded-xl font-semibold text-sm ${order.Ostatus === 'paid' ? 'bg-green-100 text-green-700 border-2 border-green-300' :
                     order.Ostatus === 'payment_review' ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300' :
-                      order.Ostatus === 'shipped' ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' :
+                      order.Ostatus === 'shipping' ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' :
                         order.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' :
                           order.Ostatus === 'cancelled' ? 'bg-red-100 text-red-700 border-2 border-red-300' :
                             'bg-gray-100 text-gray-700 border-2 border-gray-300'
                     }`}>
-                    {order.Ostatus === 'shipped' ? '📮 กำลังจัดส่ง' :
+                    {order.Ostatus === 'shipping' ? '📮 กำลังจัดส่ง' :
                       order.Ostatus === 'paid' ? '✅ ชำระแล้ว' :
                         order.Ostatus === 'payment_review' ? '⌛ รอตรวจสอบ' :
                           order.Ostatus === 'delivered' ? '📬 ได้รับแล้ว' :

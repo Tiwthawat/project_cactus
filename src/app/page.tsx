@@ -146,23 +146,33 @@ const HomePage = () => {
   const isFiltered =
     showFavorites || !!keyword || selectedType !== null || selectedSubtype !== null;
 
+    useEffect(() => {
+  const handleGoHome = () => {
+    setKeyword("");
+    setSelectedType(null);
+    setSelectedSubtype(null);
+    setShowFavorites(false);
+  };
+
+  window.addEventListener("go-home", handleGoHome);
+  return () => window.removeEventListener("go-home", handleGoHome);
+}, []);
+
+
   return (
     <>
       <Navbar />
 
-      {!isFiltered && (
-        <div className="!pt-16">
-          <BannerSlider />
-        </div>
-      )}
+ 
 
-      <main className="mt-16 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
-        {/* ❤️ ถ้าเลือกดูเฉพาะสินค้าที่ถูกใจ */}
-        {showFavorites ? (
-          <>
-            <SectionTitle title="รายการโปรดของคุณ" subtitle="FAVORITES" badge="❤️ รายการโปรด" />
-            <CactusItems filterFavorites={favoriteIds} />
-          </>
+      <main className="pt-16 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
+      {!isFiltered && <BannerSlider />}
+
+      {showFavorites ? (
+        <>
+          <SectionTitle title="รายการโปรดของคุณ" subtitle="FAVORITES" badge="❤️ รายการโปรด" />
+          <CactusItems filterFavorites={favoriteIds} />
+        </>
         ) : keyword ? (
           <>
             <SectionTitle

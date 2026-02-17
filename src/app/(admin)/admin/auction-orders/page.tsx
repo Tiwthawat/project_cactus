@@ -13,7 +13,7 @@ interface AuctionOrder {
   current_price: number;
   payment_status: string;
 
-  shipping_status?: 'pending' | 'shipped' | 'delivered' | null;
+  shipping_status?: 'pending' | 'shipping' | 'delivered' | null;
   shipping_company?: string | null;
   tracking_number?: string | null;
 
@@ -65,13 +65,14 @@ function shippingBadge(o: AuctionOrder) {
   const hasTracking = Boolean(o.tracking_number);
 
   if (s === 'delivered') return { label: '✅ ส่งสำเร็จ', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-  if (s === 'shipped' || hasTracking) return { label: '🚚 จัดส่งแล้ว', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
+  if (s === 'shipping' || hasTracking) return { label: '🚚 จัดส่งแล้ว', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
   if (o.payment_status === 'paid') return { label: '📦 รอจัดส่ง', cls: 'bg-purple-100 text-purple-800 border-purple-200' };
 
   return { label: '—', cls: 'bg-gray-100 text-gray-700 border-gray-200' };
 }
 
 type Filter = 'all' | 'pending_payment' | 'payment_review' | 'paid';
+type ShipFilter = 'all' | 'pending' | 'shipping' | 'delivered';
 
 export default function AuctionOrdersPage() {
   const router = useRouter();
@@ -91,6 +92,10 @@ export default function AuctionOrdersPage() {
 
   const [orders, setOrders] = useState<AuctionOrder[]>([]);
   const [filterStatus, setFilterStatus] = useState<Filter>('pending_payment');
+
+  // ✅ เพิ่มฟิลเตอร์จัดส่ง
+  const [shipFilter, setShipFilter] = useState<ShipFilter>('all');
+
   const [loading, setLoading] = useState(true);
 
   // ✅ 1) หลัง mount ค่อยอ่าน: URL > localStorage > nowYear
@@ -162,15 +167,46 @@ export default function AuctionOrdersPage() {
     };
   }, [orders]);
 
+  // ✅ normalize สถานะจัดส่ง (นับเฉพาะ paid)
+  const normalizeShip = (o: AuctionOrder): 'pending' | 'shipping' | 'delivered' | null => {
+    if (o.payment_status !== 'paid') return null;
+    if (o.shipping_status === 'delivered') return 'delivered';
+    if (o.shipping_status === 'shipping' || Boolean(o.tracking_number)) return 'shipping';
+    return 'pending'; // paid แล้วแต่ยังไม่ส่ง
+  };
+
+  // ✅ count แยกตามสถานะจัดส่ง (เฉพาะ paid)
+  const shipCounts = useMemo(() => {
+    const all = Array.isArray(orders) ? orders : [];
+    const paidOnly = all.filter((o) => o.payment_status === 'paid');
+    return {
+      all: paidOnly.length,
+      pending: paidOnly.filter((o) => normalizeShip(o) === 'pending').length,
+      shipping: paidOnly.filter((o) => normalizeShip(o) === 'shipping').length,
+      delivered: paidOnly.filter((o) => normalizeShip(o) === 'delivered').length,
+    };
+  }, [orders]);
+
   const filtered = useMemo(() => {
-    return orders.filter((o) => (filterStatus === 'all' ? true : o.payment_status === filterStatus));
-  }, [orders, filterStatus]);
+    const byPayment = orders.filter((o) => (filterStatus === 'all' ? true : o.payment_status === filterStatus));
+    if (shipFilter === 'all') return byPayment;
+
+    // ถ้ากรองตามจัดส่ง: มันมีความหมายจริง ๆ เฉพาะ paid เท่านั้น
+    return byPayment.filter((o) => normalizeShip(o) === shipFilter);
+  }, [orders, filterStatus, shipFilter]);
 
   const filterButtons: Array<{ v: Filter; label: string; count: number }> = [
     { v: 'pending_payment', label: '⏳ รอชำระเงิน', count: counts.pending_payment },
     { v: 'payment_review', label: '🔍 รอตรวจสอบสลิป', count: counts.payment_review },
     { v: 'paid', label: '✅ ชำระแล้ว', count: counts.paid },
     { v: 'all', label: '📦 ทั้งหมด', count: counts.all },
+  ];
+
+  const shipButtons: Array<{ v: ShipFilter; label: string; count: number }> = [
+    { v: 'pending', label: '📦 รอจัดส่ง', count: shipCounts.pending },
+    { v: 'shipping', label: '🚚 จัดส่งแล้ว', count: shipCounts.shipping },
+    { v: 'delivered', label: '✅ ส่งสำเร็จ', count: shipCounts.delivered },
+    { v: 'all', label: '📦 ชำระแล้วทั้งหมด', count: shipCounts.all },
   ];
 
   return (
@@ -217,27 +253,108 @@ export default function AuctionOrdersPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex flex-wrap gap-2">
-            {filterButtons.map((x) => {
-              const isActive = filterStatus === x.v;
+        {/* ✅ ฟิลเตอร์แบบไม่งง: แยก 2 กล่อง */}
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+  {/* ------- Payment ------- */}
+  <div className="bg-white rounded-2xl shadow-lg p-5 border-2 border-gray-200">
+    <div className="flex items-center justify-between gap-3 mb-3">
+      <div>
+        <div className="text-sm font-bold text-gray-800">สถานะชำระเงิน</div>
+        <div className="text-xs text-gray-500">กรองตามขั้นตอนการจ่ายเงิน</div>
+      </div>
+      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-700 border">
+        ทั้งหมด {counts.all}
+      </span>
+    </div>
+
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      {filterButtons.map((x) => {
+        const isActive = filterStatus === x.v;
+        return (
+          <button
+            key={x.v}
+            type="button"
+            onClick={() => setFilterStatus(x.v)}
+            className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl font-semibold border transition
+              ${isActive
+                ? 'bg-green-600 text-white border-green-600 shadow'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}`}
+          >
+            <span className="truncate">{x.label}</span>
+            <span
+              className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                isActive ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {x.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+
+  {/* ------- Shipping ------- */}
+  <div className="bg-white rounded-2xl shadow-lg p-5 border-2 border-gray-200">
+    <div className="flex items-center justify-between gap-3 mb-3">
+      <div>
+        <div className="text-sm font-bold text-gray-800">สถานะจัดส่ง</div>
+        <div className="text-xs text-gray-500">นับ/กรองเฉพาะออเดอร์ที่ “ชำระแล้ว”</div>
+      </div>
+      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+        ชำระแล้ว {shipCounts.all}
+      </span>
+    </div>
+
+    {/* ✅ ถ้าไม่ได้อยู่ใน paid/all ให้ปุ่มจัดส่ง disable เพื่อไม่ให้งง */}
+    {(() => {
+      const shipEnabled = filterStatus === 'paid' || filterStatus === 'all';
+      return (
+        <>
+          <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${!shipEnabled ? 'opacity-50' : ''}`}>
+            {shipButtons.map((x) => {
+              const isActive = shipFilter === x.v;
               return (
                 <button
                   key={x.v}
                   type="button"
-                  onClick={() => setFilterStatus(x.v)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold border transition
-                    ${isActive ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}`}
+                  disabled={!shipEnabled}
+                  onClick={() => setShipFilter(x.v)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl font-semibold border transition
+                    ${!shipEnabled
+                      ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                      : isActive
+                        ? 'bg-blue-600 text-white border-blue-600 shadow'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
                 >
-                  {x.label}
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isActive ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-700'}`}>
+                  <span className="truncate">{x.label}</span>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      !shipEnabled
+                        ? 'bg-gray-200 text-gray-500'
+                        : isActive
+                          ? 'bg-white text-blue-700'
+                          : 'bg-gray-200 text-gray-700'
+                    }`}
+                  >
                     {x.count}
                   </span>
                 </button>
               );
             })}
           </div>
-        </div>
+
+          {!shipEnabled ? (
+            <div className="mt-3 text-xs text-gray-500">
+              * เลือก “✅ ชำระแล้ว” หรือ “📦 ทั้งหมด” ก่อน ถึงจะกรองสถานะจัดส่งได้
+            </div>
+          ) : null}
+        </>
+      );
+    })()}
+  </div>
+</div>
+
 
         <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -259,11 +376,15 @@ export default function AuctionOrdersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-gray-500">⏳ กำลังโหลด...</td>
+                    <td colSpan={9} className="p-8 text-center text-gray-500">
+                      ⏳ กำลังโหลด...
+                    </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-gray-500">ไม่พบข้อมูล</td>
+                    <td colSpan={9} className="p-8 text-center text-gray-500">
+                      ไม่พบข้อมูล
+                    </td>
                   </tr>
                 ) : (
                   filtered.map((o) => {
@@ -278,7 +399,9 @@ export default function AuctionOrdersPage() {
                         <td className="p-4 text-gray-700">{o.Cname}</td>
                         <td className="p-4 text-center text-sm text-gray-700">{fmtDateTime(o.end_time)}</td>
                         <td className="p-4 text-center text-sm text-gray-700">{fmtDateTime(o.paid_at)}</td>
-                        <td className="p-4 text-right font-bold text-lg text-green-600">{fmtBaht(Number(o.current_price))} ฿</td>
+                        <td className="p-4 text-right font-bold text-lg text-green-600">
+                          {fmtBaht(Number(o.current_price))} ฿
+                        </td>
 
                         <td className="p-4 text-center">
                           <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-semibold border ${p.cls}`}>
@@ -290,7 +413,9 @@ export default function AuctionOrdersPage() {
                           <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-semibold border ${s.cls}`}>
                             {s.label}
                           </span>
-                          {o.tracking_number ? <div className="text-xs text-gray-500 mt-1">#{o.tracking_number}</div> : null}
+                          {o.tracking_number ? (
+                            <div className="text-xs text-gray-500 mt-1">#{o.tracking_number}</div>
+                          ) : null}
                         </td>
 
                         <td className="p-4 text-center">
