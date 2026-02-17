@@ -12,7 +12,6 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-
 interface ReviewItem {
   id: number;
   text: string;
@@ -20,6 +19,9 @@ interface ReviewItem {
   Cname?: string;
   images?: string[];
   created_at?: string;
+
+  admin_reply?: string | null;
+  replied_at?: string | null;
 }
 
 interface ReviewsErrorResponse {
@@ -28,42 +30,45 @@ interface ReviewsErrorResponse {
 }
 
 function safeParseImages(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.filter((x) => typeof x === "string") as string[];
-  if (typeof raw === "string") {
+  if (Array.isArray(raw)) return raw.filter((x) => typeof x === 'string') as string[];
+  if (typeof raw === 'string') {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === "string") as string[];
+      if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === 'string') as string[];
       return [];
     } catch {
-      return raw.startsWith("/") ? [raw] : [];
+      return raw.startsWith('/') ? [raw] : [];
     }
   }
   return [];
 }
 
 function toReviewItem(x: unknown): ReviewItem | null {
-  if (typeof x !== "object" || x === null) return null;
+  if (typeof x !== 'object' || x === null) return null;
   const o = x as Record<string, unknown>;
 
-  const id = typeof o.id === "number" ? o.id : null;
-  const text = typeof o.text === "string" ? o.text : null;
-  const stars = typeof o.stars === "number" ? o.stars : null;
+  const id = typeof o.id === 'number' ? o.id : null;
+  const text = typeof o.text === 'string' ? o.text : null;
+  const stars = typeof o.stars === 'number' ? o.stars : null;
 
   if (id === null || text === null || stars === null) return null;
 
-  const Cname = typeof o.Cname === "string" ? o.Cname : undefined;
+  const Cname = typeof o.Cname === 'string' ? o.Cname : undefined;
   const images = safeParseImages(o.images);
-  const created_at = typeof o.created_at === "string" ? o.created_at : undefined;
+  const created_at = typeof o.created_at === 'string' ? o.created_at : undefined;
 
-  return { id, text, stars, Cname, images, created_at };
+  const admin_reply = typeof o.admin_reply === 'string' ? o.admin_reply : (o.admin_reply === null ? null : undefined);
+  const replied_at = typeof o.replied_at === 'string' ? o.replied_at : (o.replied_at === null ? null : undefined);
+
+  return { id, text, stars, Cname, images, created_at, admin_reply, replied_at };
 }
 
 const maskCustomerName = (full?: string) => {
-  if (!full) return "ผู้ใช้";
+  if (!full) return 'ผู้ใช้';
   const parts = full.trim().split(/\s+/);
 
   if (parts.length === 1) {
-    return parts[0][0] + "xxx";
+    return parts[0][0] + 'xxx';
   }
 
   const first = parts[0];
@@ -72,11 +77,10 @@ const maskCustomerName = (full?: string) => {
 };
 
 function toPublicImgUrl(path: string) {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
   return `${API}${path}`;
 }
-
 
 export default function About() {
   const [review, setReview] = useState('');
@@ -85,10 +89,10 @@ export default function About() {
 
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
 
-  // ✅ รูปที่ผู้ใช้เลือกจะอัปโหลด
+  // รูปที่ผู้ใช้เลือกจะอัปโหลด
   const [images, setImages] = useState<File[]>([]);
 
-  // ✅ modal ดูรูปใหญ่
+  // modal ดูรูปใหญ่
   const [openImg, setOpenImg] = useState<string | null>(null);
 
   const loadReviews = async () => {
@@ -101,10 +105,7 @@ export default function About() {
         return;
       }
 
-      const normalized = data
-        .map(toReviewItem)
-        .filter((x): x is ReviewItem => x !== null);
-
+      const normalized = data.map(toReviewItem).filter((x): x is ReviewItem => x !== null);
       setReviews(normalized);
     } catch (err) {
       console.error('โหลดรีวิวผิด:', err);
@@ -117,18 +118,13 @@ export default function About() {
   }, []);
 
   const onPickImages = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files ?? []);
-
-  setImages((prev) => [...prev, ...files].slice(0, 5));
-
-  // reset input ให้เลือกไฟล์เดิมซ้ำได้
-  e.target.value = '';
-};
-
+    const files = Array.from(e.target.files ?? []);
+    setImages((prev) => [...prev, ...files].slice(0, 5));
+    e.target.value = ''; // reset input ให้เลือกไฟล์เดิมซ้ำได้
+  };
 
   const previews = useMemo(() => {
-    const urls = images.map((f) => URL.createObjectURL(f));
-    return urls;
+    return images.map((f) => URL.createObjectURL(f));
   }, [images]);
 
   useEffect(() => {
@@ -149,7 +145,7 @@ export default function About() {
       const fd = new FormData();
       fd.append('text', review);
       fd.append('stars', String(rating));
-      images.forEach((f) => fd.append('images', f)); // ✅ รูปสูงสุด 5
+      images.forEach((f) => fd.append('images', f)); // รูปสูงสุด 5
 
       const res = await apiFetch('/reviews/store', {
         method: 'POST',
@@ -192,8 +188,9 @@ export default function About() {
             onClick={interactive ? () => setRating(star) : undefined}
             onMouseEnter={interactive ? () => setHoverRating(star) : undefined}
             onMouseLeave={interactive ? () => setHoverRating(0) : undefined}
-            className={`text-3xl focus:outline-none transition-all duration-200 ${interactive ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
-              }`}
+            className={`text-3xl focus:outline-none transition-all duration-200 ${
+              interactive ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
+            }`}
             disabled={!interactive}
           >
             {star <= (interactive ? hoverRating || rating : count) ? (
@@ -206,22 +203,6 @@ export default function About() {
       </div>
     );
   };
-
-  const maskFullName = (full?: string) => {
-    if (!full) return "ผู้ใช้";
-
-    const parts = full.trim().split(/\s+/);
-    if (parts.length === 1) {
-      // ชื่อเดียว
-      return parts[0][0] + "xxx";
-    }
-
-    const first = parts[0];
-    const last = parts[1];
-
-    return `${first[0]}xxx ${last[0]}x`;
-  };
-
 
   return (
     <main className="mt-16 min-h-screen bg-white px-4 py-16">
@@ -249,9 +230,8 @@ export default function About() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 text-lg font-semibold mb-3">
-              ความคิดเห็น
-            </label>
+            <label className="block text-gray-700 text-lg font-semibold mb-3">ความคิดเห็น</label>
+
             <div className="relative">
               <textarea
                 value={review}
@@ -262,7 +242,7 @@ export default function About() {
               <FaQuoteLeft className="absolute top-3 right-3 text-green-200 text-2xl" />
             </div>
 
-            {/* ✅ อัปโหลดรูป */}
+            {/* Upload images */}
             <div className="mt-4">
               <label className="block text-gray-700 text-base font-semibold mb-2">
                 เพิ่มรูป (สูงสุด 5 รูป)
@@ -283,26 +263,22 @@ export default function About() {
                       className="w-20 h-20 rounded-xl overflow-hidden border bg-white"
                       title="พรีวิว"
                     >
-                      <img
-                        src={src}
-                        alt="preview"
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={src} alt="preview" className="w-full h-full object-cover" />
                     </div>
                   ))}
                 </div>
+              )}
+
+              {images.length > 0 && (
+                <div className="mt-2 text-xs text-gray-500">{images.length}/5 รูป</div>
               )}
             </div>
           </div>
 
           <div className="mb-8">
-            <label className="block text-gray-700 text-lg font-semibold mb-3">
-              ให้คะแนน
-            </label>
+            <label className="block text-gray-700 text-lg font-semibold mb-3">ให้คะแนน</label>
             <StarRating count={rating} interactive />
-            {rating > 0 && (
-              <p className="mt-2 text-green-600 font-medium">คุณให้ {rating} ดาว</p>
-            )}
+            {rating > 0 && <p className="mt-2 text-green-600 font-medium">คุณให้ {rating} ดาว</p>}
           </div>
 
           <button
@@ -331,9 +307,7 @@ export default function About() {
                   <FaStar className="text-gray-300 text-3xl" />
                 </div>
                 <p className="text-gray-400 text-lg">ยังไม่มีรีวิว</p>
-                <p className="text-gray-400 text-sm mt-2">
-                  เป็นคนแรกที่แบ่งปันประสบการณ์ของคุณ!
-                </p>
+                <p className="text-gray-400 text-sm mt-2">เป็นคนแรกที่แบ่งปันประสบการณ์ของคุณ!</p>
               </div>
             ) : (
               reviews.map((r) => (
@@ -349,38 +323,52 @@ export default function About() {
                       </div>
                     </div>
 
-                    {/* content + right images */}
+                    {/* content */}
                     <div className="flex-1 w-full">
                       <div className="flex items-start justify-between gap-4">
-                        {/* left: name + stars + text */}
+                        {/* left */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="font-semibold text-gray-700">
-                              {maskCustomerName(r.Cname)}
-
-                            </div>
-
-                            <span className="text-sm text-gray-400 font-medium">
-                              {r.stars}/5
-                            </span>
+                            <div className="font-semibold text-gray-700">{maskCustomerName(r.Cname)}</div>
+                            <span className="text-sm text-gray-400 font-medium">{r.stars}/5</span>
                           </div>
 
-                          <div className="flex space-x-1 mb-3">
+                          <div className="flex space-x-1 mb-2">
                             {[1, 2, 3, 4, 5].map((star) => (
                               <FaStar
                                 key={star}
-                                className={`text-xl ${star <= r.stars ? 'text-yellow-400' : 'text-gray-200'
-                                  }`}
+                                className={`text-xl ${star <= r.stars ? 'text-yellow-400' : 'text-gray-200'}`}
                               />
                             ))}
                           </div>
 
-                          <p className="text-gray-700 text-base leading-relaxed">
-                            &quot;{r.text}&quot;
-                          </p>
+                          {r.created_at && (
+                            <div className="text-xs text-gray-400 mb-3">
+                              รีวิวเมื่อ: {new Date(r.created_at).toLocaleString('th-TH')}
+                            </div>
+                          )}
+
+                          <p className="text-gray-700 text-base leading-relaxed">&quot;{r.text}&quot;</p>
+
+                          {/* ✅ admin reply */}
+                          {typeof r.admin_reply === 'string' && r.admin_reply.trim().length > 0 && (
+                            <div className="mt-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4">
+                              <div className="flex items-center justify-between gap-3 mb-2">
+                                <div className="font-bold text-emerald-700">🗨️ แอดมินตอบกลับ</div>
+                                {r.replied_at ? (
+                                  <div className="text-xs text-emerald-700/70">
+                                    {new Date(r.replied_at).toLocaleString('th-TH')}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <p className="text-emerald-900 leading-relaxed whitespace-pre-wrap">
+                                {r.admin_reply}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
-                        {/* right: images */}
+                        {/* right images */}
                         {r.images && r.images.length > 0 && (
                           <div className="flex flex-col gap-2 items-end">
                             {r.images.slice(0, 3).map((img, idx) => (
@@ -400,9 +388,7 @@ export default function About() {
                             ))}
 
                             {r.images.length > 3 && (
-                              <div className="text-xs text-gray-400">
-                                +{r.images.length - 3} รูป
-                              </div>
+                              <div className="text-xs text-gray-400">+{r.images.length - 3} รูป</div>
                             )}
                           </div>
                         )}
@@ -440,7 +426,7 @@ export default function About() {
         )}
       </div>
 
-      {/* ✅ modal ดูรูปใหญ่ */}
+      {/* modal ดูรูปใหญ่ */}
       {openImg && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
