@@ -30,6 +30,14 @@ const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 const fmt = (n: number) =>
   Number(n ?? 0).toLocaleString("th-TH", { minimumFractionDigits: 2 });
 
+function safeImgUrl(p: string) {
+  const raw = String(p || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("http")) return raw;
+  if (raw.startsWith("/")) return `${API}${raw}`;
+  return `${API}/${raw}`;
+}
+
 export default function AdminAuctionDetailPage() {
   const { Aid } = useParams<{ Aid: string }>();
   const router = useRouter();
@@ -65,7 +73,8 @@ export default function AdminAuctionDetailPage() {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((p) => `${API}${p.startsWith("/") ? "" : "/"}${p}`);
+      .map((p) => safeImgUrl(p))
+      .filter(Boolean);
   }, [data?.PROpicture]);
 
   const [sel, setSel] = useState(0);
@@ -104,139 +113,252 @@ export default function AdminAuctionDetailPage() {
   };
 
   if (loading || !data) {
-    return <main className="p-6 text-black">กำลังโหลด...</main>;
+    return (
+      <main className="min-h-screen bg-emerald-50">
+        <div className="max-w-5xl mx-auto px-8 py-10">
+          <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-8">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+              <div className="text-sm text-slate-600">กำลังโหลดข้อมูล...</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   const closePrice = data.close_price ?? data.current_price;
-
-  // ✅ ใช้ status.ts คุม label + สี
   const st = getMeta(AUCTION_STATUS, data.status);
 
+  const cardCls =
+    "bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden";
+  const sectionTitleCls =
+    "text-xs uppercase tracking-widest text-emerald-700 font-semibold";
+  const labelCls = "text-xs uppercase tracking-wide text-slate-500";
+  const valueCls = "text-sm font-semibold text-slate-800";
+  const rowCls = "flex items-center justify-between py-3 border-t border-emerald-100/70";
+
+  const Btn = ({
+    children,
+    onClick,
+    disabled,
+    tone = "outline",
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    tone?: "outline" | "primary" | "danger" | "neutral";
+  }) => {
+    const base =
+      "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition shadow-sm";
+    const tones: Record<string, string> = {
+      outline:
+        "border border-emerald-200 bg-white text-slate-700 hover:bg-emerald-50",
+      primary: "bg-emerald-800 text-white hover:bg-emerald-900",
+      danger: "bg-rose-700 text-white hover:bg-rose-800",
+      neutral: "bg-slate-700 text-white hover:bg-slate-800",
+    };
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={[
+          base,
+          tones[tone],
+          disabled ? "opacity-50 cursor-not-allowed hover:shadow-sm" : "",
+        ].join(" ")}
+      >
+        {children}
+      </button>
+    );
+  };
+
   return (
-    <main className="p-6 text-black">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">รายละเอียดประมูล #{Aid}</h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* รูปสินค้า */}
-          <div className="bg-white rounded-xl shadow p-4">
-            <div className="w-full aspect-[4/3] bg-gray-50 rounded-lg flex items-center justify-center overflow-hidden">
-              {imageUrls[sel] ? (
-                <img
-                  src={imageUrls[sel]}
-                  className="w-full h-full object-contain"
-                  alt={data.PROname}
-                />
-              ) : (
-                <div className="text-gray-400">ไม่มีรูป</div>
-              )}
+    <main className="min-h-screen bg-emerald-50 text-black">
+      <div className="max-w-5xl mx-auto px-8 py-10">
+        {/* Header */}
+        <div className="mb-8 border-b border-emerald-100 pb-6">
+          <p className={sectionTitleCls}>Auctions</p>
+          <div className="mt-2 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-semibold text-emerald-950 tracking-wide">
+                รายละเอียดประมูล
+              </h1>
+              <div className="mt-1 text-sm text-slate-600">
+                รหัสรอบ:{" "}
+                <span className="font-mono text-slate-800">{`auc:${String(
+                  Aid
+                ).padStart(4, "0")}`}</span>
+              </div>
             </div>
 
-            {imageUrls.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto">
-                {imageUrls.map((u, i) => (
-                  <button
-                    key={`${u}-${i}`}
-                    type="button"
-                    className={`w-20 h-20 rounded border overflow-hidden ${
-                      sel === i
-                        ? "ring-2 ring-orange-500"
-                        : "hover:ring-1 hover:ring-gray-300"
-                    }`}
-                    onClick={() => setSel(i)}
-                  >
-                    <img
-                      src={u}
-                      className="w-full h-full object-cover"
-                      alt={`${data.PROname}-${i + 1}`}
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ข้อมูลประมูล */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <div className="mb-4">
-              <div className="text-sm text-gray-500">สินค้า</div>
-              <div className="text-2xl font-semibold">{data.PROname}</div>
-            </div>
-
-            <div className="space-y-2 text-[15px]">
-              <div className="flex justify-between border-b py-2">
-                <span className="text-gray-600">ราคาเริ่มต้น</span>
-                <b>{fmt(data.start_price)} ฿</b>
-              </div>
-
-              <div className="flex justify-between border-b py-2">
-                <span className="text-gray-600">ราคาปัจจุบัน</span>
-                <b className="text-red-600">{fmt(data.current_price)} ฿</b>
-              </div>
-
-              <div className="flex justify-between border-b py-2">
-                <span className="text-gray-600">ราคาปิด</span>
-                <b className="text-blue-600">{fmt(closePrice)} ฿</b>
-              </div>
-
-              <div className="flex justify-between border-b py-2">
-                <span className="text-gray-600">ปิดประมูล</span>
-                <span>{new Date(data.end_time).toLocaleString("th-TH")}</span>
-              </div>
-
-              <div className="flex items-center gap-2 py-2">
-                <span className="text-gray-600">สถานะ</span>
-                <StatusBadge label={st.label} tone={st.tone} />
-              </div>
-
-              {data.status === "closed" && (
-                <>
-                  <div className="flex justify-between border-b py-2">
-                    <span className="text-gray-600">ผู้ชนะ</span>
-                    <b>{data.winnerName || "—"}</b>
-                  </div>
-
-                  {data.winner_id ? (
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/admin/auction-orders/${data.Aid}`)}
-                      className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-                    >
-                      ดูออเดอร์ประมูล
-                    </button>
-                  ) : null}
-                </>
-              )}
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/admin/auctions")}
-                className="px-4 py-2 rounded border border-gray-300 hover:bg-gray-50"
-              >
-                ← กลับ
-              </button>
-
-              {data.status === "open" && (
-                <button
-                  type="button"
-                  onClick={closeAuction}
-                  className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+            <div className="flex flex-wrap gap-2">
+              <Btn tone="outline" onClick={() => router.push("/admin/auctions")}>
+                กลับไปรายการ
+              </Btn>
+              {data.status === "closed" && data.winner_id ? (
+                <Btn
+                  tone="primary"
+                  onClick={() => router.push(`/admin/auction-orders/${data.Aid}`)}
                 >
-                  ปิดประมูล
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={deleteProduct}
-                className="px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-800"
-              >
-                ลบสินค้า
-              </button>
+                  ดูออเดอร์ประมูล
+                </Btn>
+              ) : null}
             </div>
           </div>
+        </div>
+
+        {/* Content */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Gallery */}
+          <section className={cardCls}>
+            <div className="p-5 border-b border-emerald-100 bg-emerald-50/60">
+              <div className="text-lg font-semibold text-emerald-950">
+                รูปสินค้า
+              </div>
+              <div className="text-sm text-slate-600">
+                เลือกรูปด้านล่างเพื่อดูภาพขยาย
+              </div>
+            </div>
+
+            <div className="p-5">
+              <div className="w-full aspect-[4/3] rounded-2xl bg-emerald-50/60 border border-emerald-100 overflow-hidden flex items-center justify-center">
+                {imageUrls[sel] ? (
+                  <img
+                    src={imageUrls[sel]}
+                    className="w-full h-full object-contain"
+                    alt={data.PROname}
+                  />
+                ) : (
+                  <div className="text-sm text-slate-500">ไม่มีรูป</div>
+                )}
+              </div>
+
+              {imageUrls.length > 1 && (
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                  {imageUrls.map((u, i) => {
+                    const active = sel === i;
+                    return (
+                      <button
+                        key={`${u}-${i}`}
+                        type="button"
+                        onClick={() => setSel(i)}
+                        className={[
+                          "h-16 w-16 rounded-xl overflow-hidden border transition flex-none",
+                          active
+                            ? "border-emerald-400 ring-4 ring-emerald-100"
+                            : "border-emerald-100 hover:border-emerald-300",
+                        ].join(" ")}
+                        aria-label={`เลือกภาพ ${i + 1}`}
+                      >
+                        <img
+                          src={u}
+                          className="w-full h-full object-cover"
+                          alt={`${data.PROname}-${i + 1}`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Detail */}
+          <section className={cardCls}>
+            <div className="p-5 border-b border-emerald-100 bg-emerald-50/60">
+              <div className="text-lg font-semibold text-emerald-950">
+                ข้อมูลประมูล
+              </div>
+              <div className="text-sm text-slate-600">
+                ตรวจสอบราคา เวลา และสถานะรอบประมูล
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Product */}
+              <div className="mb-5">
+                <div className={labelCls}>สินค้า</div>
+                <div className="text-2xl font-semibold text-emerald-950 mt-1">
+                  {data.PROname}
+                </div>
+                {data.PROdetail ? (
+                  <div className="mt-2 text-sm text-slate-600 leading-relaxed line-clamp-4">
+                    {data.PROdetail}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Metrics */}
+              <div className="rounded-2xl border border-emerald-100 overflow-hidden">
+                <div className="px-5 py-3 bg-white">
+                  <div className="grid grid-cols-1 gap-0">
+                    <div className={rowCls}>
+                      <span className="text-slate-600">ราคาเริ่มต้น</span>
+                      <span className={valueCls}>{fmt(data.start_price)} ฿</span>
+                    </div>
+
+                    <div className={rowCls}>
+                      <span className="text-slate-600">ราคาปัจจุบัน</span>
+                      <span className="text-sm font-semibold text-emerald-800">
+                        {fmt(data.current_price)} ฿
+                      </span>
+                    </div>
+
+                    <div className={rowCls}>
+                      <span className="text-slate-600">ราคาปิด</span>
+                      <span className="text-sm font-semibold text-slate-800">
+                        {fmt(closePrice)} ฿
+                      </span>
+                    </div>
+
+                    <div className={rowCls}>
+                      <span className="text-slate-600">ปิดประมูล</span>
+                      <span className="text-sm text-slate-700">
+                        {new Date(data.end_time).toLocaleString("th-TH")}
+                      </span>
+                    </div>
+
+                    <div className={rowCls}>
+                      <span className="text-slate-600">สถานะ</span>
+                      <StatusBadge label={st.label} tone={st.tone} />
+                    </div>
+
+                    {data.status === "closed" && (
+                      <div className={rowCls}>
+                        <span className="text-slate-600">ผู้ชนะ</span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          {data.winnerName || "—"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Btn tone="outline" onClick={() => router.push("/admin/auctions")}>
+                  กลับ
+                </Btn>
+
+                {data.status === "open" && (
+                  <Btn tone="danger" onClick={closeAuction}>
+                    ปิดประมูล
+                  </Btn>
+                )}
+
+                <Btn tone="neutral" onClick={deleteProduct}>
+                  ลบสินค้า
+                </Btn>
+              </div>
+
+              <div className="mt-3 text-xs text-slate-500">
+                หมายเหตุ: ลบสินค้าจะลบออกจากคลังสินค้าประมูล (ตรวจสอบให้แน่ใจก่อนทำรายการ)
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </main>

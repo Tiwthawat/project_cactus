@@ -53,11 +53,11 @@ function safeImgUrl(raw: string) {
 type RemainMeta = { t: string; c: string };
 
 function remainLabel(end: string, status: Auction['status'], nowTs: number): RemainMeta {
-  if (status === 'closed') return { t: 'ปิดแล้ว', c: 'text-gray-500' };
+  if (status === 'closed') return { t: 'ปิดแล้ว', c: 'text-slate-500' };
 
   const diff = new Date(end).getTime() - nowTs;
-  if (Number.isNaN(diff)) return { t: '—', c: 'text-gray-400' };
-  if (diff <= 0) return { t: 'หมดเวลาแล้ว', c: 'text-red-600' };
+  if (Number.isNaN(diff)) return { t: '—', c: 'text-slate-400' };
+  if (diff <= 0) return { t: 'หมดเวลา', c: 'text-rose-700' };
 
   let s = Math.floor(diff / 1000);
   const d = Math.floor(s / 86400);
@@ -71,7 +71,7 @@ function remainLabel(end: string, status: Auction['status'], nowTs: number): Rem
     .filter(Boolean)
     .join(' ');
 
-  return { t: txt, c: 'text-gray-700' };
+  return { t: txt, c: 'text-slate-700' };
 }
 
 function getErrMsg(err: unknown) {
@@ -233,98 +233,100 @@ export default function AdminAuctionsPage() {
   }, [auctions, sortKey]);
 
   const btnBase =
-    'text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap';
-  const disabledCls = 'opacity-50 cursor-not-allowed hover:shadow-md';
+    'px-3 py-2 rounded-lg text-sm font-semibold transition shadow-sm hover:shadow-md whitespace-nowrap';
+  const disabledCls = 'opacity-50 cursor-not-allowed hover:shadow-sm';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
-      <div className="p-6 pt-8">
+    <div className="min-h-screen bg-emerald-50">
+      <div className="max-w-7xl mx-auto px-8 py-10">
         {/* Header */}
-        <div className="mb-8">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
-            จัดการประมูล
-          </div>
+        <div className="mb-8 border-b border-emerald-100 pb-6">
+          <p className="text-xs uppercase tracking-widest text-emerald-700 font-semibold">
+            Auctions
+          </p>
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-              🔨 จัดการสินค้าประมูล
-            </h1>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mt-2">
+            <div>
+              <h1 className="text-3xl font-semibold text-emerald-950 tracking-wide">
+                จัดการสินค้าประมูล
+              </h1>
+              <p className="text-sm text-slate-600 mt-1">
+                จัดการรอบประมูล ปิดรอบ ลบรอบ และดูสถานะได้จากหน้านี้
+              </p>
+            </div>
 
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => fetchAuctions(filter)}
                 disabled={loading || Boolean(busyId)}
-                className={`bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-300 px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg ${
-                  loading || busyId ? 'opacity-50 cursor-not-allowed' : ''
+                className={`bg-white text-slate-700 border border-emerald-200 hover:bg-emerald-50 ${btnBase} ${
+                  loading || busyId ? disabledCls : ''
                 }`}
               >
-                🔄 รีเฟรช
+                รีเฟรช
               </button>
 
               <Link
                 href="/admin/auction-products/new"
-                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                className={`bg-emerald-800 text-white hover:bg-emerald-900 ${btnBase}`}
               >
-                + เพิ่มสินค้าประมูล
+                เพิ่มสินค้าประมูล
               </Link>
 
               <Link
                 href="/admin/auctions/new"
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                className={`bg-emerald-700 text-white hover:bg-emerald-800 ${btnBase}`}
               >
-                + เปิดรอบประมูล
+                เปิดรอบประมูล
               </Link>
             </div>
           </div>
         </div>
 
-        {/* Filters Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              🔍
+        {/* Filters */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-emerald-100">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="text-lg font-semibold text-emerald-950">ตัวกรอง</div>
+              <div className="text-sm text-slate-600">เลือกสถานะและการเรียงลำดับ</div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">กรองรายการ</h2>
+
+            <div className="flex gap-2">
+              {[
+                { v: 'open' as StatusFilter, label: 'เปิดประมูล' },
+                { v: 'closed' as StatusFilter, label: 'ปิดแล้ว' },
+                { v: 'all' as StatusFilter, label: 'ทั้งหมด' },
+              ].map((x) => {
+                const active = filter === x.v;
+                return (
+                  <button
+                    key={x.v}
+                    type="button"
+                    onClick={() => setFilter(x.v)}
+                    className={`px-3 py-2 rounded-lg text-sm font-semibold border transition ${
+                      active
+                        ? 'bg-emerald-800 text-white border-emerald-800'
+                        : 'bg-white text-slate-700 border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {x.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* สถานะประมูล */}
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2">สถานะประมูล:</label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { v: 'open' as StatusFilter, label: '🟢 เปิดประมูล' },
-                  { v: 'closed' as StatusFilter, label: '🔴 ปิดแล้ว' },
-                  { v: 'all' as StatusFilter, label: '📦 ทั้งหมด' },
-                ].map((x) => {
-                  const active = filter === x.v;
-                  return (
-                    <button
-                      key={x.v}
-                      type="button"
-                      onClick={() => setFilter(x.v)}
-                      className={`px-3 py-2 rounded-xl font-semibold border transition text-sm ${
-                        active
-                          ? 'bg-green-600 text-white border-green-600 shadow'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
-                      }`}
-                    >
-                      {x.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* เรียงลำดับ */}
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
-              <label className="block text-gray-700 font-semibold mb-2">เรียงลำดับ:</label>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                เรียงลำดับ
+              </label>
               <select
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
-                className="w-full border-2 border-gray-300 rounded-xl px-3 py-2 font-semibold text-gray-700 bg-white hover:bg-gray-50 transition"
+                className="w-full border border-emerald-200 rounded-xl px-3 py-2 font-medium text-slate-700 bg-white hover:bg-emerald-50 transition"
               >
-                <option value="admin">⭐ แนะนำ (open ก่อน → ใกล้หมดก่อน → closed ใหม่ก่อน)</option>
+                <option value="admin">แนะนำ (open ก่อน → ใกล้หมดก่อน → closed ใหม่ก่อน)</option>
                 <option value="aid_desc">รหัสประมูล (Aid) : ใหม่ → เก่า</option>
                 <option value="aid_asc">รหัสประมูล (Aid) : เก่า → ใหม่</option>
                 <option value="end_asc">เวลาปิด (end_time) : ใกล้สุด → ไกลสุด</option>
@@ -333,38 +335,49 @@ export default function AdminAuctionsPage() {
                 <option value="price_asc">ราคาปัจจุบัน : น้อย → มาก</option>
               </select>
             </div>
+
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+              <div className="text-xs uppercase tracking-widest text-emerald-700 font-semibold">
+                Summary
+              </div>
+              <div className="mt-1 text-sm text-slate-700">
+                แสดงผล: <span className="font-semibold">{sortedAuctions.length}</span> รายการ
+              </div>
+              <div className="text-xs text-slate-500 mt-1">อัปเดตอัตโนมัติทุก 30 วินาที</div>
+            </div>
           </div>
         </div>
 
-        {/* Table */}
+        {/* Content */}
         {loading ? (
-          <div className="bg-white rounded-2xl shadow-lg p-10 text-center border-2 border-gray-200">
-            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">กำลังโหลด...</p>
+          <div className="bg-white rounded-2xl shadow-sm p-10 text-center border border-emerald-100">
+            <div className="w-12 h-12 border-4 border-emerald-700 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-slate-600">กำลังโหลดข้อมูล...</p>
           </div>
         ) : sortedAuctions.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-10 text-center border-2 border-gray-200">
-            <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">
-              🔨
-            </div>
-            <p className="text-gray-800 text-2xl md:text-3xl font-bold mb-3">ไม่พบข้อมูล</p>
-            <p className="text-gray-500 text-base md:text-lg">ลองปรับเปลี่ยนตัวกรองหรือเพิ่มรอบประมูลใหม่</p>
+          <div className="bg-white rounded-2xl shadow-sm p-10 text-center border border-emerald-100">
+            <p className="text-emerald-950 text-2xl font-semibold mb-2">ไม่พบข้อมูล</p>
+            <p className="text-slate-600">ลองเปลี่ยนตัวกรอง หรือสร้างรอบประมูลใหม่</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
-                    <th className="p-4 text-center">#</th>
-                    <th className="p-4 text-center">รหัส</th>
-                    <th className="p-4 text-center hidden md:table-cell">รูป</th>
-                    <th className="p-4 text-left">สินค้า</th>
-                    <th className="p-4 text-right">เริ่มต้น</th>
-                    <th className="p-4 text-right">ปัจจุบัน</th>
-                    <th className="p-4 text-center hidden lg:table-cell">ปิดประมูล</th>
-                    <th className="p-4 text-center">สถานะ</th>
-                    <th className="p-4 text-center">จัดการ</th>
+                  <tr className="bg-emerald-950 text-emerald-50">
+                    <th className="px-5 py-3 text-left text-xs uppercase tracking-wide font-semibold">#</th>
+                    <th className="px-5 py-3 text-left text-xs uppercase tracking-wide font-semibold">รหัส</th>
+                    <th className="px-5 py-3 text-left text-xs uppercase tracking-wide font-semibold hidden md:table-cell">
+                      รูป
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs uppercase tracking-wide font-semibold">สินค้า</th>
+                    <th className="px-5 py-3 text-right text-xs uppercase tracking-wide font-semibold">เริ่มต้น</th>
+                    <th className="px-5 py-3 text-right text-xs uppercase tracking-wide font-semibold">ปัจจุบัน</th>
+                    <th className="px-5 py-3 text-center text-xs uppercase tracking-wide font-semibold hidden lg:table-cell">
+                      ปิดประมูล
+                    </th>
+                    <th className="px-5 py-3 text-center text-xs uppercase tracking-wide font-semibold">สถานะ</th>
+                    <th className="px-5 py-3 text-center text-xs uppercase tracking-wide font-semibold">จัดการ</th>
                   </tr>
                 </thead>
 
@@ -386,59 +399,63 @@ export default function AdminAuctionsPage() {
                         : 'ลบไม่ได้: รอบนี้มีคนบิดแล้ว'
                       : '';
 
-                    // ✅ ใช้ status.ts (แก้สีจากที่เดียว)
                     const meta = getMeta(AUCTION_STATUS, a.status);
-                    const statusLabel = a.status === 'open' ? `🟢 ${meta.label}` : `🔴 ${meta.label}`;
+                    const statusLabel = meta.label;
 
                     return (
-                      <tr key={a.Aid} className="border-b border-gray-200 hover:bg-green-50 transition-colors">
-                        <td className="p-4 text-center font-semibold text-gray-700">{idx + 1}</td>
+                      <tr
+                        key={a.Aid}
+                        className="border-t border-emerald-100 hover:bg-emerald-50/60 transition-colors"
+                      >
+                        <td className="px-5 py-4 text-slate-700 font-medium">{idx + 1}</td>
 
-                        <td className="p-4 text-center font-mono text-sm bg-gray-50">
+                        <td className="px-5 py-4 font-mono text-xs text-slate-700 bg-emerald-50/50">
                           {`auc:${String(a.Aid).padStart(4, '0')}`}
                         </td>
 
-                        <td className="p-4 text-center hidden md:table-cell">
+                        <td className="px-5 py-4 hidden md:table-cell">
                           <img
                             src={img}
-                            className="h-16 w-16 mx-auto rounded-lg object-cover shadow-md"
+                            className="h-14 w-14 rounded-xl object-cover border border-emerald-100"
                             alt={a.PROname}
                           />
                         </td>
 
-                        <td className="p-4">
+                        <td className="px-5 py-4">
                           <Link
                             href={`/admin/auctions/${a.Aid}`}
-                            className="text-blue-600 hover:text-blue-800 font-semibold hover:underline"
+                            className="text-emerald-900 hover:text-emerald-700 font-semibold hover:underline"
                           >
                             {a.PROname}
                           </Link>
                         </td>
 
-                        <td className="p-4 text-right font-semibold text-gray-700">{fmtPrice(a.start_price)}</td>
-
-                        <td className="p-4 text-right font-semibold text-green-600">
-                          {fmtPrice(a.current_price)}
-                          {hasBid && <div className="text-xs text-gray-500 mt-0.5">มีการบิดแล้ว</div>}
+                        <td className="px-5 py-4 text-right font-medium text-slate-700">
+                          {fmtPrice(a.start_price)}
                         </td>
 
-                        <td className="p-4 text-center hidden lg:table-cell">
-                          <div className="text-sm text-gray-600">{new Date(a.end_time).toLocaleString('th-TH')}</div>
+                        <td className="px-5 py-4 text-right">
+                          <div className="font-semibold text-emerald-800">{fmtPrice(a.current_price)}</div>
+                          {hasBid && <div className="text-[11px] text-slate-500 mt-0.5">มีการบิดแล้ว</div>}
+                        </td>
+
+                        <td className="px-5 py-4 text-center hidden lg:table-cell">
+                          <div className="text-xs text-slate-600">
+                            {new Date(a.end_time).toLocaleString('th-TH')}
+                          </div>
                           <div className={`text-xs font-semibold ${remain.c}`}>{remain.t}</div>
                         </td>
 
-                        {/* ✅ เปลี่ยนจาก span hardcode -> StatusBadge */}
-                        <td className="p-4 text-center">
+                        <td className="px-5 py-4 text-center">
                           <StatusBadge label={statusLabel} tone={meta.tone} />
                         </td>
 
-                        <td className="p-4 text-center">
+                        <td className="px-5 py-4 text-center">
                           <div className="flex flex-col gap-2 items-center">
                             <button
                               onClick={() => closeAuction(a.Aid)}
                               disabled={!canClose || busyThisRow}
-                              title={!canClose ? 'ปิดแล้ว' : ''}
-                              className={`bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 ${btnBase} ${
+                              className={`bg-rose-700 text-white hover:bg-rose-800 ${btnBase} ${
                                 !canClose || busyThisRow ? disabledCls : ''
                               }`}
                             >
@@ -449,7 +466,7 @@ export default function AdminAuctionsPage() {
                               onClick={() => deleteAuction(a.Aid)}
                               disabled={!canDeleteAuction || busyThisRow}
                               title={hintDeleteAuction}
-                              className={`bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 ${btnBase} ${
+                              className={`bg-slate-700 text-white hover:bg-slate-800 ${btnBase} ${
                                 !canDeleteAuction || busyThisRow ? disabledCls : ''
                               }`}
                             >
@@ -460,7 +477,7 @@ export default function AdminAuctionsPage() {
                               <button
                                 onClick={() => deleteAuctionProduct(a.PROid, a.Aid)}
                                 disabled={busyThisRow}
-                                className={`bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 ${btnBase} ${
+                                className={`bg-slate-500 text-white hover:bg-slate-600 ${btnBase} ${
                                   busyThisRow ? disabledCls : ''
                                 }`}
                               >
@@ -469,12 +486,14 @@ export default function AdminAuctionsPage() {
                             )}
 
                             {!canDeleteAuction && (
-                              <div className="text-[11px] text-gray-500 leading-snug max-w-[170px]">{hintDeleteAuction}</div>
+                              <div className="text-[11px] text-slate-500 leading-snug max-w-[200px]">
+                                {hintDeleteAuction}
+                              </div>
                             )}
 
                             {hasBid && a.status === 'open' && (
-                              <div className="text-[11px] text-gray-400 leading-snug max-w-[170px]">
-                                * รอบนี้มีคนบิดแล้ว จึงซ่อนปุ่มลบสินค้า
+                              <div className="text-[11px] text-slate-400 leading-snug max-w-[200px]">
+                                รอบนี้มีการบิดแล้ว จึงซ่อนปุ่มลบสินค้า
                               </div>
                             )}
                           </div>
@@ -486,8 +505,8 @@ export default function AdminAuctionsPage() {
               </table>
             </div>
 
-            <div className="px-6 py-4 text-xs text-gray-500 border-t bg-gray-50">
-              * ปุ่ม “ลบรอบ / ลบสินค้า” จะทำงานได้เฉพาะรอบที่ยังเปิดและไม่มีคนบิด เพื่อกันข้อมูลพัง
+            <div className="px-6 py-4 text-xs text-slate-500 border-t border-emerald-100 bg-emerald-50/60">
+              ปุ่ม “ลบรอบ / ลบสินค้า” ทำได้เฉพาะรอบที่ยังเปิดและไม่มีคนบิด เพื่อป้องกันข้อมูลเสียหาย
             </div>
           </div>
         )}

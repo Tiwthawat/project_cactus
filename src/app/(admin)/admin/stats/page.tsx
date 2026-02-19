@@ -19,6 +19,21 @@ import {
   Line,
 } from 'recharts';
 
+import {
+  FiBarChart2,
+  FiPieChart,
+  FiTrendingUp,
+  FiTag,
+  FiBox,
+  FiAlertTriangle,
+  FiUsers,
+  FiCalendar,
+  FiChevronLeft,
+  FiChevronRight,
+  FiRefreshCw,
+  FiLoader,
+} from 'react-icons/fi';
+
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
 type SeriesMode = 'day' | 'month' | 'year';
@@ -141,7 +156,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 2022;
 const MAX_YEAR = CURRENT_YEAR;
 
-const LOW_STOCK_THRESHOLD = 10; // ✅ ใกล้หมด <= 10
+const LOW_STOCK_THRESHOLD = 10; // ใกล้หมด <= 10
 
 const clampYear = (y: number) => {
   if (!Number.isFinite(y)) return CURRENT_YEAR;
@@ -176,12 +191,12 @@ function pathLabel(type?: string | null, subtype?: string | null) {
 /** ---------- Tabs ---------- */
 type TabKey = 'overview' | 'payments' | 'trend' | 'insights' | 'stock';
 
-const TAB_LIST: { key: TabKey; label: string; icon: string; desc: string }[] = [
-  { key: 'overview', label: 'ภาพรวม', icon: '🧭', desc: 'ยอดขาย + ตัวเลขหลัก' },
-  { key: 'payments', label: 'ช่องทางรายได้', icon: '💳', desc: 'โอน / COD / ประมูล (Pie + ตาราง + bar)' },
-  { key: 'trend', label: 'แนวโน้ม', icon: '📈', desc: 'ยอดขายรายวัน/เดือน/ปี + เลือกช่วงเอง' },
-  { key: 'insights', label: 'หมวดทำเงิน', icon: '🏷️', desc: 'หมวดหลักก่อน แล้วค่อยแจกแจงหมวดย่อย' },
-  { key: 'stock', label: 'สต็อก', icon: '📦', desc: 'หมวดหลักก่อน + เจาะหมวดย่อย + ใกล้หมด' },
+const TAB_LIST: { key: TabKey; label: string; Icon: React.ComponentType<any>; desc: string }[] = [
+  { key: 'overview', label: 'ภาพรวม', Icon: FiBarChart2, desc: 'ยอดขาย + ตัวเลขหลัก' },
+  { key: 'payments', label: 'ช่องทางรายได้', Icon: FiPieChart, desc: 'โอน / COD / ประมูล (Pie + ตาราง + Bar)' },
+  { key: 'trend', label: 'แนวโน้ม', Icon: FiTrendingUp, desc: 'รายวัน/เดือน/ปี + เลือกช่วงเอง' },
+  { key: 'insights', label: 'หมวดทำเงิน', Icon: FiTag, desc: 'หมวดหลักก่อน แล้วค่อยแจกแจงหมวดย่อย' },
+  { key: 'stock', label: 'สต็อก', Icon: FiBox, desc: 'หมวดหลักก่อน + เจาะหมวดย่อย + ใกล้หมด' },
 ];
 
 const LS_TAB_KEY = 'admin_stats_tab';
@@ -191,9 +206,9 @@ function isTabKey(x: string | null): x is TabKey {
   return !!x && TAB_LIST.some((t) => t.key === x);
 }
 
-/** ---------- colors ---------- */
+/** ---------- theme colors (premium green / white / gray) ---------- */
 const COLOR_BANK = '#0ea5e9';
-const COLOR_COD = '#f97316';
+const COLOR_COD = '#f59e0b';
 const COLOR_AUCTION = '#22c55e';
 
 const COLOR_SALES = '#22c55e';
@@ -505,7 +520,7 @@ export default function AdminStatsPage() {
     return m;
   }, [stockByCategory]);
 
-  /** ✅ NEW: map สินค้าใกล้หมดแยกตาม (Type + Subtype) เพื่อโชว์ใต้หมวดย่อย */
+  /** map สินค้าใกล้หมดแยกตาม (Type + Subtype) เพื่อโชว์ใต้หมวดย่อย */
   const lowStockMap = useMemo(() => {
     const m = new Map<string, LowStockRow[]>();
     for (const p of lowStockProducts) {
@@ -517,7 +532,7 @@ export default function AdminStatsPage() {
       m.set(key, arr);
     }
     for (const [k, arr] of Array.from(m.entries())) {
-      arr.sort((a, b) => toNum(a.stock) - toNum(b.stock)); // เหลือน้อยขึ้นก่อน
+      arr.sort((a, b) => toNum(a.stock) - toNum(b.stock));
       m.set(k, arr);
     }
     return m;
@@ -534,9 +549,12 @@ export default function AdminStatsPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-sm text-center text-gray-500">
-          ⏳ กำลังโหลดสถิติร้านค้า...
-        </div>
+        <Surface>
+          <div className="flex items-center justify-center gap-3 text-slate-500">
+            <FiLoader className="h-4 w-4 animate-spin" />
+            <span className="text-sm">กำลังโหลดสถิติร้านค้า...</span>
+          </div>
+        </Surface>
       </div>
     );
   }
@@ -544,17 +562,25 @@ export default function AdminStatsPage() {
   if (errMsg) {
     return (
       <div className="p-6">
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
-          <div className="font-semibold text-rose-700">โหลดสถิติไม่สำเร็จ</div>
-          <div className="mt-2 text-sm text-rose-700/90 break-words">{errMsg}</div>
+        <Surface className="border-rose-200 bg-rose-50/60">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-xl bg-white/70 p-2 ring-1 ring-rose-100">
+              <FiAlertTriangle className="h-5 w-5 text-rose-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-rose-700">โหลดสถิติไม่สำเร็จ</div>
+              <div className="mt-1 text-sm text-rose-700/90 break-words">{errMsg}</div>
 
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 inline-flex items-center justify-center rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700"
-          >
-            ลองใหม่
-          </button>
-        </div>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 inline-flex items-center justify-center rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700"
+              >
+                <FiRefreshCw className="mr-2" />
+                ลองใหม่
+              </button>
+            </div>
+          </div>
+        </Surface>
       </div>
     );
   }
@@ -562,82 +588,92 @@ export default function AdminStatsPage() {
   if (!stats) {
     return (
       <div className="p-6">
-        <div className="rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-sm text-center text-gray-500">
-          ยังไม่มีข้อมูลสถิติ
-        </div>
+        <Surface>
+          <div className="text-center text-slate-500 text-sm">ยังไม่มีข้อมูลสถิติ</div>
+        </Surface>
       </div>
     );
   }
 
   const activeTabMeta = TAB_LIST.find((t) => t.key === tab) || TAB_LIST[0];
+  const ActiveIcon = activeTabMeta.Icon;
 
   return (
-    <div className="p-6 text-black space-y-8">
+    <div className="p-6 text-slate-900 space-y-8">
+      {/* ===== Background vibe (green / gray premium) ===== */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-40 -left-40 h-[420px] w-[420px] rounded-full bg-emerald-400/15 blur-3xl" />
+        <div className="absolute -bottom-44 -right-44 h-[520px] w-[520px] rounded-full bg-slate-900/10 blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-slate-50" />
+      </div>
+
       {/* ===== Header ===== */}
-      <header className="space-y-3">
-        <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-2">
-          <span className="text-3xl">📊</span>
-          <span>รายงาน & สถิติร้านค้า</span>
-        </h1>
-
-        <p className="text-sm text-gray-500">
-          Dashboard สำหรับเจ้าของร้าน: ยอดขาย, แนวโน้ม, สต็อก, และหมวดทำเงิน (แบบ Type → Subtype)
-        </p>
-
-        {/* ===== Year Switcher ===== */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            disabled={year <= MIN_YEAR}
-            onClick={() => setYearAndPersist(year - 1)}
-            className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            ◀
-          </button>
-
-          <div className="px-6 py-2 rounded-lg bg-gray-100 text-lg font-bold text-gray-800 min-w-[90px] text-center">
-            {year}
+      <header className="space-y-4">
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+              รายงาน & สถิติร้านค้า
+              <span className="ml-3 align-middle inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                Admin Analytics
+              </span>
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Dashboard สำหรับเจ้าของร้าน: ยอดขาย, แนวโน้ม, สต็อก, และหมวดทำเงิน (Type → Subtype)
+            </p>
           </div>
 
-          <button
-            type="button"
-            disabled={year >= MAX_YEAR}
-            onClick={() => setYearAndPersist(year + 1)}
-            className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            ▶
-          </button>
-        </div>
-      </header>
-
-      {/* ===== Tabs ===== */}
-      <section className="bg-white/70 backdrop-blur border border-gray-100 rounded-2xl shadow-sm p-4">
-        <div className="flex flex-wrap gap-2">
-          {TAB_LIST.map((t) => (
+          {/* ===== Year Switcher ===== */}
+          <div className="flex items-center gap-2">
             <button
-              key={t.key}
-              onClick={() => setTabAndUrl(t.key)}
-              className={[
-                'px-4 py-2 rounded-xl text-sm font-semibold border transition',
-                tab === t.key
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50',
-              ].join(' ')}
               type="button"
+              disabled={year <= MIN_YEAR}
+              onClick={() => setYearAndPersist(year - 1)}
+              className="group inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <span className="mr-2">{t.icon}</span>
-              {t.label}
+              <FiChevronLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition" />
             </button>
-          ))}
+
+            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-5 py-2 text-center shadow-sm">
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-400" />
+              <div className="flex items-center gap-2">
+                <FiCalendar className="text-emerald-700" />
+                <span className="text-lg font-extrabold text-slate-900 tabular-nums">{year}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={year >= MAX_YEAR}
+              onClick={() => setYearAndPersist(year + 1)}
+              className="group inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FiChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition" />
+            </button>
+          </div>
         </div>
 
-        <div className="mt-3 text-sm text-gray-500">
-          <span className="font-semibold text-gray-800">
-            {activeTabMeta.icon} {activeTabMeta.label}
-          </span>
-          <span className="ml-2">— {activeTabMeta.desc}</span>
-        </div>
-      </section>
+        {/* ===== Tabs ===== */}
+        <Surface className="p-3">
+          <div className="flex flex-wrap gap-2">
+            {TAB_LIST.map((t) => (
+              <TabButton key={t.key} active={tab === t.key} onClick={() => setTabAndUrl(t.key)} Icon={t.Icon}>
+                {t.label}
+              </TabButton>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+            <span className="inline-flex items-center gap-2 font-semibold text-slate-900">
+              <span className="rounded-lg bg-emerald-50 p-1.5 ring-1 ring-emerald-100">
+                <ActiveIcon className="h-4 w-4 text-emerald-700" />
+              </span>
+              {activeTabMeta.label}
+            </span>
+            <span className="text-slate-400">—</span>
+            <span>{activeTabMeta.desc}</span>
+          </div>
+        </Surface>
+      </header>
 
       {/* ===================== TAB CONTENTS ===================== */}
       {tab === 'overview' && (
@@ -647,36 +683,35 @@ export default function AdminStatsPage() {
               title="รายได้รวมทั้งหมด"
               subtitle="ปกติ + ประมูล"
               value={`${fmtBaht(stats.totalSales)} บาท`}
-              accent="from-emerald-400/80 to-emerald-600/90"
+              accent="from-emerald-500/70 via-emerald-600/70 to-emerald-500/70"
+              icon={<FiBarChart2 className="h-4 w-4" />}
             />
             <StatCard
               title="รายได้จากการขายปกติ"
               subtitle="ออเดอร์ที่นับเป็นรายได้จริง"
               value={`${fmtBaht(stats.orderSales)} บาท`}
-              accent="from-sky-400/80 to-sky-600/90"
+              accent="from-slate-700/60 via-slate-900/60 to-slate-700/60"
+              icon={<FiBarChart2 className="h-4 w-4" />}
             />
             <StatCard
               title="รายได้จากการประมูล"
               subtitle="สรุปยอดขายฝั่งประมูล"
               value={`${fmtBaht(stats.auctionSales)} บาท`}
-              accent="from-orange-400/80 to-orange-600/90"
+              accent="from-emerald-400/60 via-emerald-600/60 to-slate-900/50"
+              icon={<FiTrendingUp className="h-4 w-4" />}
             />
           </section>
 
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <MiniCard label="ยอดขายแบบโอน (Bank)" value={`${fmtBaht(stats.bankSales)} บาท`} tag="ช่องทางโอน" />
-            <MiniCard label="ยอดขายแบบเก็บปลายทาง (COD)" value={`${fmtBaht(stats.codSales)} บาท`} tag="ชำระหน้าบ้าน" />
-            <MiniCard
-              label="ยกเลิก / ล้มเหลว"
-              value={`${fmtInt(stats.cancelledOrders)} / ${fmtInt(stats.failedOrders)}`}
-              tag="คุณภาพออเดอร์"
-            />
+            <MiniCard label="ยอดขายแบบโอน (Bank)" value={`${fmtBaht(stats.bankSales)} บาท`} tag="Transfer" />
+            <MiniCard label="ยอดขายแบบเก็บปลายทาง (COD)" value={`${fmtBaht(stats.codSales)} บาท`} tag="COD" />
+            <MiniCard label="ยกเลิก / ล้มเหลว" value={`${fmtInt(stats.cancelledOrders)} / ${fmtInt(stats.failedOrders)}`} tag="Quality" />
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <MiniCard label="ออเดอร์ทั้งหมด (ขายปกติ)" value={`${fmtInt(stats.totalOrders)} รายการ`} tag="Orders" />
-            <MiniCard label="ออเดอร์วันนี้ (รายได้)" value={`${fmtBaht(stats.orderToday)} บาท`} tag="Today revenue" />
-            <MiniCard label="ออเดอร์เดือนนี้ (รายได้)" value={`${fmtBaht(stats.orderMonth)} บาท`} tag="Month revenue" />
+            <MiniCard label="ออเดอร์วันนี้ (รายได้)" value={`${fmtBaht(stats.orderToday)} บาท`} tag="Today" />
+            <MiniCard label="ออเดอร์เดือนนี้ (รายได้)" value={`${fmtBaht(stats.orderMonth)} บาท`} tag="Month" />
             <MiniCard label="ยอดขายรวม (ย้ำอีกที)" value={`${fmtBaht(stats.totalSales)} บาท`} tag="Total" />
           </section>
         </>
@@ -686,7 +721,11 @@ export default function AdminStatsPage() {
         <>
           <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
             <CardShell className="lg:col-span-2">
-              <CardTitle icon="🍰" title="สัดส่วนรายได้ตามประเภท" subtitle="โอน / COD / ประมูล" />
+              <CardTitle
+                icon={<FiPieChart className="h-4 w-4 text-emerald-700" />}
+                title="สัดส่วนรายได้ตามประเภท"
+                subtitle="โอน / COD / ประมูล"
+              />
               <div className="flex-1 min-h-[240px]">
                 {!hasAnySales ? (
                   <EmptyState text="ยังไม่มีข้อมูลรายได้" />
@@ -701,9 +740,9 @@ export default function AdminStatsPage() {
                       <Tooltip
                         formatter={(value) => `${fmtBaht(value)} บาท`}
                         contentStyle={{
-                          borderRadius: 12,
-                          borderColor: '#e5e7eb',
-                          boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                          borderRadius: 14,
+                          borderColor: '#e2e8f0',
+                          boxShadow: '0 18px 40px rgba(15, 23, 42, 0.14)',
                         }}
                       />
                       <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 12 }} />
@@ -714,7 +753,11 @@ export default function AdminStatsPage() {
             </CardShell>
 
             <CardShell className="lg:col-span-3">
-              <CardTitle icon="📋" title="ตารางสรุปรายได้ตามช่องทาง" subtitle="ยอดขาย + สัดส่วน" />
+              <CardTitle
+                icon={<FiBarChart2 className="h-4 w-4 text-emerald-700" />}
+                title="ตารางสรุปรายได้ตามช่องทาง"
+                subtitle="ยอดขาย + สัดส่วน"
+              />
               <DataTable
                 columns={[
                   { key: 'type', header: 'ประเภท', align: 'left' },
@@ -738,7 +781,11 @@ export default function AdminStatsPage() {
           </section>
 
           <CardShell>
-            <CardTitle icon="📦" title="เปรียบเทียบยอดขาย (โอน / COD / ประมูล)" subtitle="กราฟแท่งภาพรวม" />
+            <CardTitle
+              icon={<FiBarChart2 className="h-4 w-4 text-emerald-700" />}
+              title="เปรียบเทียบยอดขาย (โอน / COD / ประมูล)"
+              subtitle="กราฟแท่งภาพรวม"
+            />
             <div className="h-72 min-h-[288px]">
               {!hasAnySales ? (
                 <EmptyState text="ยังไม่มีข้อมูลยอดขาย" />
@@ -751,9 +798,9 @@ export default function AdminStatsPage() {
                     <Tooltip
                       formatter={(value) => `${fmtBaht(value)} บาท`}
                       contentStyle={{
-                        borderRadius: 12,
-                        borderColor: '#e5e7eb',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                        borderRadius: 14,
+                        borderColor: '#e2e8f0',
+                        boxShadow: '0 18px 40px rgba(15, 23, 42, 0.14)',
                       }}
                     />
                     <Legend />
@@ -770,111 +817,97 @@ export default function AdminStatsPage() {
 
       {tab === 'trend' && (
         <CardShell>
-          <CardTitle icon="📈" title="แนวโน้มยอดขาย" subtitle="รายวัน / รายเดือน / รายปี + เลือกช่วงเองได้" />
+          <CardTitle
+            icon={<FiTrendingUp className="h-4 w-4 text-emerald-700" />}
+            title="แนวโน้มยอดขาย"
+            subtitle="รายวัน / รายเดือน / รายปี + เลือกช่วงเองได้"
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-gray-100 bg-white p-4">
-              <div className="text-xs font-semibold text-gray-500 mb-2">ความละเอียด</div>
+            <Panel title="ความละเอียด">
               <div className="flex gap-2">
                 {(['day', 'month', 'year'] as SeriesMode[]).map((m) => (
-                  <button
+                  <PillButton
                     key={m}
-                    type="button"
+                    active={seriesMode === m}
                     onClick={() => setSeriesMode(m)}
-                    className={[
-                      'px-3 py-2 rounded-lg border text-sm font-semibold transition',
-                      seriesMode === m
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50',
-                    ].join(' ')}
-                  >
-                    {m === 'day' ? 'รายวัน' : m === 'month' ? 'รายเดือน' : 'รายปี'}
-                  </button>
+                    label={m === 'day' ? 'รายวัน' : m === 'month' ? 'รายเดือน' : 'รายปี'}
+                  />
                 ))}
               </div>
-              <p className="mt-2 text-xs text-gray-500">ถ้าเลือก “ช่วงปีหลายปี” ระบบจะสรุปเป็นรายปีให้อัตโนมัติ</p>
-            </div>
+              <p className="mt-2 text-xs text-slate-500">ถ้าเลือก “ช่วงปีหลายปี” ระบบจะสรุปเป็นรายปีให้อัตโนมัติ</p>
+            </Panel>
 
-            <div className="rounded-xl border border-gray-100 bg-white p-4">
-              <div className="text-xs font-semibold text-gray-500 mb-2">ช่วงข้อมูล</div>
+            <Panel title="ช่วงข้อมูล">
               <div className="flex gap-2 flex-wrap">
                 {(['year', 'dateRange', 'yearRange'] as RangeMode[]).map((r) => (
-                  <button
+                  <PillButton
                     key={r}
-                    type="button"
+                    active={rangeMode === r}
                     onClick={() => setRangeMode(r)}
-                    className={[
-                      'px-3 py-2 rounded-lg border text-sm font-semibold transition',
-                      rangeMode === r
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50',
-                    ].join(' ')}
-                  >
-                    {r === 'year' ? 'ทั้งปีที่เลือก' : r === 'dateRange' ? 'เลือกช่วงวันที่' : 'เลือกช่วงปี'}
-                  </button>
+                    label={r === 'year' ? 'ทั้งปีที่เลือก' : r === 'dateRange' ? 'เลือกช่วงวันที่' : 'เลือกช่วงปี'}
+                  />
                 ))}
               </div>
-              <p className="mt-2 text-xs text-gray-500">ใช้ปีบนหัวหน้าเป็นค่าเริ่มต้นสำหรับ “ทั้งปีที่เลือก”</p>
-            </div>
+              <p className="mt-2 text-xs text-slate-500">ใช้ปีบนหัวหน้าเป็นค่าเริ่มต้นสำหรับ “ทั้งปีที่เลือก”</p>
+            </Panel>
 
-            <div className="rounded-xl border border-gray-100 bg-white p-4">
-              <div className="text-xs font-semibold text-gray-500 mb-2">ตั้งค่าเพิ่มเติม</div>
-
+            <Panel title="ตั้งค่าเพิ่มเติม">
               {rangeMode === 'year' && (
-                <div className="text-sm text-gray-700">
-                  ดูข้อมูลทั้งปี: <b>{year}</b>
+                <div className="text-sm text-slate-700">
+                  ดูข้อมูลทั้งปี: <b className="text-slate-900">{year}</b>
                 </div>
               )}
 
               {rangeMode === 'yearRange' && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">ปีเริ่ม</div>
+                    <div className="text-xs text-slate-500 mb-1">ปีเริ่ม</div>
                     <input
                       value={yearStart}
                       onChange={(e) => setYearStart(Number(e.target.value))}
                       type="number"
                       min={MIN_YEAR}
                       max={MAX_YEAR}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">ปีจบ</div>
+                    <div className="text-xs text-slate-500 mb-1">ปีจบ</div>
                     <input
                       value={yearEnd}
                       onChange={(e) => setYearEnd(Number(e.target.value))}
                       type="number"
                       min={MIN_YEAR}
                       max={MAX_YEAR}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>
-                  <p className="col-span-2 text-xs text-gray-500">* ระบบจะสรุปเป็น “รายปี” ให้อัตโนมัติ</p>
+                  <p className="col-span-2 text-xs text-slate-500">ระบบจะสรุปเป็น “รายปี” ให้อัตโนมัติ</p>
                 </div>
               )}
 
               {rangeMode === 'dateRange' && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">เริ่ม</div>
+                    <div className="text-xs text-slate-500 mb-1">เริ่ม</div>
                     <input
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       type="date"
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">ถึง</div>
+                    <div className="text-xs text-slate-500 mb-1">ถึง</div>
                     <input
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       type="date"
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>
-                  <p className="col-span-2 text-xs text-gray-500">* ช่วงวันที่ใช้แบบ inclusive (เริ่ม..ถึง)</p>
+                  <p className="col-span-2 text-xs text-slate-500">ช่วงวันที่ใช้แบบ inclusive (เริ่ม..ถึง)</p>
                 </div>
               )}
 
@@ -882,7 +915,7 @@ export default function AdminStatsPage() {
                 <button
                   type="button"
                   onClick={loadSeries}
-                  className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800"
+                  className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
                 >
                   โหลดกราฟ
                 </button>
@@ -899,26 +932,34 @@ export default function AdminStatsPage() {
                     setStartDate(ymd(start));
                     setEndDate(ymd(today));
                   }}
-                  className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-800 border border-gray-200 hover:bg-gray-50"
+                  className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-800 border border-slate-200 hover:bg-slate-50"
                 >
                   รีเซ็ต
                 </button>
               </div>
-            </div>
+            </Panel>
           </div>
 
           <div className="mt-5">
             {seriesLoading ? (
-              <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-gray-500">⏳ กำลังโหลดกราฟ...</div>
+              <Surface className="p-6">
+                <div className="flex items-center justify-center gap-3 text-slate-500">
+                  <FiLoader className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">กำลังโหลดกราฟ...</span>
+                </div>
+              </Surface>
             ) : seriesErr ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-6">
+              <Surface className="border-rose-200 bg-rose-50/60 p-6">
                 <div className="font-semibold text-rose-700">โหลดกราฟไม่สำเร็จ</div>
                 <div className="mt-2 text-sm text-rose-700/90 break-words">{seriesErr}</div>
-              </div>
+              </Surface>
             ) : seriesChartData.length === 0 ? (
-              <div className="rounded-xl border border-gray-100 bg-white p-6 text-center text-gray-400">ยังไม่มีข้อมูลในช่วงนี้</div>
+              <Surface className="p-6">
+                <div className="text-center text-slate-400 text-sm">ยังไม่มีข้อมูลในช่วงนี้</div>
+              </Surface>
             ) : (
-              <div className="h-[340px] rounded-xl border border-gray-100 bg-white p-3">
+              <div className="h-[340px] rounded-2xl border border-slate-200 bg-white/80 shadow-sm p-3">
+                <div className="absolute inset-x-0 top-0 h-[2px] rounded-t-2xl bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-400" />
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={seriesChartData} margin={{ left: 8, right: 12, top: 6, bottom: 6 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -957,7 +998,11 @@ export default function AdminStatsPage() {
       {tab === 'insights' && (
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           <CardShell className="lg:col-span-2">
-            <CardTitle icon="🏷️" title="หมวดทำเงิน (Type → Subtype)" subtitle="หมวดหลักก่อน แล้วค่อยกดดูหมวดย่อย" />
+            <CardTitle
+              icon={<FiTag className="h-4 w-4 text-emerald-700" />}
+              title="หมวดทำเงิน (Type → Subtype)"
+              subtitle="หมวดหลักก่อน แล้วค่อยกดดูหมวดย่อย"
+            />
 
             {categoryRevenueByType.length === 0 ? (
               <EmptyState text="ยังไม่มีข้อมูลหมวดทำเงิน" />
@@ -968,55 +1013,40 @@ export default function AdminStatsPage() {
                   const opened = !!openTypesRevenue[t];
                   const subs = revenueSubsByType.get(t) ?? [];
                   return (
-                    <div key={`${t}-${idx}`} className="rounded-xl border border-gray-100 bg-white">
-                      <button
-                        type="button"
-                        onClick={() => toggleRevenueType(t)}
-                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 rounded-xl"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 truncate">{t}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            ยอดขาย: <b className="text-gray-900">{fmtBaht(tRow.revenue)}</b> บาท · จำนวนขาย:{' '}
-                            <b className="text-gray-900">{fmtInt(tRow.qty)}</b>
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-sm text-gray-500">{opened ? 'ซ่อน ▲' : 'ดูย่อย ▼'}</div>
-                      </button>
+                    <AccordionCard
+                      key={`${t}-${idx}`}
+                      title={t}
+                      subtitle={`ยอดขาย: ${fmtBaht(tRow.revenue)} บาท · จำนวนขาย: ${fmtInt(tRow.qty)}`}
+                      opened={opened}
+                      onToggle={() => toggleRevenueType(t)}
+                    >
+                      {subs.length === 0 ? (
+                        <div className="text-sm text-slate-400 py-2">ไม่มีข้อมูลหมวดย่อย</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="text-slate-600 bg-slate-50">
+                                <th className="text-left px-2 py-2">หมวดย่อย</th>
+                                <th className="text-right px-2 py-2">จำนวนขาย</th>
+                                <th className="text-right px-2 py-2">ยอดขาย</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {subs.slice(0, 12).map((sRow, sIdx) => (
+                                <tr key={`${t}-${sIdx}`} className={sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                  <td className="px-2 py-2">{subtypeName(sRow.subtype)}</td>
+                                  <td className="px-2 py-2 text-right">{fmtInt(sRow.qty)}</td>
+                                  <td className="px-2 py-2 text-right">{fmtBaht(sRow.revenue)} บาท</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
 
-                      {opened && (
-                        <div className="px-4 pb-3">
-                          {subs.length === 0 ? (
-                            <div className="text-sm text-gray-400 py-2">ไม่มีข้อมูลหมวดย่อย</div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full text-sm">
-                                <thead>
-                                  <tr className="text-gray-600 bg-gray-50">
-                                    <th className="text-left px-2 py-2">หมวดย่อย</th>
-                                    <th className="text-right px-2 py-2">จำนวนขาย</th>
-                                    <th className="text-right px-2 py-2">ยอดขาย</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {subs.slice(0, 12).map((sRow, sIdx) => (
-                                    <tr key={`${t}-${sIdx}`} className={sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
-                                      <td className="px-2 py-2">{subtypeName(sRow.subtype)}</td>
-                                      <td className="px-2 py-2 text-right">{fmtInt(sRow.qty)}</td>
-                                      <td className="px-2 py-2 text-right">{fmtBaht(sRow.revenue)} บาท</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-
-                              {subs.length > 12 && (
-                                <div className="text-xs text-gray-400 mt-2">* แสดงแค่ 12 หมวดย่อยแรก (เรียงตามยอดขาย)</div>
-                              )}
-                            </div>
-                          )}
+                          {subs.length > 12 && <div className="text-xs text-slate-400 mt-2">แสดงแค่ 12 หมวดย่อยแรก (เรียงตามยอดขาย)</div>}
                         </div>
                       )}
-                    </div>
+                    </AccordionCard>
                   );
                 })}
               </div>
@@ -1024,7 +1054,11 @@ export default function AdminStatsPage() {
           </CardShell>
 
           <CardShell className="lg:col-span-3">
-            <CardTitle icon="📊" title="กราฟหมวดทำเงิน (หมวดหลัก)" subtitle="แนวนอน อ่านง่าย ไม่มั่วแล้ว" />
+            <CardTitle
+              icon={<FiBarChart2 className="h-4 w-4 text-emerald-700" />}
+              title="กราฟหมวดทำเงิน (หมวดหลัก)"
+              subtitle="แนวนอน อ่านง่าย (Type-first)"
+            />
 
             <div className="h-[520px] min-h-[520px]">
               {categoryTypeBarData.length === 0 ? (
@@ -1050,7 +1084,11 @@ export default function AdminStatsPage() {
           </CardShell>
 
           <CardShell className="lg:col-span-5">
-            <CardTitle icon="👑" title="ลูกค้าประจำ (Top Customers)" subtitle="ซื้อบ่อย / ยอดรวมสูง (ยัง useful อยู่)" />
+            <CardTitle
+              icon={<FiUsers className="h-4 w-4 text-emerald-700" />}
+              title="ลูกค้าประจำ (Top Customers)"
+              subtitle="ซื้อบ่อย / ยอดรวมสูง"
+            />
             <DataTable
               columns={[
                 { key: 'name', header: 'ลูกค้า', align: 'left' },
@@ -1076,7 +1114,7 @@ export default function AdminStatsPage() {
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <CardShell>
             <CardTitle
-              icon="📦"
+              icon={<FiBox className="h-4 w-4 text-emerald-700" />}
               title="สต็อกคงเหลือตามหมวด (หมวดหลักก่อน)"
               subtitle={`กราฟแนวนอน: สต็อกรวม + ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD})`}
             />
@@ -1104,13 +1142,17 @@ export default function AdminStatsPage() {
               )}
             </div>
 
-            <p className="mt-3 text-xs text-gray-500">
-              * เกณฑ์: ใกล้หมด = stock ≤ {LOW_STOCK_THRESHOLD} · หมดแล้ว = stock = 0 (ตัวแดง)
+            <p className="mt-3 text-xs text-slate-500">
+              เกณฑ์: ใกล้หมด = stock ≤ {LOW_STOCK_THRESHOLD} · หมดแล้ว = stock = 0 (ตัวแดง)
             </p>
           </CardShell>
 
           <CardShell>
-            <CardTitle icon="🧩" title="เจาะหมวดย่อย (Type → Subtype)" subtitle="กดหมวดหลักเพื่อดูหมวดย่อย + รายชื่อสินค้าใกล้หมด" />
+            <CardTitle
+              icon={<FiTag className="h-4 w-4 text-emerald-700" />}
+              title="เจาะหมวดย่อย (Type → Subtype)"
+              subtitle="กดหมวดหลักเพื่อดูหมวดย่อย + รายชื่อสินค้าใกล้หมด"
+            />
 
             {stockByType.length === 0 ? (
               <EmptyState text="ยังไม่มีข้อมูลสต๊อก" />
@@ -1122,132 +1164,114 @@ export default function AdminStatsPage() {
                   const subs = stockSubsByType.get(t) ?? [];
 
                   return (
-                    <div key={`${t}-${idx}`} className="rounded-xl border border-gray-100 bg-white">
-                      <button
-                        type="button"
-                        onClick={() => toggleStockType(t)}
-                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 rounded-xl"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 truncate">{t}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            สต๊อกรวม:{' '}
-                            <b
-                              className={[
-                                toNum(tRow.total_stock) === 0
-                                  ? 'text-red-600'
-                                  : toNum(tRow.total_stock) <= LOW_STOCK_THRESHOLD
-                                  ? 'text-orange-600'
-                                  : 'text-gray-900',
-                              ].join(' ')}
-                            >
-                              {fmtInt(tRow.total_stock)}
-                            </b>{' '}
-                            · ใกล้หมด:{' '}
-                            <b className={toNum(tRow.low_stock) > 0 ? 'text-rose-600' : 'text-gray-900'}>{fmtInt(tRow.low_stock)}</b> · สินค้า:{' '}
-                            <b className="text-gray-900">{fmtInt(tRow.total_products)}</b>
-                          </div>
+                    <AccordionCard
+                      key={`${t}-${idx}`}
+                      title={t}
+                      subtitle={`สต๊อกรวม: ${fmtInt(tRow.total_stock)} · ใกล้หมด: ${fmtInt(tRow.low_stock)} · สินค้า: ${fmtInt(tRow.total_products)}`}
+                      opened={opened}
+                      onToggle={() => toggleStockType(t)}
+                      tone="stock"
+                      rightMeta={
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={[
+                              'rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
+                              toNum(tRow.total_stock) === 0
+                                ? 'bg-red-50 text-red-700 ring-red-100'
+                                : toNum(tRow.total_stock) <= LOW_STOCK_THRESHOLD
+                                ? 'bg-amber-50 text-amber-800 ring-amber-100'
+                                : 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+                            ].join(' ')}
+                          >
+                            {toNum(tRow.total_stock) === 0 ? 'หมดแล้ว' : toNum(tRow.total_stock) <= LOW_STOCK_THRESHOLD ? 'ใกล้หมด' : 'ปกติ'}
+                          </span>
                         </div>
-                        <div className="shrink-0 text-sm text-gray-500">{opened ? 'ซ่อน ▲' : 'ดูย่อย ▼'}</div>
-                      </button>
+                      }
+                    >
+                      {subs.length === 0 ? (
+                        <div className="text-sm text-slate-400 py-2">ไม่มีข้อมูลหมวดย่อย</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="text-slate-600 bg-slate-50">
+                                <th className="text-left px-2 py-2">หมวดย่อย</th>
+                                <th className="text-right px-2 py-2">สินค้า</th>
+                                <th className="text-right px-2 py-2">สต๊อก</th>
+                                <th className="text-right px-2 py-2">ใกล้หมด</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {subs.slice(0, 12).map((sRow, sIdx) => {
+                                const sub = subtypeName(sRow.subtype);
+                                const key = `${t}||${sub}`;
+                                const lowItems = lowStockMap.get(key) ?? [];
 
-                      {opened && (
-                        <div className="px-4 pb-3">
-                          {subs.length === 0 ? (
-                            <div className="text-sm text-gray-400 py-2">ไม่มีข้อมูลหมวดย่อย</div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full text-sm">
-                                <thead>
-                                  <tr className="text-gray-600 bg-gray-50">
-                                    <th className="text-left px-2 py-2">หมวดย่อย</th>
-                                    <th className="text-right px-2 py-2">สินค้า</th>
-                                    <th className="text-right px-2 py-2">สต๊อก</th>
-                                    <th className="text-right px-2 py-2">ใกล้หมด</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {subs.slice(0, 12).map((sRow, sIdx) => {
-                                    const sub = subtypeName(sRow.subtype);
-                                    const key = `${t}||${sub}`;
-                                    const lowItems = lowStockMap.get(key) ?? [];
+                                const stockN = toNum(sRow.total_stock);
+                                const lowN = toNum(sRow.low_stock);
 
-                                    return (
-                                      <React.Fragment key={`${t}-${sub}-${sIdx}`}>
-                                        <tr className={sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
-                                          <td className="px-2 py-2">{sub}</td>
-                                          <td className="px-2 py-2 text-right">{fmtInt(sRow.total_products)}</td>
+                                return (
+                                  <React.Fragment key={`${t}-${sub}-${sIdx}`}>
+                                    <tr className={sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                      <td className="px-2 py-2">{sub}</td>
+                                      <td className="px-2 py-2 text-right">{fmtInt(sRow.total_products)}</td>
+                                      <td
+                                        className={[
+                                          'px-2 py-2 text-right font-semibold',
+                                          stockN === 0 ? 'text-red-600' : stockN <= LOW_STOCK_THRESHOLD ? 'text-amber-700' : 'text-slate-900',
+                                        ].join(' ')}
+                                      >
+                                        {fmtInt(stockN)}
+                                      </td>
+                                      <td className={['px-2 py-2 text-right font-semibold', lowN > 0 ? 'text-rose-600' : 'text-slate-900'].join(' ')}>
+                                        {fmtInt(lowN)}
+                                      </td>
+                                    </tr>
 
-                                          {/* ✅ stock สีตามเกณฑ์ */}
-                                          <td
-                                            className={[
-                                              'px-2 py-2 text-right font-semibold',
-                                              toNum(sRow.total_stock) === 0
-                                                ? 'text-red-600'
-                                                : toNum(sRow.total_stock) <= LOW_STOCK_THRESHOLD
-                                                ? 'text-orange-600'
-                                                : 'text-gray-900',
-                                            ].join(' ')}
-                                          >
-                                            {fmtInt(sRow.total_stock)}
-                                          </td>
+                                    {lowItems.length > 0 && (
+                                      <tr className={sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                        <td colSpan={4} className="px-3 py-2">
+                                          <div className="rounded-2xl border border-rose-200 bg-rose-50/60 px-3 py-3">
+                                            <div className="flex items-center gap-2 text-[11px] font-semibold text-rose-700 mb-2">
+                                              <FiAlertTriangle className="h-3.5 w-3.5" />
+                                              สินค้าใกล้หมด (≤ {LOW_STOCK_THRESHOLD}) / หมดแล้ว (0)
+                                            </div>
 
-                                          {/* ✅ low count สีชมพู */}
-                                          <td className={['px-2 py-2 text-right font-semibold', toNum(sRow.low_stock) > 0 ? 'text-rose-600' : 'text-gray-900'].join(' ')}>
-                                            {fmtInt(sRow.low_stock)}
-                                          </td>
-                                        </tr>
+                                            <div className="space-y-1.5">
+                                              {lowItems.map((item) => (
+                                                <div key={item.product_id} className="flex items-center justify-between gap-3">
+                                                  <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900 truncate">{item.name}</div>
+                                                    <div className="text-[11px] text-slate-500">ID: {item.product_id}</div>
+                                                  </div>
 
-                                        {/* ✅ แสดงชื่อสินค้าใกล้หมดใต้หมวดย่อย (แก้ปัญหา "รู้ว่ามี แต่ไม่รู้ตัวไหน") */}
-                                        {lowItems.length > 0 && (
-                                          <tr className={sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
-                                            <td colSpan={4} className="px-3 py-2">
-                                              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
-                                                <div className="text-[11px] font-semibold text-rose-700 mb-2">
-                                                  ⚠ สินค้าใกล้หมดในหมวดย่อยนี้ (≤ {LOW_STOCK_THRESHOLD}) / หมดแล้ว (0)
+                                                  <span
+                                                    className={[
+                                                      'shrink-0 rounded-full px-3 py-1 text-xs font-semibold ring-1',
+                                                      toNum(item.stock) === 0
+                                                        ? 'bg-red-50 text-red-700 ring-red-100'
+                                                        : 'bg-amber-50 text-amber-800 ring-amber-100',
+                                                    ].join(' ')}
+                                                  >
+                                                    {toNum(item.stock) === 0 ? 'หมดแล้ว (0)' : `เหลือ ${fmtInt(item.stock)}`}
+                                                  </span>
                                                 </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </tbody>
+                          </table>
 
-                                                <div className="space-y-1">
-                                                  {lowItems.map((item) => (
-                                                    <div key={item.product_id} className="flex items-center justify-between gap-3">
-                                                      <div className="min-w-0">
-                                                        <div className="text-sm font-medium text-gray-900 truncate">
-                                                          {item.name}
-                                                        </div>
-                                                        <div className="text-[11px] text-gray-500">ID: {item.product_id}</div>
-                                                      </div>
-
-                                                      <span
-                                                        className={[
-                                                          'shrink-0 rounded-full px-3 py-1 text-xs font-semibold',
-                                                          toNum(item.stock) === 0
-                                                            ? 'bg-red-100 text-red-700'
-                                                            : 'bg-orange-100 text-orange-700',
-                                                        ].join(' ')}
-                                                      >
-                                                        {toNum(item.stock) === 0 ? 'หมดแล้ว (0)' : `เหลือ ${fmtInt(item.stock)}`}
-                                                      </span>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        )}
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-
-                              {subs.length > 12 && (
-                                <div className="text-xs text-gray-400 mt-2">* แสดงแค่ 12 หมวดย่อยแรก (เรียงตามสต๊อก)</div>
-                              )}
-                            </div>
-                          )}
+                          {subs.length > 12 && <div className="text-xs text-slate-400 mt-2">แสดงแค่ 12 หมวดย่อยแรก (เรียงตามสต๊อก)</div>}
                         </div>
                       )}
-                    </div>
+                    </AccordionCard>
                   );
                 })}
               </div>
@@ -1255,7 +1279,7 @@ export default function AdminStatsPage() {
 
             <div className="mt-6">
               <CardTitle
-                icon="⚠️"
+                icon={<FiAlertTriangle className="h-4 w-4 text-rose-600" />}
                 title="สินค้าใกล้หมด (Low Stock)"
                 subtitle={`รวมทุกหมวด: ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD}) + หมดแล้ว (0 แดง)`}
               />
@@ -1270,12 +1294,7 @@ export default function AdminStatsPage() {
                   name: p.name,
                   category: pathLabel(p.type ?? null, p.subtype ?? null),
                   stock: (
-                    <span
-                      className={[
-                        'font-semibold',
-                        toNum(p.stock) === 0 ? 'text-red-600' : 'text-orange-600',
-                      ].join(' ')}
-                    >
+                    <span className={['font-semibold', toNum(p.stock) === 0 ? 'text-red-600' : 'text-amber-700'].join(' ')}>
                       {fmtInt(p.stock)}
                     </span>
                   ),
@@ -1292,44 +1311,62 @@ export default function AdminStatsPage() {
 
 /* ------------------------ UI blocks ------------------------ */
 
-function CardShell(props: { className?: string; children: React.ReactNode }) {
+function Surface(props: { className?: string; children: React.ReactNode }) {
   return (
     <section
       className={[
-        'bg-white/80 backdrop-blur rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col',
+        'relative overflow-hidden rounded-2xl border border-slate-200 bg-white/80 backdrop-blur shadow-sm p-5',
         props.className || '',
       ].join(' ')}
     >
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-400" />
       {props.children}
     </section>
   );
 }
 
-function CardTitle(props: { icon: string; title: string; subtitle?: string }) {
+function CardShell(props: { className?: string; children: React.ReactNode }) {
+  return (
+    <section
+      className={[
+        'relative overflow-hidden bg-white/80 backdrop-blur rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col',
+        props.className || '',
+      ].join(' ')}
+    >
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-400" />
+      {props.children}
+    </section>
+  );
+}
+
+function CardTitle(props: { icon: React.ReactNode; title: string; subtitle?: string }) {
   return (
     <div className="mb-4">
       <h2 className="font-semibold flex items-center gap-2">
-        <span>{props.icon}</span>
+        <span className="rounded-lg bg-emerald-50 p-1.5 ring-1 ring-emerald-100">{props.icon}</span>
         <span>{props.title}</span>
       </h2>
-      {props.subtitle ? <p className="text-xs text-gray-500 mt-1">{props.subtitle}</p> : null}
+      {props.subtitle ? <p className="text-xs text-slate-500 mt-1">{props.subtitle}</p> : null}
     </div>
   );
 }
 
 function EmptyState(props: { text: string }) {
-  return <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">{props.text}</div>;
+  return <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">{props.text}</div>;
 }
 
-function StatCard(props: { title: string; subtitle: string; value: string; accent: string }) {
-  const { title, subtitle, value, accent } = props;
+function StatCard(props: { title: string; subtitle: string; value: string; accent: string; icon: React.ReactNode }) {
+  const { title, subtitle, value, accent, icon } = props;
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 shadow-sm">
-      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white/85 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${accent}`} />
       <div className="p-5 space-y-1">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</div>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
-        <div className="text-xs text-gray-400">{subtitle}</div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{title}</div>
+          <div className="rounded-xl bg-slate-50 p-2 ring-1 ring-slate-200 text-slate-700">{icon}</div>
+        </div>
+        <div className="text-2xl font-extrabold text-slate-900 tabular-nums">{value}</div>
+        <div className="text-xs text-slate-400">{subtitle}</div>
       </div>
     </div>
   );
@@ -1338,10 +1375,99 @@ function StatCard(props: { title: string; subtitle: string; value: string; accen
 function MiniCard(props: { label: string; value: string; tag: string }) {
   const { label, value, tag } = props;
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white/80 shadow-sm p-4 flex flex-col justify-between">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className="text-xl font-semibold text-gray-900 mb-2 break-words">{value}</div>
-      <span className="inline-flex w-fit rounded-full bg-gray-100 px-3 py-0.5 text-[11px] text-gray-500">{tag}</span>
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white/85 shadow-sm p-4 flex flex-col justify-between transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-300 via-emerald-500 to-emerald-300 opacity-70" />
+      <div className="text-xs text-slate-500 mb-1">{label}</div>
+      <div className="text-xl font-semibold text-slate-900 mb-2 break-words tabular-nums">{value}</div>
+      <span className="inline-flex w-fit rounded-full bg-slate-50 px-3 py-0.5 text-[11px] text-slate-500 ring-1 ring-slate-200">
+        {tag}
+      </span>
+    </div>
+  );
+}
+
+function TabButton(props: {
+  active: boolean;
+  onClick: () => void;
+  Icon: React.ComponentType<any>;
+  children: React.ReactNode;
+}) {
+  const { active, onClick, Icon, children } = props;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'group relative inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition',
+        active
+          ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      <Icon className={['h-4 w-4 transition', active ? 'text-emerald-300' : 'text-emerald-600 group-hover:text-emerald-700'].join(' ')} />
+      <span>{children}</span>
+      {active && <span className="absolute inset-x-2 -bottom-1 h-1 rounded-full bg-emerald-400/70 blur-[1px]" />}
+    </button>
+  );
+}
+
+function Panel(props: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm">
+      <div className="text-xs font-semibold text-slate-500 mb-2">{props.title}</div>
+      {props.children}
+    </div>
+  );
+}
+
+function PillButton(props: { active: boolean; onClick: () => void; label: string }) {
+  const { active, onClick, label } = props;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'px-3 py-2 rounded-xl border text-sm font-semibold transition',
+        active
+          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  );
+}
+
+function AccordionCard(props: {
+  title: string;
+  subtitle: string;
+  opened: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  tone?: 'default' | 'stock';
+  rightMeta?: React.ReactNode;
+}) {
+  const { title, subtitle, opened, onToggle, children, rightMeta } = props;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white/85 shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition"
+      >
+        <div className="min-w-0">
+          <div className="font-semibold text-slate-900 truncate">{title}</div>
+          <div className="text-xs text-slate-500 mt-0.5">{subtitle}</div>
+        </div>
+        <div className="shrink-0 flex items-center gap-2">
+          {rightMeta}
+          <span className="text-sm text-slate-500">{opened ? 'ซ่อน' : 'ดูย่อย'}</span>
+          <span className={['text-slate-400 transition', opened ? 'rotate-180' : 'rotate-0'].join(' ')}>▾</span>
+        </div>
+      </button>
+
+      {opened && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }
@@ -1356,10 +1482,10 @@ function DataTable(props: {
   const { columns, rows, emptyText } = props;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white/85 shadow-sm">
       <table className="min-w-full text-sm">
         <thead>
-          <tr className="bg-gray-50 text-gray-600">
+          <tr className="bg-slate-50 text-slate-600">
             {columns.map((c) => (
               <th
                 key={c.key}
@@ -1377,13 +1503,13 @@ function DataTable(props: {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-6 text-center text-gray-400">
+              <td colSpan={columns.length} className="px-3 py-6 text-center text-slate-400">
                 {emptyText}
               </td>
             </tr>
           ) : (
             rows.map((row, idx) => (
-              <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+              <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
                 {columns.map((c) => (
                   <td
                     key={c.key}
@@ -1407,13 +1533,13 @@ function DataTable(props: {
 /** ---------- Tooltip cards ---------- */
 function TooltipCard(props: { title: string; lines: { label: string; value: string; color: string }[] }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg">
-      <div className="font-semibold text-gray-900">{props.title}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-xl">
+      <div className="font-semibold text-slate-900">{props.title}</div>
       <div className="mt-2 space-y-1 text-sm">
         {props.lines.map((l, i) => (
           <div key={i} className="flex items-center gap-2">
             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
-            <span className="text-gray-600">{l.label}:</span>
+            <span className="text-slate-600">{l.label}:</span>
             <span className="font-semibold" style={{ color: l.color }}>
               {l.value}
             </span>

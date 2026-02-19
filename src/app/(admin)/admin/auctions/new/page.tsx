@@ -1,7 +1,9 @@
 'use client';
+
 import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
@@ -43,16 +45,14 @@ export default function NewAuctionPage() {
     setEnd(toMySQL(defaultLocalDT));
   }, [defaultLocalDT]);
 
-  // ✅ โหลดเฉพาะ ready และไม่มีรอบเปิดอยู่
   useEffect(() => {
     setLoadingItems(true);
 
     const load = async () => {
       try {
-        const res = await apiFetch(
-          `${API}/auction-products?status=ready&available=1`,
-          { cache: 'no-store' }
-        );
+        const res = await apiFetch(`${API}/auction-products?status=ready&available=1`, {
+          cache: 'no-store',
+        });
 
         if (!res.ok) {
           setProducts([]);
@@ -127,132 +127,185 @@ export default function NewAuctionPage() {
       const json = await res.json().catch(() => ({} as any));
 
       if (res.status === 409) {
-        setMsg(json.error || '❌ สินค้านี้มีรอบเปิดอยู่แล้ว');
+        setMsg(json.error || 'สินค้านี้มีรอบเปิดอยู่แล้ว');
         return;
       }
       if (!res.ok || !json.Aid) {
-        setMsg(json.error || '❌ เปิดรอบประมูลไม่สำเร็จ');
+        setMsg(json.error || 'เปิดรอบประมูลไม่สำเร็จ');
         return;
       }
 
-      setMsg('✅ เปิดรอบประมูลสำเร็จ! กำลังไปหน้าจัดการ…');
+      setMsg('เปิดรอบประมูลสำเร็จ กำลังไปหน้าจัดการ...');
       router.push(`/admin/auctions/${json.Aid}`);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const Field = ({
+    label,
+    hint,
+    children,
+  }: {
+    label: string;
+    hint?: string;
+    children: React.ReactNode;
+  }) => (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <label className="text-sm font-semibold text-emerald-950">{label}</label>
+        {hint && <div className="text-xs text-slate-500">{hint}</div>}
+      </div>
+      {children}
+    </div>
+  );
+
+  const inputCls =
+    'w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-slate-800 ' +
+    'placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-300';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
-      <main className="max-w-2xl mx-auto p-6 pt-8">
-        <div className="mb-8">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
-            เปิดรอบประมูล
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            🔨 เปิดรอบประมูลใหม่
+    <div className="min-h-screen bg-emerald-50">
+      <main className="max-w-2xl mx-auto px-8 py-10">
+        {/* Header */}
+        <div className="mb-8 border-b border-emerald-100 pb-6">
+          <p className="text-xs uppercase tracking-widest text-emerald-700 font-semibold">
+            Auctions
+          </p>
+          <h1 className="text-3xl font-semibold text-emerald-950 tracking-wide mt-2">
+            เปิดรอบประมูลใหม่
           </h1>
+          <p className="text-sm text-slate-600 mt-1">
+            เลือกสินค้าประมูล ตั้งราคาเริ่มต้น ก้าวบิดขั้นต่ำ และเวลาปิดรอบ
+          </p>
         </div>
 
+        {/* Form Card */}
         <form
           onSubmit={submit}
-          className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 p-8 space-y-6"
+          className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-8 space-y-6"
         >
-          <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              เลือกสินค้า *
-            </label>
-
+          {/* Product select */}
+          <Field label="เลือกสินค้า" hint="เฉพาะสินค้าที่พร้อมเปิดรอบและยังไม่มีรอบเปิดอยู่">
             {loadingItems ? (
-              <div className="text-gray-600 border-2 border-gray-200 p-4 rounded-xl bg-gray-50 text-center">
-                <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                กำลังโหลด…
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+                  <div className="text-sm text-slate-600">กำลังโหลดรายการสินค้า...</div>
+                </div>
               </div>
             ) : products.length === 0 ? (
-              <div className="text-gray-600 border-2 border-yellow-200 p-4 rounded-xl bg-yellow-50">
-                <p className="font-semibold text-yellow-700 mb-2">
-                  ⚠️ ยังไม่มีสินค้าที่พร้อมเปิดรอบ
-                </p>
-                <a
-                  href="/admin/auction-products/new"
-                  className="text-blue-600 hover:underline font-semibold"
-                >
-                  → เพิ่มสินค้าประมูล
-                </a>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="text-sm font-semibold text-amber-800">
+                  ยังไม่มีสินค้าที่พร้อมเปิดรอบ
+                </div>
+                <div className="text-sm text-amber-800/80 mt-1">
+                  ไปเพิ่มสินค้าประมูลก่อน แล้วค่อยกลับมาเปิดรอบ
+                </div>
+                <div className="mt-3">
+                  <Link
+                    href="/admin/auction-products/new"
+                    className="inline-flex items-center justify-center rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900"
+                  >
+                    เพิ่มสินค้าประมูล
+                  </Link>
+                </div>
               </div>
             ) : (
               <select
-                className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none transition-colors text-gray-800 font-semibold"
+                className={inputCls}
                 value={selectedProduct}
                 onChange={(e) => handleSelectProduct(e.target.value)}
                 required
               >
-                <option value="">-- เลือกสินค้า --</option>
+                <option value="">เลือกสินค้า</option>
                 {products.map((p) => (
                   <option key={p.PROid} value={p.PROid}>
-                    {p.PROname} (ราคา {p.PROprice} บาท)
+                    {p.PROname} (ราคา {Number(p.PROprice).toLocaleString('th-TH')} บาท)
                   </option>
                 ))}
               </select>
             )}
-          </div>
+          </Field>
 
-          <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              ราคาเริ่มต้น (บาท) *
-            </label>
+          {/* Start price */}
+          <Field label="ราคาเริ่มต้น (บาท)" hint="ต้องมากกว่า 0">
             <input
               type="number"
               step="1"
               min={0}
               value={startPrice}
               onChange={(e) => setStartPrice(e.target.value)}
-              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none"
+              className={inputCls}
               required
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              ก้าวบิดขั้นต่ำ (บาท) *
-            </label>
+          {/* Min increment */}
+          <Field label="ก้าวบิดขั้นต่ำ (บาท)" hint="ขั้นต่ำ 1 บาท">
             <input
               type="number"
               min={1}
               step={1}
               value={minIncrement}
               onChange={(e) => setMinIncrement(e.target.value)}
-              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none"
+              className={inputCls}
               required
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              เวลาปิดรอบ *
-            </label>
+          {/* End time */}
+          <Field label="เวลาปิดรอบ" hint={!endIsFuture && end ? 'เวลาปิดต้องอยู่ในอนาคต' : undefined}>
             <input
               type="datetime-local"
               value={localDT}
               onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none"
+              className={inputCls}
               required
             />
+          </Field>
+
+          {/* Action bar */}
+          <div className="pt-2 flex flex-col gap-3">
+            <button
+              type="submit"
+              disabled={!valid || submitting}
+              className={[
+                'w-full rounded-xl px-6 py-3 font-semibold transition shadow-sm',
+                'bg-emerald-800 text-white hover:bg-emerald-900',
+                'disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed disabled:hover:bg-slate-300',
+              ].join(' ')}
+            >
+              {submitting ? 'กำลังบันทึก...' : 'เปิดรอบประมูล'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="w-full rounded-xl px-6 py-3 font-semibold border border-emerald-200 bg-white text-slate-700 hover:bg-emerald-50 transition"
+            >
+              ย้อนกลับ
+            </button>
           </div>
 
-          <button
-            type="submit"
-            disabled={!valid || submitting}
-            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 disabled:from-gray-300 disabled:to-gray-400 text-white px-6 py-3 rounded-xl font-bold transition-all"
-          >
-            {submitting ? '⏳ กำลังบันทึก…' : '🔨 เปิดรอบประมูล'}
-          </button>
-
+          {/* Message */}
           {msg && (
-            <div className="p-4 rounded-xl border-2 border-gray-300">
+            <div
+              className={[
+                'rounded-xl border px-4 py-3 text-sm',
+                msg.includes('สำเร็จ')
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : 'border-rose-200 bg-rose-50 text-rose-900',
+              ].join(' ')}
+            >
               {msg}
             </div>
           )}
+
+          {/* Tiny helper */}
+          <div className="text-xs text-slate-500">
+            หมายเหตุ: ระบบจะกันไม่ให้เปิดรอบซ้ำกับสินค้าที่มีรอบเปิดอยู่แล้ว
+          </div>
         </form>
       </main>
     </div>

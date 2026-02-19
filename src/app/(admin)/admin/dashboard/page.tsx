@@ -2,22 +2,31 @@
 
 import AdminDashboardTasks from "@/app/component/admin/AdminDashboardStats"
 
-
 export default function AdminDashboardPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
-      <div className="p-6 pt-8">
-        <div className="mb-8">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
-            แผงงานแอดมิน
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            ✅ จัดการงาน
+    <div className="min-h-screen bg-emerald-50">
+      <div className="max-w-7xl mx-auto px-8 py-10">
+        
+        {/* Header */}
+        <div className="mb-10 border-b border-emerald-100 pb-6">
+          <p className="text-xs uppercase tracking-widest text-emerald-600 font-semibold mb-3">
+            Administration
+          </p>
+
+          <h1 className="text-3xl font-semibold text-emerald-900 tracking-wide">
+            Dashboard Overview
           </h1>
-          <p className="text-gray-600 mt-2">โฟกัสงานที่ต้องทำ: ตรวจสลิป / จัดส่ง / ผู้ชนะประมูล</p>
+
+          <p className="text-emerald-700/70 mt-2 text-sm">
+            ตรวจสอบงานที่ต้องดำเนินการ เช่น การยืนยันการชำระเงิน การจัดส่ง และผู้ชนะการประมูล
+          </p>
         </div>
 
-        <AdminDashboardTasks />
+        {/* Content Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-emerald-100 p-8">
+          <AdminDashboardTasks />
+        </div>
+
       </div>
     </div>
   )

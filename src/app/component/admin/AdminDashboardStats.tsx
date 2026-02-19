@@ -2,8 +2,6 @@
 
 import { apiFetch } from '@/app/lib/apiFetch';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Cell } from 'recharts';
-
 import Link from 'next/link';
 import {
   ResponsiveContainer,
@@ -13,6 +11,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  Cell,
 } from 'recharts';
 
 import StatusBadge from '@/app/component/StatusBadge';
@@ -26,14 +25,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-
-
 interface TasksOverview {
-  paymentReviewOrders: number; // โอน: รอตรวจสลิป
-  codPendingOrders: number; // COD: รอยืนยัน/รอดำเนินการ
-  toShipOrders: number; // พร้อมจัดส่ง (ออเดอร์ปกติ)
-  pendingAuctionWinners: number; // ผู้ชนะประมูลรอจ่าย
-  auctionToShip: number; // ✅ ประมูล: จ่ายแล้วรอจัดส่ง
+  paymentReviewOrders: number;
+  codPendingOrders: number;
+  toShipOrders: number;
+  pendingAuctionWinners: number;
+  auctionToShip: number;
 }
 
 interface AdminOrder {
@@ -76,17 +73,15 @@ const fmtBaht = (n: number | null | undefined): string =>
     maximumFractionDigits: 2,
   });
 
-  const BAR_COLORS = [
-  '#f59e0b', // amber - โอนรอตรวจ
-  '#7c3aed', // violet - COD
-  '#2563eb', // blue - ออเดอร์รอส่ง
-  '#f97316', // orange - ประมูลรอจ่าย
-  '#06b6d4', // cyan - ประมูลรอส่ง
+// ✅ Premium: ใช้โทนเขียวชุดเดียว (ไม่รุ้ง)
+const BAR_COLORS = [
+  '#064E3B', // emerald-900
+  '#065F46', // emerald-800
+  '#047857', // emerald-700
+  '#059669', // emerald-600
+  '#10B981', // emerald-500
 ];
 
-
-// ✅ ถ้า backend ส่ง datetime เป็น local TH อยู่แล้ว = ไม่ต้อง +7
-// ถ้า backend ส่งเป็น UTC string (ISO) แล้ว UI แสดงเพี้ยน = ค่อยเปิดอันนี้
 const FORCE_ADD_7_HOURS = false;
 
 function formatThaiDate(dateStr: string) {
@@ -94,7 +89,6 @@ function formatThaiDate(dateStr: string) {
   const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') : raw);
 
   if (FORCE_ADD_7_HOURS) d.setHours(d.getHours() + 7);
-
   if (Number.isNaN(d.getTime())) return '-';
 
   return d.toLocaleString('th-TH', {
@@ -116,15 +110,6 @@ function toKey(raw: unknown): string {
   return raw == null ? '' : String(raw).trim();
 }
 
-/**
- * Normalize ship status for auction orders:
- * - only meaningful when paid
- * - delivered -> delivered
- * - shipping OR has tracking -> shipping
- * - else -> pending
- *
- * (ทำในหน้านี้เพื่อกัน error จากการ import export แปลก ๆ)
- */
 function getAuctionShippingMeta(input: {
   payment_status?: unknown;
   shipping_status?: unknown;
@@ -162,9 +147,7 @@ export default function AdminDashboardTasks() {
     auctionToShip: 0,
   });
 
-  const [paymentReviewOrders, setPaymentReviewOrders] = useState<AdminOrder[]>(
-    []
-  );
+  const [paymentReviewOrders, setPaymentReviewOrders] = useState<AdminOrder[]>([]);
   const [codPendingOrders, setCodPendingOrders] = useState<AdminOrder[]>([]);
   const [toShipOrders, setToShipOrders] = useState<AdminOrder[]>([]);
   const [auctionPending, setAuctionPending] = useState<AuctionWinnerRow[]>([]);
@@ -196,31 +179,22 @@ export default function AdminDashboardTasks() {
       try {
         setLoading(true);
 
-        const [ovRes, prRes, codRes, shipRes, aRes, aShipRes] =
-          await Promise.all([
-            apiFetch(`${API}/stats/tasks-overview?year=${year}`).catch(
-              () => null
-            ),
-            apiFetch(`${API}/orders/all?year=${year}&type=payment_review&limit=10`),
-            apiFetch(`${API}/orders/all?year=${year}&type=cod_pending&limit=10`).catch(
-              () => null
-            ),
-            apiFetch(`${API}/orders/all?year=${year}&type=to_ship&limit=10`),
-            apiFetch(`${API}/auctions/winners?year=${year}&type=pending_payment&limit=10`).catch(
-              () => null
-            ),
-            apiFetch(`${API}/auctions/shipping?year=${year}&limit=10`).catch(
-              () => null
-            ),
-          ]);
+        const [ovRes, prRes, codRes, shipRes, aRes, aShipRes] = await Promise.all([
+          apiFetch(`${API}/stats/tasks-overview?year=${year}`).catch(() => null),
+          apiFetch(`${API}/orders/all?year=${year}&type=payment_review&limit=10`),
+          apiFetch(`${API}/orders/all?year=${year}&type=cod_pending&limit=10`).catch(() => null),
+          apiFetch(`${API}/orders/all?year=${year}&type=to_ship&limit=10`),
+          apiFetch(`${API}/auctions/winners?year=${year}&type=pending_payment&limit=10`).catch(
+            () => null
+          ),
+          apiFetch(`${API}/auctions/shipping?year=${year}&limit=10`).catch(() => null),
+        ]);
 
-        // auth guard (ใช้ prRes เป็นตัวหลักเหมือนเดิม)
         if (prRes.status === 401 || prRes.status === 403) {
           window.location.href = '/';
           return;
         }
 
-        // lists
         const prList = await readJsonArray<AdminOrder>(prRes);
         const shipList = await readJsonArray<AdminOrder>(shipRes);
         const codList = await readJsonArray<AdminOrder>(codRes);
@@ -233,7 +207,6 @@ export default function AdminDashboardTasks() {
         setAuctionPending(aPendingList);
         setAuctionToShip(aShipList);
 
-        // overview
         if (ovRes && ovRes.ok) {
           const ovJson: any = await ovRes.json().catch(() => ({}));
           setOverview({
@@ -244,7 +217,6 @@ export default function AdminDashboardTasks() {
             auctionToShip: Number(ovJson?.auctionToShip || 0),
           });
         } else {
-          // fallback: เอาจำนวนจาก list ที่โหลดมาแน่ ๆ
           setOverview({
             paymentReviewOrders: prList.length,
             codPendingOrders: codList.length,
@@ -273,22 +245,28 @@ export default function AdminDashboardTasks() {
     };
 
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
   if (loading)
     return (
-      <p className="text-center mt-10 text-gray-500">⏳ กำลังโหลดงาน...</p>
+      <div className="rounded-2xl border border-emerald-100 bg-white p-10 text-center text-emerald-700/70">
+        กำลังโหลดข้อมูล...
+      </div>
     );
 
   return (
-    <div className="space-y-10 text-black">
-      {/* Header + Year switch */}
-      <section className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-10 text-slate-900">
+      {/* Header + Year */}
+      <section className="flex items-end justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-xl font-bold">📌 งานแอดมิน (จัดการงานเท่านั้น)</h2>
-          <p className="text-sm text-gray-600">
-            ไม่มีสรุปรายได้ ไม่มีกราฟยอดขาย — หน้านี้ไว้เคลียร์งานให้จบ 😈
+          <p className="text-xs uppercase tracking-widest text-emerald-700 font-semibold">
+            Tasks
+          </p>
+          <h2 className="text-2xl font-semibold text-emerald-950 tracking-wide">
+            งานที่ต้องจัดการ
+          </h2>
+          <p className="text-sm text-slate-600 mt-1">
+            หน้านี้ไว้เคลียร์งานค้างให้จบ: ตรวจสลิป / จัดส่ง / ผู้ชนะประมูล
           </p>
         </div>
 
@@ -297,12 +275,13 @@ export default function AdminDashboardTasks() {
             type="button"
             disabled={year <= MIN_YEAR}
             onClick={() => setYear((y) => y - 1)}
-            className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-10 w-10 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="previous year"
           >
-            ◀
+            ‹
           </button>
 
-          <div className="px-6 py-2 rounded-lg bg-gray-100 text-lg font-bold text-gray-800 min-w-[90px] text-center">
+          <div className="h-10 px-6 rounded-lg bg-emerald-50 border border-emerald-100 text-base font-semibold text-emerald-950 flex items-center justify-center min-w-[96px]">
             {year}
           </div>
 
@@ -310,9 +289,10 @@ export default function AdminDashboardTasks() {
             type="button"
             disabled={year >= MAX_YEAR}
             onClick={() => setYear((y) => y + 1)}
-            className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-10 w-10 rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="next year"
           >
-            ▶
+            ›
           </button>
         </div>
       </section>
@@ -320,132 +300,120 @@ export default function AdminDashboardTasks() {
       {/* Cards */}
       <section>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card
-            label="โอน: รอตรวจสอบสลิป"
-            value={`${overview.paymentReviewOrders} รายการ`}
-            tone="amber"
-          />
-          <Card
-            label="COD: รอยืนยัน/รอดำเนินการ"
-            value={`${overview.codPendingOrders} รายการ`}
-            tone="violet"
-          />
-          <Card
-            label="ออเดอร์: รอจัดส่ง"
-            value={`${overview.toShipOrders} รายการ`}
-            tone="blue"
-          />
-          <Card
-            label="ประมูล: รอจ่าย"
-            value={`${overview.pendingAuctionWinners} รายการ`}
-            tone="orange"
-          />
-          <Card
-            label="ประมูล: รอจัดส่ง"
-            value={`${overview.auctionToShip} รายการ`}
-            tone="cyan"
-          />
+          <Card label="โอนรอตรวจสลิป" value={`${overview.paymentReviewOrders} รายการ`} />
+          <Card label="COD รอยืนยัน" value={`${overview.codPendingOrders} รายการ`} />
+          <Card label="ออเดอร์รอส่ง" value={`${overview.toShipOrders} รายการ`} />
+          <Card label="ประมูลรอจ่าย" value={`${overview.pendingAuctionWinners} รายการ`} />
+          <Card label="ประมูลรอส่ง" value={`${overview.auctionToShip} รายการ`} />
         </div>
 
         {!hasAny && (
-          <div className="mt-4 rounded-2xl border bg-white p-6 text-center text-gray-600">
-            ตอนนี้ไม่มีงานค้าง 🎉
+          <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-6 text-center text-slate-600">
+            ตอนนี้ไม่มีงานค้าง
           </div>
         )}
       </section>
 
       {/* Tables */}
       <TaskTable
-        title="🧾 โอน: รายการรอตรวจสอบการชำระเงิน"
-        subtitle="ออเดอร์ที่แนบสลิปแล้ว (รอแอดมินตรวจ/กดยืนยัน)"
+        title="โอน: รายการรอตรวจสอบการชำระเงิน"
+        subtitle="ออเดอร์ที่แนบสลิปแล้ว รอแอดมินตรวจและยืนยัน"
         rows={paymentReviewOrders}
         emptyText="ยังไม่มีรายการรอตรวจสอบ"
         rightAction={(o) => (
           <Link
             href={`/admin/orders/${o.Oid}`}
-            className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+            className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-sm hover:bg-emerald-800"
           >
-            ไปจัดการ
+            จัดการ
           </Link>
         )}
       />
 
       <TaskTable
-        title="💸 COD: รายการรอยืนยัน/รอดำเนินการ"
-        subtitle="ออเดอร์แบบ COD ที่ต้องจัดการตาม flow ของร้าน"
+        title="COD: รายการรอยืนยัน/รอดำเนินการ"
+        subtitle="ออเดอร์แบบ COD ที่ต้องจัดการตามขั้นตอนของร้าน"
         rows={codPendingOrders}
         emptyText="ยังไม่มีรายการ COD ค้าง"
         rightAction={(o) => (
           <Link
             href={`/admin/orders/${o.Oid}`}
-            className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-700"
+            className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-sm hover:bg-emerald-800"
           >
-            ไปจัดการ
+            จัดการ
           </Link>
         )}
       />
 
       <TaskTable
-        title="📦 ออเดอร์: รายการรอจัดส่ง"
-        subtitle="ออเดอร์ที่พร้อมกรอกขนส่ง/Tracking"
+        title="ออเดอร์: รายการรอจัดส่ง"
+        subtitle="ออเดอร์ที่พร้อมกรอกขนส่งและ Tracking"
         rows={toShipOrders}
         emptyText="ยังไม่มีรายการรอจัดส่ง"
         rightAction={(o) => (
           <Link
             href={`/admin/orders/${o.Oid}`}
-            className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
+            className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-sm hover:bg-emerald-800"
           >
             จัดส่ง
           </Link>
         )}
       />
 
-      {/* Auction pending table */}
-      <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
-        <div className="p-5 border-b bg-gray-50">
-          <div className="text-lg font-bold">🔨 ประมูล: ผู้ชนะรอชำระ</div>
-          <div className="text-sm text-gray-600">จบประมูลแล้ว แต่ยังไม่จ่าย</div>
+      {/* Auction pending */}
+      <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+        <div className="p-6 border-b border-emerald-100 bg-emerald-50/60">
+          <div className="text-lg font-semibold text-emerald-950">ประมูล: ผู้ชนะรอชำระ</div>
+          <div className="text-sm text-slate-600">จบประมูลแล้ว แต่ยังไม่ชำระเงิน</div>
         </div>
 
         {auctionPending.length === 0 ? (
-          <div className="p-6 text-gray-500">
-            ยังไม่มีผู้ชนะประมูลรอชำระ (หรือยังไม่ได้ทำ endpoint)
-          </div>
+          <div className="p-6 text-slate-600">ยังไม่มีรายการค้าง</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-white">
-                  <th className="px-4 py-3 text-left">สินค้า</th>
-                  <th className="px-4 py-3 text-left">ผู้ชนะ</th>
-                  <th className="px-4 py-3 text-right">ยอด</th>
-                  <th className="px-4 py-3 text-center">จบประมูล</th>
-                  <th className="px-4 py-3 text-center">สถานะ</th>
-                  <th className="px-4 py-3 text-center">จัดการ</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    สินค้า
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    ผู้ชนะ
+                  </th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    ยอด
+                  </th>
+                  <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    จบประมูล
+                  </th>
+                  <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    สถานะ
+                  </th>
+                  <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    จัดการ
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {auctionPending.map((x) => {
                   const meta = getMeta(AUCTION_PRODUCT_STATUS, x.PROstatus);
                   return (
-                    <tr key={x.Aid} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{x.PROname}</td>
-                      <td className="px-4 py-3">{x.winner_name}</td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {fmtBaht(x.current_price)} บาท
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                    <tr key={x.Aid} className="border-t border-emerald-100 hover:bg-emerald-50/50">
+                      <td className="px-5 py-4 font-medium">{x.PROname}</td>
+                      <td className="px-5 py-4">{x.winner_name}</td>
+                      <td className="px-5 py-4 text-right font-semibold">{fmtBaht(x.current_price)} บาท</td>
+                      <td className="px-5 py-4 text-center text-slate-600 text-xs">
                         {formatThaiDate(x.end_time)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-5 py-4 text-center">
                         <StatusBadge label={meta.label} tone={meta.tone} />
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-5 py-4 text-center">
                         <Link
                           href={`/admin/auction-orders/${x.Aid}`}
-                          className="px-3 py-2 rounded-lg bg-orange-600 text-white text-sm hover:bg-orange-700"
+                          className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-sm hover:bg-emerald-800"
                         >
-                          ไปจัดการ
+                          จัดการ
                         </Link>
                       </td>
                     </tr>
@@ -457,30 +425,38 @@ export default function AdminDashboardTasks() {
         )}
       </section>
 
-      {/* ✅ Auction to ship table */}
-      <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
-        <div className="p-5 border-b bg-gray-50">
-          <div className="text-lg font-bold">🚚 ประมูล: รายการรอจัดส่ง</div>
-          <div className="text-sm text-gray-600">
-            จ่ายแล้ว (paid) แต่ยังไม่กรอกขนส่ง/Tracking
-          </div>
+      {/* Auction to ship */}
+      <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+        <div className="p-6 border-b border-emerald-100 bg-emerald-50/60">
+          <div className="text-lg font-semibold text-emerald-950">ประมูล: รายการรอจัดส่ง</div>
+          <div className="text-sm text-slate-600">ชำระแล้ว แต่ยังไม่กรอกขนส่งหรือ Tracking</div>
         </div>
 
         {auctionToShip.length === 0 ? (
-          <div className="p-6 text-gray-500">
-            ยังไม่มีรายการประมูลรอจัดส่ง (หรือยังไม่ได้ทำ endpoint)
-          </div>
+          <div className="p-6 text-slate-600">ยังไม่มีรายการค้าง</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-white">
-                  <th className="px-4 py-3 text-left">สินค้า</th>
-                  <th className="px-4 py-3 text-left">ผู้ชนะ</th>
-                  <th className="px-4 py-3 text-right">ยอด</th>
-                  <th className="px-4 py-3 text-center">จบประมูล</th>
-                  <th className="px-4 py-3 text-center">สถานะ</th>
-                  <th className="px-4 py-3 text-center">จัดการ</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    สินค้า
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    ผู้ชนะ
+                  </th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    ยอด
+                  </th>
+                  <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    จบประมูล
+                  </th>
+                  <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    สถานะ
+                  </th>
+                  <th className="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    จัดการ
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -492,24 +468,22 @@ export default function AdminDashboardTasks() {
                   });
 
                   return (
-                    <tr key={x.Aid} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{x.PROname}</td>
-                      <td className="px-4 py-3">{x.winner_name}</td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        {fmtBaht(x.current_price)} บาท
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                    <tr key={x.Aid} className="border-t border-emerald-100 hover:bg-emerald-50/50">
+                      <td className="px-5 py-4 font-medium">{x.PROname}</td>
+                      <td className="px-5 py-4">{x.winner_name}</td>
+                      <td className="px-5 py-4 text-right font-semibold">{fmtBaht(x.current_price)} บาท</td>
+                      <td className="px-5 py-4 text-center text-slate-600 text-xs">
                         {formatThaiDate(x.end_time)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-5 py-4 text-center">
                         <StatusBadge label={shipMeta.label} tone={shipMeta.tone} />
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-5 py-4 text-center">
                         <Link
                           href={`/admin/auction-orders/${x.Aid}`}
-                          className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
+                          className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-sm hover:bg-emerald-800"
                         >
-                          ไปจัดส่ง
+                          จัดส่ง
                         </Link>
                       </td>
                     </tr>
@@ -521,38 +495,32 @@ export default function AdminDashboardTasks() {
         )}
       </section>
 
-      {/* Bottom chart */}
-      <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
-        <div className="p-5 border-b bg-gray-50">
-          <div className="text-lg font-bold">📊 สรุปงานค้าง (ภาพรวม)</div>
-          <div className="text-sm text-gray-600">
-            ดูว่างานไปกองตรงไหน จะได้ไล่เคลียร์
-          </div>
+      {/* Chart */}
+      <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+        <div className="p-6 border-b border-emerald-100 bg-emerald-50/60">
+          <div className="text-lg font-semibold text-emerald-950">สรุปงานค้าง</div>
+          <div className="text-sm text-slate-600">ดูว่างานกองตรงไหน เพื่อไล่เคลียร์ได้ไว</div>
         </div>
 
-        <div className="p-5">
+        <div className="p-6">
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
-              >
+              <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="value">
-  {chartData.map((entry, index) => (
-    <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-  ))}
-</Bar>
-
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {chartData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="mt-3 text-xs text-gray-500">
-            *กราฟนี้คือ “งานค้าง” ไม่ใช่รายได้ — ถ้าจะเอารายได้ต้องไปหน้าแดชบอร์ดรายได้โดยเฉพาะ
+          <div className="mt-3 text-xs text-slate-500">
+            *แสดง “จำนวนงานค้าง” ไม่ใช่รายได้
           </div>
         </div>
       </section>
@@ -576,51 +544,50 @@ function TaskTable({
   rightAction: (o: AdminOrder) => React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
-      <div className="p-5 border-b bg-gray-50">
-        <div className="text-lg font-bold">{title}</div>
-        <div className="text-sm text-gray-600">{subtitle}</div>
+    <section className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+      <div className="p-6 border-b border-emerald-100 bg-emerald-50/60">
+        <div className="text-lg font-semibold text-emerald-950">{title}</div>
+        <div className="text-sm text-slate-600">{subtitle}</div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="p-6 text-gray-500">{emptyText}</div>
+        <div className="p-6 text-slate-600">{emptyText}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-white">
-                <th className="px-4 py-3 text-left">รหัส</th>
-                <th className="px-4 py-3 text-left">ลูกค้า</th>
-                <th className="px-4 py-3 text-right">ยอด</th>
-                <th className="px-4 py-3 text-center">ชำระ</th>
-                <th className="px-4 py-3 text-center">สถานะ</th>
-                <th className="px-4 py-3 text-center">วันที่</th>
-                <th className="px-4 py-3 text-center">จัดการ</th>
+                {['รหัส', 'ลูกค้า', 'ยอด', 'ชำระ', 'สถานะ', 'วันที่', 'จัดการ'].map((h) => (
+                  <th
+                    key={h}
+                    className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((o) => {
                 const meta = getMeta(ORDER_STATUS, o.Ostatus);
-
                 return (
-                  <tr key={o.Oid} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs">{`ord:${String(
-                      o.Oid
-                    ).padStart(4, '0')}`}</td>
-                    <td className="px-4 py-3 font-medium">{o.Cname}</td>
-                    <td className="px-4 py-3 text-right font-semibold">
-                      {fmtBaht(o.Oprice)} บาท
-                    </td>
-                    <td className="px-4 py-3 text-center text-xs text-gray-700">
+                  <tr key={o.Oid} className="border-t border-emerald-100 hover:bg-emerald-50/50">
+                    <td className="px-5 py-4 font-mono text-xs">{`ord:${String(o.Oid).padStart(
+                      4,
+                      '0'
+                    )}`}</td>
+                    <td className="px-5 py-4 font-medium">{o.Cname}</td>
+                    <td className="px-5 py-4 text-right font-semibold">{fmtBaht(o.Oprice)} บาท</td>
+                    <td className="px-5 py-4 text-center text-xs text-slate-700">
                       {String(o.Opayment || '-').toUpperCase()}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-5 py-4 text-center">
                       <StatusBadge label={meta.label} tone={meta.tone} />
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                    <td className="px-5 py-4 text-center text-slate-600 text-xs">
                       {formatThaiDate(o.Odate)}
                     </td>
-                    <td className="px-4 py-3 text-center">{rightAction(o)}</td>
+                    <td className="px-5 py-4 text-center">{rightAction(o)}</td>
                   </tr>
                 );
               })}
@@ -634,38 +601,17 @@ function TaskTable({
 
 /* ---------------- Card ---------------- */
 
-function Card({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: 'cyan' | 'amber' | 'orange' | 'violet' | 'gray' | 'blue';
-}) {
-  const gradientClass: Record<string, string> = {
-    cyan: 'from-cyan-500 to-cyan-600',
-    amber: 'from-amber-500 to-amber-600',
-    orange: 'from-orange-500 to-orange-600',
-    violet: 'from-violet-500 to-violet-600',
-    blue: 'from-blue-500 to-blue-600',
-    gray: 'from-gray-500 to-gray-600',
-  };
-
+function Card({ label, value }: { label: string; value: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
-      <div
-        className={`absolute inset-x-0 top-0 h-2 bg-gradient-to-r ${
-          gradientClass[tone] || gradientClass.gray
-        }`}
-      />
+    <div className="rounded-2xl bg-white border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-6 space-y-2">
-        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        <div className="text-xs font-semibold text-emerald-800/80 uppercase tracking-wide">
           {label}
         </div>
-        <div className="text-2xl md:text-3xl font-bold text-gray-900">
+        <div className="text-2xl md:text-3xl font-semibold text-emerald-950">
           {value}
         </div>
+        <div className="h-1 w-10 rounded-full bg-emerald-700/80" />
       </div>
     </div>
   );

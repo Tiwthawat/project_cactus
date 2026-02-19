@@ -57,8 +57,7 @@ const toPictures = (raw: PictureLike): string[] => {
 
 const firstPicture = (raw: PictureLike) => toPictures(raw)[0] ?? null;
 
-const makeCode = (prefix: string, id: number) =>
-  `${prefix}:${String(id).padStart(4, "0")}`;
+const makeCode = (prefix: string, id: number) => `${prefix}:${String(id).padStart(4, "0")}`;
 
 type OrderStatus =
   | "pending_payment"
@@ -102,6 +101,127 @@ interface FullOrder {
   items: OrderItem[];
 }
 
+/** --------------------------
+ *  UI helpers
+ * -------------------------- */
+function clsx(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
+}
+
+function Card({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={clsx(
+        "bg-white/80 backdrop-blur rounded-2xl shadow-lg border border-slate-200 overflow-hidden",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ title, desc }: { title: string; desc?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+        {desc ? <p className="text-sm text-slate-500 mt-1">{desc}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function GhostButton({
+  children,
+  onClick,
+  className,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "inline-flex items-center justify-center px-4 py-2 rounded-xl",
+        "border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold",
+        "shadow-sm transition",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SolidButton({
+  children,
+  onClick,
+  disabled,
+  tone = "dark",
+  className,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  tone?: "dark" | "emerald" | "amber" | "rose" | "indigo" | "blue";
+  className?: string;
+}) {
+  const map: Record<string, string> = {
+    dark: "bg-slate-900 hover:bg-slate-800 text-white",
+    emerald: "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white",
+    amber: "bg-amber-500 hover:bg-amber-600 text-white",
+    rose: "bg-rose-600 hover:bg-rose-700 text-white",
+    indigo: "bg-indigo-600 hover:bg-indigo-700 text-white",
+    blue: "bg-blue-600 hover:bg-blue-700 text-white",
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={clsx(
+        "w-full inline-flex items-center justify-center px-4 py-2 rounded-xl font-semibold",
+        "shadow-sm transition",
+        map[tone],
+        disabled && "opacity-40 cursor-not-allowed",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function KeyValue({
+  k,
+  v,
+  mono,
+}: {
+  k: string;
+  v: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2 border-b border-slate-100 last:border-b-0">
+      <div className="text-sm font-semibold text-slate-600">{k}</div>
+      <div className={clsx("text-sm text-slate-900 text-right", mono && "font-mono")}>
+        {v}
+      </div>
+    </div>
+  );
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
 
@@ -111,6 +231,18 @@ export default function OrderDetailPage() {
   const [shipComp, setShipComp] = useState("");
   const [trackNo, setTrackNo] = useState("");
   const [editShip, setEditShip] = useState(false);
+
+  // ✅ image preview (สินค้า)
+  const [imgOpen, setImgOpen] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const openImg = (src: string) => {
+    setImgSrc(src);
+    setImgOpen(true);
+  };
+  const closeImg = () => {
+    setImgOpen(false);
+    setImgSrc(null);
+  };
 
   // โหลดข้อมูลออเดอร์
   useEffect(() => {
@@ -138,8 +270,39 @@ export default function OrderDetailPage() {
     load();
   }, [id]);
 
-  if (loading) return <p className="p-6 text-gray-600">⏳ กำลังโหลด...</p>;
-  if (!order) return <p className="p-6">ไม่พบข้อมูลคำสั่งซื้อ</p>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/35 to-slate-50 flex items-center justify-center">
+        <div className="bg-white/80 backdrop-blur rounded-2xl border border-slate-200 shadow-lg px-6 py-5 text-slate-600 font-semibold">
+          กำลังโหลดข้อมูล
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/35 to-slate-50">
+        <div className="p-6 pt-10 max-w-7xl mx-auto">
+          <Card className="p-10 text-center">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
+              —
+            </div>
+            <p className="mt-4 text-slate-900 text-xl font-bold">ไม่พบข้อมูลคำสั่งซื้อ</p>
+            <p className="mt-1 text-slate-500">ตรวจสอบรหัสคำสั่งซื้ออีกครั้ง</p>
+            <div className="mt-6">
+              <Link
+                href="/admin/orders"
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-sm transition"
+              >
+                กลับไปหน้ารายการ
+              </Link>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   const isCOD = order.Opayment === "cod";
 
@@ -259,7 +422,7 @@ export default function OrderDetailPage() {
 
     try {
       await navigator.clipboard.writeText(text);
-      alert("📋 คัดลอกข้อมูลจัดส่งแล้ว");
+      alert("คัดลอกข้อมูลจัดส่งแล้ว");
     } catch {
       alert("ไม่สามารถคัดลอกได้");
     }
@@ -267,259 +430,304 @@ export default function OrderDetailPage() {
 
   const shipStatusMeta = getMeta(ORDER_STATUS, order.Ostatus);
 
+  const payLabel = isCOD ? "ชำระปลายทาง (COD)" : "โอนผ่านบัญชี";
+  const orderCode = makeCode("ord", order.Oid);
+
+  const dateLabel = (() => {
+    const d = new Date(order.Odate);
+    const ok = !Number.isNaN(d.getTime());
+    return ok ? d.toLocaleString("th-TH") : String(order.Odate);
+  })();
+
   return (
-    <div className="p-6 max-w-7xl mx-auto text-black">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ================= LEFT : รายละเอียด + สินค้า + ราคา ================= */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* รายละเอียดคำสั่งซื้อ */}
-          <div className="bg-white p-6 rounded-xl shadow border">
-            <h1 className="text-2xl font-bold mb-1">
-              รายละเอียดคำสั่งซื้อ
-              <span className="ml-2 font-mono text-blue-700">
-                {makeCode("ord", order.Oid)}
-              </span>
-            </h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/35 to-slate-50">
+      <div className="p-6 pt-8 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
+            Order Detail
+          </div>
 
-            <p className="text-sm text-gray-500 mb-4">
-              วันที่สั่งซื้อ: {new Date(order.Odate).toLocaleString("th-TH")}
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <p>
-                <b>ลูกค้า:</b> {order.Cname}
-              </p>
-              <p>
-                <b>เบอร์โทร:</b> {order.Cphone}
-              </p>
-              <p className="md:col-span-2">
-                <b>ที่อยู่:</b> {order.Caddress}
-              </p>
-
-              <div className="md:col-span-2 mt-2">
-                <button
-                  onClick={copyShippingAddress}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-sm font-semibold"
-                >
-                  📋 คัดลอกข้อมูลจัดส่ง
-                </button>
-              </div>
-
-              <p>
-                <b>วิธีชำระเงิน:</b>{" "}
-                <span className="text-blue-600 font-semibold">
-                  {isCOD ? "ชำระปลายทาง (COD)" : "โอนผ่านบัญชี"}
+          <div className="mt-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
+                รายละเอียดคำสั่งซื้อ
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-lg bg-slate-50 border border-slate-200 px-3 py-1 font-mono text-xs text-slate-700">
+                  {orderCode}
                 </span>
-              </p>
-
-              <p className="flex items-center gap-2">
-                <b>สถานะ:</b>
-                <StatusBadge label={uiMeta.label} tone={uiMeta.tone} />
-              </p>
+                <span className="text-sm text-slate-500">วันที่สั่งซื้อ: {dateLabel}</span>
+              </div>
             </div>
-          </div>
 
-          {/* รายการสินค้า */}
-          <div className="bg-white p-6 rounded-xl shadow border">
-            <h2 className="text-xl font-semibold mb-4">รายการสินค้า</h2>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/admin/orders"
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-sm transition"
+              >
+                กลับไปหน้ารายการ
+              </Link>
 
-            {order.items.map((item) => {
-              const pics = toPictures(item.Ppicture);
-              const main = firstPicture(item.Ppicture);
-
-              return (
-                <div key={item.Oiid} className="border-b py-4 last:border-b-0">
-                  <div className="flex gap-4">
-                    <img
-                      src={getImageUrl(main)}
-                      className="w-20 h-20 rounded object-cover border"
-                      alt={item.Pname}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium">{item.Pname}</p>
-                      <p className="text-sm text-gray-600">
-                        จำนวน {item.Oquantity} × {fmtBaht(item.Oprice)} บาท
-                      </p>
-                    </div>
-                    <div className="font-semibold text-right">
-                      {fmtBaht(item.Oquantity * item.Oprice)} บาท
-                    </div>
-                  </div>
-
-                  {/* ✅ ถ้ามีหลายรูป โชว์ thumbnail */}
-                  {pics.length > 1 && (
-                    <div className="mt-3 ml-[96px] flex gap-2 flex-wrap">
-                      {pics.slice(0, 6).map((p, idx) => (
-                        <img
-                          key={idx}
-                          src={getImageUrl(p)}
-                          className="w-10 h-10 rounded border object-cover"
-                          alt={`${item.Pname}-${idx + 1}`}
-                        />
-                      ))}
-                      {pics.length > 6 && (
-                        <span className="text-xs text-gray-500 self-center">
-                          +{pics.length - 6}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* สรุปราคา */}
-          <div className="bg-white p-6 rounded-xl shadow border">
-            <div className="flex justify-between text-lg font-bold">
-              <span>ยอดรวมสุทธิ</span>
-              <span className="text-red-600">{fmtBaht(order.Oprice)} บาท</span>
+              <Link
+                href={`/admin/orders/${order.Oid}/receipt`}
+                target="_blank"
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold shadow-lg transition text-center"
+              >
+                พิมพ์ใบเสร็จ
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* ================= RIGHT : การจัดการ ================= */}
-        <div className="space-y-6 lg:sticky lg:top-6 h-fit">
-          {/* การดำเนินการ */}
-          <div className="bg-white p-6 rounded-xl shadow border">
-            <h2 className="text-xl font-semibold mb-4">การดำเนินการ</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ================= LEFT ================= */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* รายละเอียด */}
+            <Card>
+              <div className="p-5 md:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">ข้อมูลคำสั่งซื้อ</h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      ตรวจสอบข้อมูลลูกค้า ช่องทางชำระเงิน และสถานะปัจจุบัน
+                    </p>
+                  </div>
 
-            {/* โอน: ไปตรวจสลิป */}
-            {canGoPaymentReview && (
-              <button
-                onClick={goPaymentReview}
-                className="w-full bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 mb-2"
-              >
-                🔍 ไปตรวจสอบสลิป
-              </button>
-            )}
-
-            {/* โอน: อนุมัติสลิป */}
-            {canApproveSlip && (
-              <button
-                onClick={approveSlipToPaid}
-                className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 mb-2"
-              >
-                ✅ อนุมัติสลิป (ชำระแล้ว)
-              </button>
-            )}
-
-            {/* ยกเลิก */}
-            {canCancel && (
-              <button
-                onClick={cancelOrder}
-                className="w-full bg-red-600 text-white py-2 rounded hover:bg-red-700"
-              >
-                ❌ ยกเลิกออเดอร์
-              </button>
-            )}
-
-            {!canGoPaymentReview && !canApproveSlip && !canCancel && (
-              <p className="text-sm text-gray-500">
-                * ไม่มีการดำเนินการที่ทำได้ในสถานะนี้
-              </p>
-            )}
-          </div>
-
-          <Link
-            href={`/admin/orders/${order.Oid}/receipt`}
-            target="_blank"
-            className="block w-full text-center bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-semibold mb-2"
-          >
-            🧾 พิมพ์ใบเสร็จ
-          </Link>
-
-          {/* สลิป (ถ้ามี) */}
-          {order.Oslip && (
-            <div className="bg-white p-6 rounded-xl shadow border">
-              <h3 className="font-semibold mb-2">สลิปการโอน</h3>
-              <img src={getImageUrl(order.Oslip)} className="w-full rounded border" alt="สลิป" />
-            </div>
-          )}
-
-          {/* จัดส่ง */}
-          <div className="bg-white p-6 rounded-xl shadow border">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold">ข้อมูลจัดส่ง</h3>
-
-              {canEditShipping && (
-                <button
-                  onClick={() => setEditShip((v) => !v)}
-                  className="text-blue-600 hover:underline font-semibold text-xs"
-                >
-                  {editShip ? "ปิดการแก้ไข" : "แก้ไขข้อมูลจัดส่ง"}
-                </button>
-              )}
-            </div>
-
-            {/* ฟอร์มจัดส่ง (สร้างใหม่) */}
-            {canShowShippingForm && (
-              <div className="bg-gray-50 p-4 rounded border">
-                <label className="block mb-2 text-sm font-semibold">ขนส่ง</label>
-                <select
-                  className="border p-2 rounded w-full mb-3 bg-white"
-                  value={shipComp}
-                  onChange={(e) => setShipComp(e.target.value)}
-                >
-                  <option value="">เลือกขนส่ง</option>
-                  <option value="Flash">Flash</option>
-                  <option value="J&T">J&T</option>
-                  <option value="Kerry">Kerry</option>
-                  <option value="ThaiPost">ไปรษณีย์ไทย</option>
-                </select>
-
-                <label className="block mb-2 text-sm font-semibold">เลขพัสดุ</label>
-                <input
-                  className="border p-2 rounded w-full mb-3 bg-white"
-                  value={trackNo}
-                  onChange={(e) => setTrackNo(e.target.value)}
-                  placeholder="เช่น TH1234567890"
-                />
-
-                <button
-                  onClick={saveShipping}
-                  className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-semibold"
-                >
-                  🚚 บันทึกจัดส่ง
-                </button>
-
-                <p className="text-xs text-gray-500 mt-2">
-                  * บันทึกแล้วระบบจะเปลี่ยนสถานะเป็น “กำลังจัดส่ง”
-                </p>
-              </div>
-            )}
-
-            {/* แสดงข้อมูลจัดส่ง + โหมดแก้ไข */}
-            {hasShippingInfo && (
-              <div className="text-sm space-y-2">
-                <div className="flex items-center gap-2">
-                  <StatusBadge label={shipStatusMeta.label} tone={shipStatusMeta.tone} />
-                  <span className="text-xs text-gray-500">({order.Ostatus})</span>
+                  <div className="shrink-0">
+                    <StatusBadge label={uiMeta.label} tone={uiMeta.tone} />
+                  </div>
                 </div>
 
-                {!editShip ? (
-                  <>
-                    <p>
-                      <b>ขนส่ง:</b> {order.Oshipping || "—"}
-                    </p>
-                    <p>
-                      <b>เลขพัสดุ:</b> {order.Otracking || "—"}
-                    </p>
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-xs font-semibold text-slate-500">ลูกค้า</div>
+                    <div className="mt-1 font-bold text-slate-900">{order.Cname}</div>
+                    <div className="mt-2 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-600">เบอร์โทร:</span>{" "}
+                      {order.Cphone}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-600">ช่องทางชำระเงิน:</span>{" "}
+                      <span className="font-semibold text-emerald-700">{payLabel}</span>
+                    </div>
+                  </div>
 
-                    {canMarkDelivered && (
-                      <button
-                        onClick={markDelivered}
-                        className="mt-2 w-full bg-emerald-700 text-white py-2 rounded hover:bg-emerald-800 font-semibold"
-                      >
-                        ✔ ปิดเป็นจัดส่งสำเร็จ (delivered)
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <div className="mt-2 bg-gray-50 p-4 rounded border">
-                    <label className="block mb-2 text-sm font-semibold">ขนส่ง</label>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-xs font-semibold text-slate-500">ที่อยู่จัดส่ง</div>
+                    <div className="mt-2 text-sm text-slate-900 leading-relaxed">
+                      {order.Caddress}
+                    </div>
+
+                    <div className="mt-4">
+                      <GhostButton onClick={copyShippingAddress} className="w-full">
+                        คัดลอกข้อมูลจัดส่ง
+                      </GhostButton>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 text-xs text-slate-500 bg-slate-50 border-t border-slate-200">
+                รหัสอ้างอิง: {orderCode} • สถานะระบบ: {order.Ostatus}
+              </div>
+            </Card>
+
+            {/* รายการสินค้า */}
+            <Card>
+              <div className="p-5 md:p-6">
+                <SectionTitle
+                  title="รายการสินค้า"
+                  desc="ตรวจสอบรายการสินค้า จำนวน และยอดรวมต่อรายการ"
+                />
+
+                <div className="mt-4 divide-y divide-slate-100">
+                  {order.items.map((item) => {
+                    const pics = toPictures(item.Ppicture);
+                    const main = firstPicture(item.Ppicture);
+
+                    return (
+                      <div key={item.Oiid} className="py-4">
+                        <div className="flex gap-4">
+                          <button
+                            type="button"
+                            onClick={() => openImg(getImageUrl(main))}
+                            className="shrink-0 w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm"
+                            aria-label="open-product-image"
+                          >
+                            <img
+                              src={getImageUrl(main)}
+                              className="w-full h-full object-cover"
+                              alt={item.Pname}
+                            />
+                          </button>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-slate-900 truncate">{item.Pname}</div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              จำนวน <span className="font-semibold">{item.Oquantity}</span>{" "}
+                              <span className="text-slate-400">×</span>{" "}
+                              <span className="font-semibold">{fmtBaht(item.Oprice)}</span> บาท
+                            </div>
+
+                            {/* thumbs */}
+                            {pics.length > 1 && (
+                              <div className="mt-3 flex gap-2 flex-wrap">
+                                {pics.slice(0, 6).map((p, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => openImg(getImageUrl(p))}
+                                    className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-100"
+                                    aria-label={`thumb-${idx + 1}`}
+                                  >
+                                    <img
+                                      src={getImageUrl(p)}
+                                      className="w-full h-full object-cover"
+                                      alt={`${item.Pname}-${idx + 1}`}
+                                    />
+                                  </button>
+                                ))}
+                                {pics.length > 6 && (
+                                  <span className="text-xs text-slate-500 self-center">
+                                    +{pics.length - 6}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <div className="text-xs text-slate-500">รวม</div>
+                            <div className="font-extrabold text-slate-900">
+                              {fmtBaht(item.Oquantity * item.Oprice)}
+                            </div>
+                            <div className="text-xs text-slate-500">บาท</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+
+            {/* สรุปราคา */}
+            <Card>
+              <div className="p-5 md:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-600">ยอดรวมสุทธิ</div>
+                    <div className="text-xs text-slate-500 mt-1">รวมราคาสินค้าทั้งหมดในคำสั่งซื้อ</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-extrabold text-emerald-700">
+                      {fmtBaht(order.Oprice)}
+                    </div>
+                    <div className="text-xs text-slate-500">THB</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* ================= RIGHT ================= */}
+          <div className="space-y-6 lg:sticky lg:top-6 h-fit">
+            {/* การดำเนินการ */}
+            <Card>
+              <div className="p-5 md:p-6">
+                <SectionTitle title="การดำเนินการ" desc="ดำเนินการตามขั้นตอนของสถานะปัจจุบัน" />
+
+                <div className="mt-4 space-y-2">
+                  {canGoPaymentReview && (
+                    <SolidButton onClick={goPaymentReview} tone="amber">
+                      ไปตรวจสอบสลิป
+                    </SolidButton>
+                  )}
+
+                  {canApproveSlip && (
+                    <SolidButton onClick={approveSlipToPaid} tone="emerald">
+                      อนุมัติสลิป และเปลี่ยนเป็นชำระแล้ว
+                    </SolidButton>
+                  )}
+
+                  {canCancel && (
+                    <SolidButton onClick={cancelOrder} tone="rose">
+                      ยกเลิกออเดอร์
+                    </SolidButton>
+                  )}
+
+                  {!canGoPaymentReview && !canApproveSlip && !canCancel && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      ไม่มีการดำเนินการที่ทำได้ในสถานะนี้
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="px-6 py-4 text-xs text-slate-500 bg-slate-50 border-t border-slate-200">
+                ระบบจะเดินสถานะไปข้างหน้าเป็นหลักเพื่อลดความผิดพลาด
+              </div>
+            </Card>
+
+            {/* สลิป (ถ้ามี) */}
+            {order.Oslip && (
+              <Card>
+                <div className="p-5 md:p-6">
+                  <SectionTitle title="สลิปการโอน" desc="คลิกเพื่อขยายภาพสำหรับตรวจสอบ" />
+                  <button
+                    type="button"
+                    onClick={() => openImg(getImageUrl(order.Oslip))}
+                    className="mt-4 w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100"
+                    aria-label="open-slip"
+                  >
+                    <img
+                      src={getImageUrl(order.Oslip)}
+                      className="w-full object-contain"
+                      alt="สลิป"
+                    />
+                  </button>
+                </div>
+              </Card>
+            )}
+
+            {/* จัดส่ง */}
+            <Card>
+              <div className="p-5 md:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">ข้อมูลจัดส่ง</h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                      บันทึกขนส่งและเลขพัสดุ ระบบจะเปลี่ยนสถานะตาม flow
+                    </p>
+                  </div>
+
+                  {canEditShipping ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditShip((v) => !v)}
+                      className="shrink-0 text-emerald-700 hover:underline font-semibold text-xs"
+                    >
+                      {editShip ? "ปิดการแก้ไข" : "แก้ไข"}
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="mt-4">
+                  <div className="flex items-center gap-2">
+                    <StatusBadge label={shipStatusMeta.label} tone={shipStatusMeta.tone} />
+                    <span className="text-xs text-slate-500">({order.Ostatus})</span>
+                  </div>
+                </div>
+
+                {/* ฟอร์มจัดส่ง (สร้างใหม่) */}
+                {canShowShippingForm && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <label className="block mb-2 text-sm font-semibold text-slate-700">
+                      ขนส่ง
+                    </label>
                     <select
-                      className="border p-2 rounded w-full mb-3 bg-white"
+                      className="border border-slate-200 p-2.5 rounded-xl w-full mb-3 bg-white focus:outline-none focus:border-emerald-400"
                       value={shipComp}
                       onChange={(e) => setShipComp(e.target.value)}
                     >
@@ -530,47 +738,143 @@ export default function OrderDetailPage() {
                       <option value="ThaiPost">ไปรษณีย์ไทย</option>
                     </select>
 
-                    <label className="block mb-2 text-sm font-semibold">เลขพัสดุ</label>
+                    <label className="block mb-2 text-sm font-semibold text-slate-700">
+                      เลขพัสดุ
+                    </label>
                     <input
-                      className="border p-2 rounded w-full mb-3 bg-white"
+                      className="border border-slate-200 p-2.5 rounded-xl w-full mb-3 bg-white focus:outline-none focus:border-emerald-400"
                       value={trackNo}
                       onChange={(e) => setTrackNo(e.target.value)}
+                      placeholder="เช่น TH1234567890"
                     />
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={saveShipping}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-semibold"
-                      >
-                        บันทึก
-                      </button>
-                      <button
-                        onClick={() => setEditShip(false)}
-                        className="flex-1 border py-2 rounded hover:bg-white font-semibold"
-                      >
-                        ยกเลิก
-                      </button>
-                    </div>
+                    <SolidButton onClick={saveShipping} tone="blue">
+                      บันทึกจัดส่ง
+                    </SolidButton>
 
-                    <p className="text-xs text-gray-500 mt-2">
-                      * บันทึกแล้วระบบจะเซ็ตสถานะเป็น “กำลังจัดส่ง”
+                    <p className="text-xs text-slate-500 mt-2">
+                      บันทึกแล้วระบบจะเปลี่ยนสถานะเป็น “กำลังจัดส่ง”
                     </p>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* ยังไม่ถึงเงื่อนไขใส่จัดส่ง และยังไม่มีข้อมูล */}
-            {!hasShippingInfo && !canShowShippingForm && (
-              <p className="text-sm text-gray-500">
-                {isCOD
-                  ? "* COD: ใส่ข้อมูลจัดส่งได้เมื่ออยู่สถานะ “รอจัดส่ง (COD)”"
-                  : "* โอนเงิน: ใส่ข้อมูลจัดส่งได้เมื่ออนุมัติเป็น “ชำระแล้ว”"}
-              </p>
-            )}
+                {/* แสดงข้อมูลจัดส่ง + โหมดแก้ไข */}
+                {hasShippingInfo && (
+                  <div className="mt-4">
+                    {!editShip ? (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <KeyValue k="ขนส่ง" v={order.Oshipping || "—"} />
+                        <KeyValue k="เลขพัสดุ" v={order.Otracking || "—"} mono />
+
+                        {canMarkDelivered && (
+                          <div className="mt-3">
+                            <SolidButton onClick={markDelivered} tone="emerald">
+                              ปิดเป็นจัดส่งสำเร็จ
+                            </SolidButton>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <label className="block mb-2 text-sm font-semibold text-slate-700">
+                          ขนส่ง
+                        </label>
+                        <select
+                          className="border border-slate-200 p-2.5 rounded-xl w-full mb-3 bg-white focus:outline-none focus:border-emerald-400"
+                          value={shipComp}
+                          onChange={(e) => setShipComp(e.target.value)}
+                        >
+                          <option value="">เลือกขนส่ง</option>
+                          <option value="Flash">Flash</option>
+                          <option value="J&T">J&T</option>
+                          <option value="Kerry">Kerry</option>
+                          <option value="ThaiPost">ไปรษณีย์ไทย</option>
+                        </select>
+
+                        <label className="block mb-2 text-sm font-semibold text-slate-700">
+                          เลขพัสดุ
+                        </label>
+                        <input
+                          className="border border-slate-200 p-2.5 rounded-xl w-full mb-3 bg-white focus:outline-none focus:border-emerald-400"
+                          value={trackNo}
+                          onChange={(e) => setTrackNo(e.target.value)}
+                        />
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={saveShipping}
+                            className="flex-1 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-sm transition"
+                          >
+                            บันทึก
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditShip(false)}
+                            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold shadow-sm transition"
+                          >
+                            ยกเลิก
+                          </button>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mt-2">
+                          บันทึกแล้วระบบจะตั้งสถานะเป็น “กำลังจัดส่ง”
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ยังไม่ถึงเงื่อนไขใส่จัดส่ง และยังไม่มีข้อมูล */}
+                {!hasShippingInfo && !canShowShippingForm && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    {isCOD
+                      ? "COD: ใส่ข้อมูลจัดส่งได้เมื่ออยู่สถานะ “รอจัดส่ง (COD)”"
+                      : "โอนเงิน: ใส่ข้อมูลจัดส่งได้เมื่ออนุมัติเป็น “ชำระแล้ว”"}
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 text-xs text-slate-500 bg-slate-50 border-t border-slate-200">
+                แนะนำ: ใส่เลขพัสดุให้ครบเพื่อใช้ติดตามสถานะภายนอกระบบ
+              </div>
+            </Card>
           </div>
         </div>
       </div>
+
+      {/* Image Modal */}
+      {imgOpen && imgSrc && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeImg}
+        >
+          <div
+            className="max-w-4xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="text-sm font-semibold text-slate-700">Preview</div>
+              <button
+                type="button"
+                onClick={closeImg}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4 bg-white">
+              <img
+                src={imgSrc}
+                alt="preview"
+                className="w-full max-h-[75vh] object-contain rounded-xl border border-slate-200 bg-slate-50"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
