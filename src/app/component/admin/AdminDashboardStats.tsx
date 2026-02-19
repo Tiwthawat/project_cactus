@@ -2,6 +2,8 @@
 
 import { apiFetch } from '@/app/lib/apiFetch';
 import React, { useEffect, useMemo, useState } from 'react';
+import { Cell } from 'recharts';
+
 import Link from 'next/link';
 import {
   ResponsiveContainer,
@@ -13,21 +15,25 @@ import {
   CartesianGrid,
 } from 'recharts';
 
+import StatusBadge from '@/app/component/StatusBadge';
+import {
+  getMeta,
+  ORDER_STATUS,
+  AUCTION_PRODUCT_STATUS,
+  AUCTION_SHIP_STATUS,
+  type StatusMeta,
+} from '@/app/lib/status';
+
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
-type ModeKey =
-  | 'payment_review'
-  | 'cod_pending'
-  | 'to_ship'
-  | 'auction_pending'
-  | 'auction_to_ship';
+
 
 interface TasksOverview {
-  paymentReviewOrders: number;     // โอน: รอตรวจสลิป
-  codPendingOrders: number;        // COD: รอยืนยัน/รอดำเนินการ
-  toShipOrders: number;            // พร้อมจัดส่ง (ออเดอร์ปกติ)
-  pendingAuctionWinners: number;   // ผู้ชนะประมูลรอจ่าย
-  auctionToShip: number;           // ✅ ประมูล: จ่ายแล้วรอจัดส่ง
+  paymentReviewOrders: number; // โอน: รอตรวจสลิป
+  codPendingOrders: number; // COD: รอยืนยัน/รอดำเนินการ
+  toShipOrders: number; // พร้อมจัดส่ง (ออเดอร์ปกติ)
+  pendingAuctionWinners: number; // ผู้ชนะประมูลรอจ่าย
+  auctionToShip: number; // ✅ ประมูล: จ่ายแล้วรอจัดส่ง
 }
 
 interface AdminOrder {
@@ -70,12 +76,20 @@ const fmtBaht = (n: number | null | undefined): string =>
     maximumFractionDigits: 2,
   });
 
+  const BAR_COLORS = [
+  '#f59e0b', // amber - โอนรอตรวจ
+  '#7c3aed', // violet - COD
+  '#2563eb', // blue - ออเดอร์รอส่ง
+  '#f97316', // orange - ประมูลรอจ่าย
+  '#06b6d4', // cyan - ประมูลรอส่ง
+];
+
+
 // ✅ ถ้า backend ส่ง datetime เป็น local TH อยู่แล้ว = ไม่ต้อง +7
 // ถ้า backend ส่งเป็น UTC string (ISO) แล้ว UI แสดงเพี้ยน = ค่อยเปิดอันนี้
 const FORCE_ADD_7_HOURS = false;
 
 function formatThaiDate(dateStr: string) {
-  // รองรับ "YYYY-MM-DD HH:mm:ss" / ISO
   const raw = String(dateStr || '').trim();
   const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') : raw);
 
@@ -92,32 +106,41 @@ function formatThaiDate(dateStr: string) {
   });
 }
 
-function statusLabel(s: string) {
-  const map: Record<string, string> = {
-    pending_payment: 'รอชำระเงิน',
-    payment_review: 'รอตรวจสอบสลิป',
-    paid: 'ชำระแล้ว',
-    shipping: 'กำลังจัดส่ง',
-    delivered: 'สำเร็จ',
-    cancelled: 'ยกเลิก',
-    failed: 'ล้มเหลว',
-    waiting: 'รอตรวจสอบ',
-    to_ship: 'รอจัดส่ง',
-    ready: 'พร้อม',
-    unsold: 'ยังไม่ขาย',
-    auction: 'กำลังประมูล',
-  };
-  return map[s] || s;
+async function readJsonArray<T>(res: Response | null): Promise<T[]> {
+  if (!res || !res.ok) return [];
+  const json: unknown = await res.json().catch(() => []);
+  return Array.isArray(json) ? (json as T[]) : [];
 }
 
-function statusPillClass(s: string) {
-  if (s === 'payment_review' || s === 'waiting') return 'bg-amber-100 text-amber-800 border-amber-200';
-  if (s === 'paid') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-  if (s === 'shipping') return 'bg-blue-100 text-blue-800 border-blue-200';
-  if (s === 'delivered') return 'bg-green-100 text-green-800 border-green-200';
-  if (s === 'cancelled' || s === 'failed') return 'bg-red-100 text-red-800 border-red-200';
-  if (s === 'pending_payment') return 'bg-orange-100 text-orange-800 border-orange-200';
-  return 'bg-gray-100 text-gray-800 border-gray-200';
+function toKey(raw: unknown): string {
+  return raw == null ? '' : String(raw).trim();
+}
+
+/**
+ * Normalize ship status for auction orders:
+ * - only meaningful when paid
+ * - delivered -> delivered
+ * - shipping OR has tracking -> shipping
+ * - else -> pending
+ *
+ * (ทำในหน้านี้เพื่อกัน error จากการ import export แปลก ๆ)
+ */
+function getAuctionShippingMeta(input: {
+  payment_status?: unknown;
+  shipping_status?: unknown;
+  tracking_number?: unknown;
+}): StatusMeta {
+  if (toKey(input.payment_status) !== 'paid') {
+    return { label: '—', tone: 'gray' };
+  }
+
+  const s = toKey(input.shipping_status);
+  const hasTracking = toKey(input.tracking_number).length > 0;
+
+  if (s === 'delivered') return AUCTION_SHIP_STATUS.delivered;
+  if (s === 'shipping' || hasTracking) return AUCTION_SHIP_STATUS.shipping;
+
+  return AUCTION_SHIP_STATUS.pending;
 }
 
 /* ---------------- Page ---------------- */
@@ -139,7 +162,9 @@ export default function AdminDashboardTasks() {
     auctionToShip: 0,
   });
 
-  const [paymentReviewOrders, setPaymentReviewOrders] = useState<AdminOrder[]>([]);
+  const [paymentReviewOrders, setPaymentReviewOrders] = useState<AdminOrder[]>(
+    []
+  );
   const [codPendingOrders, setCodPendingOrders] = useState<AdminOrder[]>([]);
   const [toShipOrders, setToShipOrders] = useState<AdminOrder[]>([]);
   const [auctionPending, setAuctionPending] = useState<AuctionWinnerRow[]>([]);
@@ -171,56 +196,46 @@ export default function AdminDashboardTasks() {
       try {
         setLoading(true);
 
-        const [ovRes, prRes, codRes, shipRes, aRes, aShipRes] = await Promise.all([
-          apiFetch(`${API}/stats/tasks-overview?year=${year}`).catch(() => null),
-          apiFetch(`${API}/orders/all?year=${year}&type=payment_review&limit=10`),
-          apiFetch(`${API}/orders/all?year=${year}&type=cod_pending&limit=10`).catch(() => null),
-          apiFetch(`${API}/orders/all?year=${year}&type=to_ship&limit=10`),
-          apiFetch(`${API}/auctions/winners?year=${year}&type=pending_payment&limit=10`).catch(() => null),
-          apiFetch(`${API}/auctions/shipping?year=${year}&limit=10`).catch(() => null), // ✅ ใหม่
-        ]);
+        const [ovRes, prRes, codRes, shipRes, aRes, aShipRes] =
+          await Promise.all([
+            apiFetch(`${API}/stats/tasks-overview?year=${year}`).catch(
+              () => null
+            ),
+            apiFetch(`${API}/orders/all?year=${year}&type=payment_review&limit=10`),
+            apiFetch(`${API}/orders/all?year=${year}&type=cod_pending&limit=10`).catch(
+              () => null
+            ),
+            apiFetch(`${API}/orders/all?year=${year}&type=to_ship&limit=10`),
+            apiFetch(`${API}/auctions/winners?year=${year}&type=pending_payment&limit=10`).catch(
+              () => null
+            ),
+            apiFetch(`${API}/auctions/shipping?year=${year}&limit=10`).catch(
+              () => null
+            ),
+          ]);
 
-        // auth guard
+        // auth guard (ใช้ prRes เป็นตัวหลักเหมือนเดิม)
         if (prRes.status === 401 || prRes.status === 403) {
           window.location.href = '/';
           return;
         }
 
-        // lists: orders
-        const prJson: unknown = prRes.ok ? await prRes.json() : [];
-        const prList = Array.isArray(prJson) ? (prJson as AdminOrder[]) : [];
+        // lists
+        const prList = await readJsonArray<AdminOrder>(prRes);
+        const shipList = await readJsonArray<AdminOrder>(shipRes);
+        const codList = await readJsonArray<AdminOrder>(codRes);
+        const aPendingList = await readJsonArray<AuctionWinnerRow>(aRes);
+        const aShipList = await readJsonArray<AuctionToShipRow>(aShipRes);
+
         setPaymentReviewOrders(prList);
-
-        const shipJson: unknown = shipRes.ok ? await shipRes.json() : [];
-        const shipList = Array.isArray(shipJson) ? (shipJson as AdminOrder[]) : [];
         setToShipOrders(shipList);
-
-        let codList: AdminOrder[] = [];
-        if (codRes && (codRes as any).ok) {
-          const codJson: unknown = await (codRes as any).json();
-          codList = Array.isArray(codJson) ? (codJson as AdminOrder[]) : [];
-        }
         setCodPendingOrders(codList);
-
-        // auction pending (รอจ่าย)
-        let aPendingList: AuctionWinnerRow[] = [];
-        if (aRes && (aRes as any).ok) {
-          const aJson: unknown = await (aRes as any).json();
-          aPendingList = Array.isArray(aJson) ? (aJson as AuctionWinnerRow[]) : [];
-        }
         setAuctionPending(aPendingList);
-
-        // auction to ship (จ่ายแล้วรอส่ง)
-        let aShipList: AuctionToShipRow[] = [];
-        if (aShipRes && (aShipRes as any).ok) {
-          const sJson: unknown = await (aShipRes as any).json();
-          aShipList = Array.isArray(sJson) ? (sJson as AuctionToShipRow[]) : [];
-        }
         setAuctionToShip(aShipList);
 
         // overview
-        if (ovRes && (ovRes as any).ok) {
-          const ovJson = await (ovRes as any).json();
+        if (ovRes && ovRes.ok) {
+          const ovJson: any = await ovRes.json().catch(() => ({}));
           setOverview({
             paymentReviewOrders: Number(ovJson?.paymentReviewOrders || 0),
             codPendingOrders: Number(ovJson?.codPendingOrders || 0),
@@ -229,7 +244,7 @@ export default function AdminDashboardTasks() {
             auctionToShip: Number(ovJson?.auctionToShip || 0),
           });
         } else {
-          // ✅ fallback: เอาจำนวนจาก list ที่โหลดมาแน่ ๆ (ไม่พึ่ง state ที่อัปเดตช้า)
+          // fallback: เอาจำนวนจาก list ที่โหลดมาแน่ ๆ
           setOverview({
             paymentReviewOrders: prList.length,
             codPendingOrders: codList.length,
@@ -261,7 +276,10 @@ export default function AdminDashboardTasks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
-  if (loading) return <p className="text-center mt-10 text-gray-500">⏳ กำลังโหลดงาน...</p>;
+  if (loading)
+    return (
+      <p className="text-center mt-10 text-gray-500">⏳ กำลังโหลดงาน...</p>
+    );
 
   return (
     <div className="space-y-10 text-black">
@@ -302,11 +320,31 @@ export default function AdminDashboardTasks() {
       {/* Cards */}
       <section>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card label="โอน: รอตรวจสอบสลิป" value={`${overview.paymentReviewOrders} รายการ`} tone="amber" />
-          <Card label="COD: รอยืนยัน/รอดำเนินการ" value={`${overview.codPendingOrders} รายการ`} tone="violet" />
-          <Card label="ออเดอร์: รอจัดส่ง" value={`${overview.toShipOrders} รายการ`} tone="blue" />
-          <Card label="ประมูล: รอจ่าย" value={`${overview.pendingAuctionWinners} รายการ`} tone="orange" />
-          <Card label="ประมูล: รอจัดส่ง" value={`${overview.auctionToShip} รายการ`} tone="cyan" />
+          <Card
+            label="โอน: รอตรวจสอบสลิป"
+            value={`${overview.paymentReviewOrders} รายการ`}
+            tone="amber"
+          />
+          <Card
+            label="COD: รอยืนยัน/รอดำเนินการ"
+            value={`${overview.codPendingOrders} รายการ`}
+            tone="violet"
+          />
+          <Card
+            label="ออเดอร์: รอจัดส่ง"
+            value={`${overview.toShipOrders} รายการ`}
+            tone="blue"
+          />
+          <Card
+            label="ประมูล: รอจ่าย"
+            value={`${overview.pendingAuctionWinners} รายการ`}
+            tone="orange"
+          />
+          <Card
+            label="ประมูล: รอจัดส่ง"
+            value={`${overview.auctionToShip} รายการ`}
+            tone="cyan"
+          />
         </div>
 
         {!hasAny && (
@@ -387,27 +425,32 @@ export default function AdminDashboardTasks() {
                 </tr>
               </thead>
               <tbody>
-                {auctionPending.map((x) => (
-                  <tr key={x.Aid} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{x.PROname}</td>
-                    <td className="px-4 py-3">{x.winner_name}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{fmtBaht(x.current_price)} บาท</td>
-                    <td className="px-4 py-3 text-center text-gray-600 text-xs">{formatThaiDate(x.end_time)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${statusPillClass(x.PROstatus)}`}>
-                        {statusLabel(x.PROstatus)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Link
-                        href={`/admin/auction-orders/${x.Aid}`}
-                        className="px-3 py-2 rounded-lg bg-orange-600 text-white text-sm hover:bg-orange-700"
-                      >
-                        ไปจัดการ
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {auctionPending.map((x) => {
+                  const meta = getMeta(AUCTION_PRODUCT_STATUS, x.PROstatus);
+                  return (
+                    <tr key={x.Aid} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium">{x.PROname}</td>
+                      <td className="px-4 py-3">{x.winner_name}</td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {fmtBaht(x.current_price)} บาท
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                        {formatThaiDate(x.end_time)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge label={meta.label} tone={meta.tone} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Link
+                          href={`/admin/auction-orders/${x.Aid}`}
+                          className="px-3 py-2 rounded-lg bg-orange-600 text-white text-sm hover:bg-orange-700"
+                        >
+                          ไปจัดการ
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -418,7 +461,9 @@ export default function AdminDashboardTasks() {
       <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
         <div className="p-5 border-b bg-gray-50">
           <div className="text-lg font-bold">🚚 ประมูล: รายการรอจัดส่ง</div>
-          <div className="text-sm text-gray-600">จ่ายแล้ว (paid) แต่ยังไม่กรอกขนส่ง/Tracking</div>
+          <div className="text-sm text-gray-600">
+            จ่ายแล้ว (paid) แต่ยังไม่กรอกขนส่ง/Tracking
+          </div>
         </div>
 
         {auctionToShip.length === 0 ? (
@@ -439,27 +484,37 @@ export default function AdminDashboardTasks() {
                 </tr>
               </thead>
               <tbody>
-                {auctionToShip.map((x) => (
-                  <tr key={x.Aid} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{x.PROname}</td>
-                    <td className="px-4 py-3">{x.winner_name}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{fmtBaht(x.current_price)} บาท</td>
-                    <td className="px-4 py-3 text-center text-gray-600 text-xs">{formatThaiDate(x.end_time)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${statusPillClass(String(x.shipping_status || 'to_ship'))}`}>
-                        {statusLabel(String(x.shipping_status || 'to_ship'))}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Link
-                        href={`/admin/auction-orders/${x.Aid}`}
-                        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
-                      >
-                        ไปจัดส่ง
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {auctionToShip.map((x) => {
+                  const shipMeta = getAuctionShippingMeta({
+                    payment_status: x.payment_status,
+                    shipping_status: x.shipping_status,
+                    tracking_number: x.tracking_number,
+                  });
+
+                  return (
+                    <tr key={x.Aid} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium">{x.PROname}</td>
+                      <td className="px-4 py-3">{x.winner_name}</td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {fmtBaht(x.current_price)} บาท
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                        {formatThaiDate(x.end_time)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge label={shipMeta.label} tone={shipMeta.tone} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Link
+                          href={`/admin/auction-orders/${x.Aid}`}
+                          className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
+                        >
+                          ไปจัดส่ง
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -470,18 +525,28 @@ export default function AdminDashboardTasks() {
       <section className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
         <div className="p-5 border-b bg-gray-50">
           <div className="text-lg font-bold">📊 สรุปงานค้าง (ภาพรวม)</div>
-          <div className="text-sm text-gray-600">ดูว่างานไปกองตรงไหน จะได้ไล่เคลียร์</div>
+          <div className="text-sm text-gray-600">
+            ดูว่างานไปกองตรงไหน จะได้ไล่เคลียร์
+          </div>
         </div>
 
         <div className="p-5">
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="value" />
+                <Bar dataKey="value">
+  {chartData.map((entry, index) => (
+    <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
+  ))}
+</Bar>
+
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -534,21 +599,31 @@ function TaskTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((o) => (
-                <tr key={o.Oid} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs">{`ord:${String(o.Oid).padStart(4, '0')}`}</td>
-                  <td className="px-4 py-3 font-medium">{o.Cname}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{fmtBaht(o.Oprice)} บาท</td>
-                  <td className="px-4 py-3 text-center text-xs text-gray-700">{String(o.Opayment || '-').toUpperCase()}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${statusPillClass(o.Ostatus)}`}>
-                      {statusLabel(o.Ostatus)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-600 text-xs">{formatThaiDate(o.Odate)}</td>
-                  <td className="px-4 py-3 text-center">{rightAction(o)}</td>
-                </tr>
-              ))}
+              {rows.map((o) => {
+                const meta = getMeta(ORDER_STATUS, o.Ostatus);
+
+                return (
+                  <tr key={o.Oid} className="border-t hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs">{`ord:${String(
+                      o.Oid
+                    ).padStart(4, '0')}`}</td>
+                    <td className="px-4 py-3 font-medium">{o.Cname}</td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      {fmtBaht(o.Oprice)} บาท
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-700">
+                      {String(o.Opayment || '-').toUpperCase()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <StatusBadge label={meta.label} tone={meta.tone} />
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-600 text-xs">
+                      {formatThaiDate(o.Odate)}
+                    </td>
+                    <td className="px-4 py-3 text-center">{rightAction(o)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -579,10 +654,18 @@ function Card({
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
-      <div className={`absolute inset-x-0 top-0 h-2 bg-gradient-to-r ${gradientClass[tone] || gradientClass.gray}`} />
+      <div
+        className={`absolute inset-x-0 top-0 h-2 bg-gradient-to-r ${
+          gradientClass[tone] || gradientClass.gray
+        }`}
+      />
       <div className="p-6 space-y-2">
-        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</div>
-        <div className="text-2xl md:text-3xl font-bold text-gray-900">{value}</div>
+        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+          {label}
+        </div>
+        <div className="text-2xl md:text-3xl font-bold text-gray-900">
+          {value}
+        </div>
       </div>
     </div>
   );

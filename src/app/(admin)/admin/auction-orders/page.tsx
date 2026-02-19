@@ -1,9 +1,14 @@
 'use client';
 
 import { apiFetch } from '@/app/lib/apiFetch';
+import StatusBadge from '@/app/component/StatusBadge';
+import { getMeta, AUCTION_PAY_STATUS, AUCTION_SHIP_STATUS, StatusMeta } from '@/app/lib/status';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+
+type PaymentStatus = 'pending_payment' | 'payment_review' | 'paid' | 'expired' | string;
+type ShipStatus = 'pending' | 'shipped' | 'delivered' | null;
 
 interface AuctionOrder {
   Aid: number;
@@ -11,9 +16,10 @@ interface AuctionOrder {
   PROname: string;
   Cname: string;
   current_price: number;
-  payment_status: string;
+  payment_status: PaymentStatus;
 
-  shipping_status?: 'pending' | 'shipping' | 'delivered' | null;
+  // db อาจเก็บ 'shipping' แต่ใน status map เราใช้ 'shipped'
+  shipping_status?: 'pending' | 'shipping' | 'shipped' | 'delivered' | null;
   shipping_company?: string | null;
   tracking_number?: string | null;
 
@@ -44,35 +50,8 @@ function fmtDateTime(s?: string | null) {
   });
 }
 
-function paymentBadge(payment_status: string) {
-  switch (payment_status) {
-    case 'pending_payment':
-      return { label: '⏳ รอชำระเงิน', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
-    case 'payment_review':
-      return { label: '🔍 รอตรวจสอบสลิป', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
-    case 'paid':
-      return { label: '✅ ชำระแล้ว', cls: 'bg-green-100 text-green-800 border-green-200' };
-    default:
-      return { label: payment_status || '—', cls: 'bg-gray-100 text-gray-800 border-gray-200' };
-  }
-}
-
-function shippingBadge(o: AuctionOrder) {
-  if (o.payment_status === 'pending_payment') return { label: '—', cls: 'bg-gray-100 text-gray-700 border-gray-200' };
-  if (o.payment_status === 'payment_review') return { label: '—', cls: 'bg-gray-100 text-gray-700 border-gray-200' };
-
-  const s = o.shipping_status ?? null;
-  const hasTracking = Boolean(o.tracking_number);
-
-  if (s === 'delivered') return { label: '✅ ส่งสำเร็จ', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-  if (s === 'shipping' || hasTracking) return { label: '🚚 จัดส่งแล้ว', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
-  if (o.payment_status === 'paid') return { label: '📦 รอจัดส่ง', cls: 'bg-purple-100 text-purple-800 border-purple-200' };
-
-  return { label: '—', cls: 'bg-gray-100 text-gray-700 border-gray-200' };
-}
-
 type Filter = 'all' | 'pending_payment' | 'payment_review' | 'paid';
-type ShipFilter = 'all' | 'pending' | 'shipping' | 'delivered';
+type ShipFilter = 'all' | 'pending' | 'shipped' | 'delivered';
 
 export default function AuctionOrdersPage() {
   const router = useRouter();
@@ -84,21 +63,38 @@ export default function AuctionOrdersPage() {
 
   const isValidYear = (v: number) => Number.isFinite(v) && v >= MIN_YEAR && v <= MAX_YEAR;
 
-  // ✅ สำคัญ: render แรกให้ server/client เห็นเท่ากัน (กัน hydration error)
+  // ✅ render แรกให้ server/client เห็นเท่ากัน กัน hydration
   const [year, setYear] = useState<number>(nowYear);
-
-  // ✅ กันไม่ให้ sync กลับไปทับ URL/localStorage ก่อนที่เราจะอ่านค่าจริง
   const [ready, setReady] = useState(false);
 
   const [orders, setOrders] = useState<AuctionOrder[]>([]);
   const [filterStatus, setFilterStatus] = useState<Filter>('pending_payment');
-
-  // ✅ เพิ่มฟิลเตอร์จัดส่ง
   const [shipFilter, setShipFilter] = useState<ShipFilter>('all');
-
   const [loading, setLoading] = useState(true);
 
-  // ✅ 1) หลัง mount ค่อยอ่าน: URL > localStorage > nowYear
+  // ---------- status helpers (typed) ----------
+  const getPaymentMeta = (raw: PaymentStatus): StatusMeta => getMeta(AUCTION_PAY_STATUS, raw);
+
+  const normalizeShip = (o: AuctionOrder): ShipStatus => {
+    const paid = String(o.payment_status || '').trim() === 'paid';
+    if (!paid) return null;
+
+    const sRaw = String(o.shipping_status || '').trim();
+    const hasTracking = Boolean(o.tracking_number);
+
+    // ✅ normalize ให้เข้ามาตรฐาน AUCTION_SHIP_STATUS: pending | shipped | delivered
+    if (sRaw === 'delivered') return 'delivered';
+    if (sRaw === 'shipping' || sRaw === 'shipped' || hasTracking) return 'shipped';
+    return 'pending';
+  };
+
+  const getShipMeta = (o: AuctionOrder): StatusMeta => {
+    const s = normalizeShip(o);
+    if (!s) return { label: '—', tone: 'gray' };
+    return getMeta(AUCTION_SHIP_STATUS, s);
+  };
+
+  // ✅ 1) mount แล้วค่อยอ่าน year: URL > localStorage > nowYear
   useEffect(() => {
     const fromUrl = Number(searchParams.get('year'));
     if (isValidYear(fromUrl)) {
@@ -118,7 +114,7 @@ export default function AuctionOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ 2) หลัง ready แล้ว ค่อย sync year -> localStorage + URL
+  // ✅ 2) ready แล้วค่อย sync year -> localStorage + URL
   useEffect(() => {
     if (!ready) return;
 
@@ -132,7 +128,7 @@ export default function AuctionOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, ready]);
 
-  // ✅ 3) โหลดข้อมูลตามปี (หลัง ready กันยิงปีผิดตอนเริ่ม)
+  // ✅ 3) โหลดข้อมูลตามปี
   useEffect(() => {
     if (!ready) return;
 
@@ -167,31 +163,25 @@ export default function AuctionOrdersPage() {
     };
   }, [orders]);
 
-  // ✅ normalize สถานะจัดส่ง (นับเฉพาะ paid)
-  const normalizeShip = (o: AuctionOrder): 'pending' | 'shipping' | 'delivered' | null => {
-    if (o.payment_status !== 'paid') return null;
-    if (o.shipping_status === 'delivered') return 'delivered';
-    if (o.shipping_status === 'shipping' || Boolean(o.tracking_number)) return 'shipping';
-    return 'pending'; // paid แล้วแต่ยังไม่ส่ง
-  };
-
-  // ✅ count แยกตามสถานะจัดส่ง (เฉพาะ paid)
   const shipCounts = useMemo(() => {
     const all = Array.isArray(orders) ? orders : [];
-    const paidOnly = all.filter((o) => o.payment_status === 'paid');
+    const paidOnly = all.filter((o) => String(o.payment_status || '').trim() === 'paid');
     return {
       all: paidOnly.length,
       pending: paidOnly.filter((o) => normalizeShip(o) === 'pending').length,
-      shipping: paidOnly.filter((o) => normalizeShip(o) === 'shipping').length,
+      shipped: paidOnly.filter((o) => normalizeShip(o) === 'shipped').length,
       delivered: paidOnly.filter((o) => normalizeShip(o) === 'delivered').length,
     };
   }, [orders]);
 
   const filtered = useMemo(() => {
-    const byPayment = orders.filter((o) => (filterStatus === 'all' ? true : o.payment_status === filterStatus));
+    const byPayment = orders.filter((o) =>
+      filterStatus === 'all' ? true : o.payment_status === filterStatus
+    );
+
     if (shipFilter === 'all') return byPayment;
 
-    // ถ้ากรองตามจัดส่ง: มันมีความหมายจริง ๆ เฉพาะ paid เท่านั้น
+    // ✅ shipFilter มีความหมายจริง ๆ เฉพาะ paid เท่านั้น
     return byPayment.filter((o) => normalizeShip(o) === shipFilter);
   }, [orders, filterStatus, shipFilter]);
 
@@ -204,7 +194,7 @@ export default function AuctionOrdersPage() {
 
   const shipButtons: Array<{ v: ShipFilter; label: string; count: number }> = [
     { v: 'pending', label: '📦 รอจัดส่ง', count: shipCounts.pending },
-    { v: 'shipping', label: '🚚 จัดส่งแล้ว', count: shipCounts.shipping },
+    { v: 'shipped', label: '🚚 จัดส่งแล้ว', count: shipCounts.shipped },
     { v: 'delivered', label: '✅ ส่งสำเร็จ', count: shipCounts.delivered },
     { v: 'all', label: '📦 ชำระแล้วทั้งหมด', count: shipCounts.all },
   ];
@@ -254,107 +244,113 @@ export default function AuctionOrdersPage() {
         </div>
 
         {/* ✅ ฟิลเตอร์แบบไม่งง: แยก 2 กล่อง */}
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-  {/* ------- Payment ------- */}
-  <div className="bg-white rounded-2xl shadow-lg p-5 border-2 border-gray-200">
-    <div className="flex items-center justify-between gap-3 mb-3">
-      <div>
-        <div className="text-sm font-bold text-gray-800">สถานะชำระเงิน</div>
-        <div className="text-xs text-gray-500">กรองตามขั้นตอนการจ่ายเงิน</div>
-      </div>
-      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-700 border">
-        ทั้งหมด {counts.all}
-      </span>
-    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* ------- Payment ------- */}
+          <div className="bg-white rounded-2xl shadow-lg p-5 border-2 border-gray-200">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div className="text-sm font-bold text-gray-800">สถานะชำระเงิน</div>
+                <div className="text-xs text-gray-500">กรองตามขั้นตอนการจ่ายเงิน</div>
+              </div>
+              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-700 border">
+                ทั้งหมด {counts.all}
+              </span>
+            </div>
 
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-      {filterButtons.map((x) => {
-        const isActive = filterStatus === x.v;
-        return (
-          <button
-            key={x.v}
-            type="button"
-            onClick={() => setFilterStatus(x.v)}
-            className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl font-semibold border transition
-              ${isActive
-                ? 'bg-green-600 text-white border-green-600 shadow'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}`}
-          >
-            <span className="truncate">{x.label}</span>
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                isActive ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              {x.count}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  </div>
-
-  {/* ------- Shipping ------- */}
-  <div className="bg-white rounded-2xl shadow-lg p-5 border-2 border-gray-200">
-    <div className="flex items-center justify-between gap-3 mb-3">
-      <div>
-        <div className="text-sm font-bold text-gray-800">สถานะจัดส่ง</div>
-        <div className="text-xs text-gray-500">นับ/กรองเฉพาะออเดอร์ที่ “ชำระแล้ว”</div>
-      </div>
-      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-        ชำระแล้ว {shipCounts.all}
-      </span>
-    </div>
-
-    {/* ✅ ถ้าไม่ได้อยู่ใน paid/all ให้ปุ่มจัดส่ง disable เพื่อไม่ให้งง */}
-    {(() => {
-      const shipEnabled = filterStatus === 'paid' || filterStatus === 'all';
-      return (
-        <>
-          <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${!shipEnabled ? 'opacity-50' : ''}`}>
-            {shipButtons.map((x) => {
-              const isActive = shipFilter === x.v;
-              return (
-                <button
-                  key={x.v}
-                  type="button"
-                  disabled={!shipEnabled}
-                  onClick={() => setShipFilter(x.v)}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl font-semibold border transition
-                    ${!shipEnabled
-                      ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-                      : isActive
-                        ? 'bg-blue-600 text-white border-blue-600 shadow'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
-                >
-                  <span className="truncate">{x.label}</span>
-                  <span
-                    className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                      !shipEnabled
-                        ? 'bg-gray-200 text-gray-500'
-                        : isActive
-                          ? 'bg-white text-blue-700'
-                          : 'bg-gray-200 text-gray-700'
-                    }`}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {filterButtons.map((x) => {
+                const isActive = filterStatus === x.v;
+                return (
+                  <button
+                    key={x.v}
+                    type="button"
+                    onClick={() => {
+                      setFilterStatus(x.v);
+                      // ✅ เปลี่ยนโหมดชำระเงินแล้ว reset ship filter ให้ไม่งง
+                      setShipFilter('all');
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl font-semibold border transition
+                      ${
+                        isActive
+                          ? 'bg-green-600 text-white border-green-600 shadow'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
+                      }`}
                   >
-                    {x.count}
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="truncate">{x.label}</span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        isActive ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {x.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {!shipEnabled ? (
-            <div className="mt-3 text-xs text-gray-500">
-              * เลือก “✅ ชำระแล้ว” หรือ “📦 ทั้งหมด” ก่อน ถึงจะกรองสถานะจัดส่งได้
+          {/* ------- Shipping ------- */}
+          <div className="bg-white rounded-2xl shadow-lg p-5 border-2 border-gray-200">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div className="text-sm font-bold text-gray-800">สถานะจัดส่ง</div>
+                <div className="text-xs text-gray-500">นับ/กรองเฉพาะออเดอร์ที่ “ชำระแล้ว”</div>
+              </div>
+              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                ชำระแล้ว {shipCounts.all}
+              </span>
             </div>
-          ) : null}
-        </>
-      );
-    })()}
-  </div>
-</div>
 
+            {(() => {
+              const shipEnabled = filterStatus === 'paid' || filterStatus === 'all';
+              return (
+                <>
+                  <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${!shipEnabled ? 'opacity-50' : ''}`}>
+                    {shipButtons.map((x) => {
+                      const isActive = shipFilter === x.v;
+                      return (
+                        <button
+                          key={x.v}
+                          type="button"
+                          disabled={!shipEnabled}
+                          onClick={() => setShipFilter(x.v)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl font-semibold border transition
+                            ${
+                              !shipEnabled
+                                ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : isActive
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'
+                            }`}
+                        >
+                          <span className="truncate">{x.label}</span>
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                              !shipEnabled
+                                ? 'bg-gray-200 text-gray-500'
+                                : isActive
+                                  ? 'bg-white text-blue-700'
+                                  : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            {x.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {!shipEnabled ? (
+                    <div className="mt-3 text-xs text-gray-500">
+                      * เลือก “✅ ชำระแล้ว” หรือ “📦 ทั้งหมด” ก่อน ถึงจะกรองสถานะจัดส่งได้
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()}
+          </div>
+        </div>
 
         <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -389,8 +385,9 @@ export default function AuctionOrdersPage() {
                 ) : (
                   filtered.map((o) => {
                     const code = `auc:${String(o.Aid).padStart(4, '0')}`;
-                    const p = paymentBadge(o.payment_status);
-                    const s = shippingBadge(o);
+
+                    const pay = getPaymentMeta(o.payment_status);
+                    const ship = getShipMeta(o);
 
                     return (
                       <tr key={o.Aid} className="border-b border-gray-200 hover:bg-green-50 transition-colors">
@@ -399,23 +396,22 @@ export default function AuctionOrdersPage() {
                         <td className="p-4 text-gray-700">{o.Cname}</td>
                         <td className="p-4 text-center text-sm text-gray-700">{fmtDateTime(o.end_time)}</td>
                         <td className="p-4 text-center text-sm text-gray-700">{fmtDateTime(o.paid_at)}</td>
+
                         <td className="p-4 text-right font-bold text-lg text-green-600">
                           {fmtBaht(Number(o.current_price))} ฿
                         </td>
 
                         <td className="p-4 text-center">
-                          <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-semibold border ${p.cls}`}>
-                            {p.label}
-                          </span>
+                          <StatusBadge label={pay.label} tone={pay.tone} />
                         </td>
 
                         <td className="p-4 text-center">
-                          <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-semibold border ${s.cls}`}>
-                            {s.label}
-                          </span>
-                          {o.tracking_number ? (
-                            <div className="text-xs text-gray-500 mt-1">#{o.tracking_number}</div>
-                          ) : null}
+                          <div className="flex flex-col items-center gap-1">
+                            <StatusBadge label={ship.label} tone={ship.tone} />
+                            {o.tracking_number ? (
+                              <div className="text-xs text-gray-500">#{o.tracking_number}</div>
+                            ) : null}
+                          </div>
                         </td>
 
                         <td className="p-4 text-center">

@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EditProfileModal from '../../component/EditProfileModal';
 import ChangePasswordModal from '../../component/ChangePassword';
-import Link from 'next/link';
 import { apiFetch } from '@/app/lib/apiFetch';
 
 interface UserInfo {
@@ -24,8 +23,12 @@ interface UserInfo {
   Cprofile: string | null;
 }
 
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
 const formatThaiDate = (isoDate: string) => {
+  if (!isoDate) return '-';
   const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('th-TH', {
     year: 'numeric',
     month: 'long',
@@ -33,11 +36,18 @@ const formatThaiDate = (isoDate: string) => {
   });
 };
 
+const getProfileUrl = (filename: string | null) => {
+  if (!filename) return '/default-profile.png';
+  // ถ้า backend เสิร์ฟ /profiles/:file
+  if (filename.startsWith('http')) return filename;
+  return `${API}/profiles/${filename}`;
+};
+
 export default function MePage() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const router = useRouter();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -48,10 +58,7 @@ export default function MePage() {
       }
 
       try {
-        const res = await apiFetch('http://localhost:3000/me', {
-          
-        });
-
+        const res = await apiFetch(`${API}/me`);
         if (!res.ok) throw new Error('Unauthorized');
         const data = await res.json();
 
@@ -59,8 +66,7 @@ export default function MePage() {
           ...data.user,
           Cpassword: '********',
         });
-
-      } catch (err) {
+      } catch {
         router.push('/login');
       }
     };
@@ -70,188 +76,159 @@ export default function MePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-emerald-600 text-lg font-semibold">กำลังโหลดข้อมูล...</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-3xl border border-emerald-100 bg-white/80 backdrop-blur p-8 shadow-xl">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-emerald-600" />
+          </div>
+          <div className="mt-4 text-center text-sm font-semibold text-emerald-700">
+            กำลังโหลดข้อมูลบัญชี...
+          </div>
         </div>
       </div>
     );
   }
 
+  const fullAddress = [
+    user.Caddress,
+    user.Csubdistrict ? `ต.${user.Csubdistrict}` : '',
+    user.Cdistrict ? `อ.${user.Cdistrict}` : '',
+    user.Cprovince ? `จ.${user.Cprovince}` : '',
+    user.Czipcode || '',
+  ]
+    .filter((x) => typeof x === 'string' && x.trim().length > 0)
+    .join(' ');
+
   return (
-    <div className="min-h-screen px-4">
-
-      <div className="mx-auto space-y-10">
-
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50 text-black px-4">
+      <div className="max-w-4xl mx-auto pt-16 pb-16">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4 shadow-lg">
-            ข้อมูลส่วนตัว
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-4 py-2 shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-emerald-600" />
+            <span className="text-xs font-extrabold tracking-wide text-emerald-800">
+              ACCOUNT PROFILE
+            </span>
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            บัญชีผู้ใช้งานของคุณ
+
+          <h1 className="mt-4 text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900">
+            บัญชีผู้ใช้งาน
           </h1>
-          <div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-500 mx-auto mt-3 rounded-full"></div>
+          <p className="mt-2 text-sm text-gray-600">
+            ข้อมูลนี้ใช้สำหรับจัดส่งและการยืนยันคำสั่งซื้อ
+          </p>
         </div>
 
-        <div className="grid gap-8 grid-cols-1 md:grid-cols-2">
+        {/* Main Card */}
+        <div className="rounded-3xl border border-emerald-100 bg-white shadow-xl overflow-hidden">
+          {/* Card Top */}
+          <div className="px-6 md:px-10 py-6 md:py-7 border-b border-emerald-50 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/70">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="h-16 w-16 md:h-20 md:w-20 rounded-2xl overflow-hidden border border-emerald-100 bg-white shadow-sm">
+                    <img
+                      src={getProfileUrl(user.Cprofile)}
+                      alt="โปรไฟล์"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <span className="absolute -bottom-2 -right-2 inline-flex items-center rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-emerald-800 shadow-sm">
+                    {user.Cstatus || 'active'}
+                  </span>
+                </div>
 
-          {/* Profile Card */}
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-emerald-100 p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl text-emerald-700 font-bold flex items-center gap-2">
-                ข้อมูลผู้ใช้
-              </h2>
-              <button
-                className="px-4 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-md hover:shadow-lg font-semibold"
-                onClick={() => setShowModal(true)}
-              >
-                ✏️ แก้ไขข้อมูล
-              </button>
-            </div>
-
-            {/* Profile Image */}
-            <div className="flex justify-center mb-8">
-              <div className="relative">
-                <div className="w-36 h-36 rounded-full overflow-hidden shadow-2xl border-4 border-white ring-4 ring-emerald-200">
-                  <img
-                    src={user.Cprofile ? `http://localhost:3000/profiles/${user.Cprofile}` : '/default-profile.png'}
-                    alt="โปรไฟล์"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="min-w-0">
+                  <div className="text-lg md:text-xl font-extrabold text-gray-900 line-clamp-1">
+                    {user.Cname}
+                  </div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    Username: <span className="font-bold text-gray-900">{user.Cusername}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              {/* <InfoRow icon="🆔" label="รหัสผู้ใช้" value={user.Cid.toString()} /> */}
-              <InfoRow icon="👤" label="ชื่อ-นามสกุล" value={user.Cname} />
-              <InfoRow
-                icon="📍"
-                label="ที่อยู่"
-                value={`${user.Caddress} ต.${user.Csubdistrict} อ.${user.Cdistrict} จ.${user.Cprovince} ${user.Czipcode}`}
-                multiline
-              />
-              <InfoRow icon="🔑" label="ชื่อผู้ใช้" value={user.Cusername} />
-              <InfoRow icon="🔒" label="รหัสผ่าน" value={user.Cpassword} />
-              <InfoRow icon="📞" label="เบอร์โทร" value={user.Cphone} />
-              <InfoRow icon="✅" label="สถานะบัญชี" value={user.Cstatus} badge />
-              <InfoRow icon="📅" label="วันที่ลงทะเบียน" value={formatThaiDate(user.Cdate)} />
-              <InfoRow icon="🎂" label="วันเกิด" value={formatThaiDate(user.Cbirth)} />
-            </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="h-11 px-5 rounded-2xl border-2 border-emerald-500 bg-white text-emerald-700 font-extrabold hover:bg-emerald-50 transition"
+                  type="button"
+                >
+                  แก้ไขข้อมูล
+                </button>
 
-            <button
-              onClick={() => setShowPasswordModal(true)}
-              className="mt-8 w-full bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl py-3.5 font-semibold hover:from-emerald-700 hover:to-green-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              🔒 เปลี่ยนรหัสผ่าน
-            </button>
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="h-11 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-extrabold shadow-lg hover:shadow-xl hover:from-emerald-700 hover:to-green-700 transition"
+                  type="button"
+                >
+                  เปลี่ยนรหัสผ่าน
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Menu */}
-          <div className="bg-white rounded-2xl shadow-xl border-2 border-emerald-100 p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          {/* Details */}
+          <div className="px-6 md:px-10 py-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+              <InfoRow label="ชื่อ-นามสกุล" value={user.Cname} />
+              <InfoRow label="เบอร์โทรศัพท์" value={user.Cphone || '-'} />
 
-            <h2 className="text-2xl font-bold text-emerald-700 mb-6 flex items-center gap-2">
-              เมนูการใช้งาน
-            </h2>
+              <InfoRow label="ที่อยู่จัดส่ง" value={fullAddress || '-'} multiline />
+              <InfoRow label="รหัสไปรษณีย์" value={user.Czipcode || '-'} />
 
-            <ul className="space-y-3">
+              <InfoRow label="วันเกิด" value={formatThaiDate(user.Cbirth)} />
+              <InfoRow label="วันที่ลงทะเบียน" value={formatThaiDate(user.Cdate)} />
 
-              <li>
-                <Link
-                  href="/me/my-bidding"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 text-emerald-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 group"
-                >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">📦</span>
-                  <span className="font-semibold">รายการประมูลของฉัน</span>
-                </Link>
-              </li>
+              <InfoRow label="รหัสผ่าน" value={user.Cpassword} />
+              <InfoRow label="สถานะบัญชี" value={user.Cstatus || '-'} badge />
+            </div>
 
-              <li>
-                <Link
-                  href="/me/orders"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 text-emerald-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 group"
-                >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">🧾</span>
-                  <span className="font-semibold">ประวัติคำสั่งซื้อ</span>
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  href="/me/auction-wins"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 text-emerald-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 group"
-                >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">🏆</span>
-                  <span className="font-semibold">สินค้าที่ชนะประมูล</span>
-                </Link>
-              </li>
-
-              <li className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 text-gray-400 cursor-not-allowed opacity-60">
-                <span className="text-2xl">❌</span>
-                <div className="flex-1">
-                  <span className="font-semibold block">รายการยกเลิกสินค้า</span>
-                  <span className="text-xs">(เร็วๆ นี้)</span>
-                </div>
-              </li>
-
-              <li className="flex items-center gap-3 p-4 rounded-xl bg-gray-50 text-gray-400 cursor-not-allowed opacity-60">
-                <span className="text-2xl">💰</span>
-                <div className="flex-1">
-                  <span className="font-semibold block">ประวัติแจ้งชำระเงิน</span>
-                  <span className="text-xs">(เร็วๆ นี้)</span>
-                </div>
-              </li>
-
-            </ul>
-
+            <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 text-sm text-gray-700">
+              หากต้องการแก้ที่อยู่/เบอร์โทร ให้กด “แก้ไขข้อมูล” เพื่อให้ระบบใช้ข้อมูลใหม่กับการจัดส่ง
+            </div>
           </div>
-
         </div>
       </div>
 
-      {showModal && (
-        <EditProfileModal user={user} onClose={() => setShowModal(false)} />
-      )}
-
-      {showPasswordModal && (
-        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
-      )}
-
+      {showModal && <EditProfileModal user={user} onClose={() => setShowModal(false)} />}
+      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
     </div>
   );
 }
 
-// InfoRow Component
 function InfoRow({
-  icon,
   label,
   value,
   multiline = false,
-  badge = false
+  badge = false,
 }: {
-  icon: string;
   label: string;
   value: string;
   multiline?: boolean;
   badge?: boolean;
 }) {
   return (
-    <div className={`flex gap-3 pb-4 border-b border-emerald-50 ${multiline ? 'items-start' : 'items-center'}`}>
-      {/* ถ้าอยากใส่ไอคอนให้เอาคอมเมนต์ข้างล่างออก */}
-      {/* <span className="text-2xl">{icon}</span> */}
-      <div className="flex-1">
-        <p className="text-xs text-emerald-700 font-semibold mb-1 uppercase tracking-wide">{label}</p>
+    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="text-[11px] font-extrabold tracking-wide text-emerald-800 uppercase">
+        {label}
+      </div>
+
+      <div className="mt-2">
         {badge ? (
-          <span className="inline-block bg-gradient-to-r from-emerald-500 to-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-md">
+          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-extrabold text-emerald-800">
             {value}
           </span>
         ) : (
-          <p className={`text-gray-800 font-semibold ${multiline ? 'leading-relaxed' : ''}`}>
+          <div
+            className={[
+              'text-gray-900 font-bold',
+              multiline ? 'leading-relaxed whitespace-pre-line' : 'line-clamp-1',
+            ].join(' ')}
+            title={value}
+          >
             {value}
-          </p>
+          </div>
         )}
       </div>
     </div>

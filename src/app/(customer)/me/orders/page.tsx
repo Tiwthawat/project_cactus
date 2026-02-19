@@ -1,9 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { apiFetch } from "@/app/lib/apiFetch";
 
-// ✅ กำหนด type สำหรับ User และ Order
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { apiFetch } from '@/app/lib/apiFetch';
+import StatusBadge from '@/app/component/StatusBadge';
+import { getOrderBadge } from '@/app/lib/status';
+
+// ✅ types
 interface User {
   Cid: number;
   Cname: string;
@@ -19,14 +22,94 @@ interface Order {
   Oid: number;
   Odate: string;
   Oprice: number | string;
-  Ostatus: string;
-  Opayment: string;
+  Ostatus: string; // pending_payment | waiting | payment_review | paid | shipping | delivered | cancelled ...
+  Opayment: string; // cod | bank | transfer | ...
 }
-const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
+
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
+type FilterKey =
+  | 'all'
+  | 'pending_payment'
+  | 'payment_review'
+  | 'to_ship'
+  | 'shipping'
+  | 'delivered'
+  | 'cancelled';
+
+function norm(s: unknown) {
+  return String(s ?? '').trim();
+}
+
+function isCodPay(pay: unknown) {
+  const p = norm(pay).toLowerCase();
+  return p === 'cod' || p === 'cash_on_delivery' || p === 'cashondelivery';
+}
+
+function isWaitingOrPendingPayment(status: unknown) {
+  const s = norm(status);
+  return s === 'pending_payment' || s === 'waiting';
+}
+
+/** ✅ ตัวกลาง “groupKey” สำหรับ filter/count ฝั่งลูกค้า */
+function customerGroupKey(o: Order): Exclude<FilterKey, 'all'> {
+  const s = norm(o.Ostatus);
+  const cod = isCodPay(o.Opayment);
+
+  if (s === 'cancelled') return 'cancelled';
+  if (s === 'delivered') return 'delivered';
+  if (s === 'shipping') return 'shipping';
+  if (s === 'payment_review') return 'payment_review';
+
+  // ✅ โอน + pending_payment/waiting => รอชำระเงิน
+  if (!cod && isWaitingOrPendingPayment(s)) return 'pending_payment';
+
+  // ✅ paid => รอจัดส่ง
+  if (s === 'paid') return 'to_ship';
+
+  // ✅ COD + pending_payment/waiting => รอจัดส่ง (รวมไปเลย)
+  if (cod && isWaitingOrPendingPayment(s)) return 'to_ship';
+
+  // ✅ fallback
+  return 'to_ship';
+}
+
+/* ---------- UI helpers ---------- */
+function fmtBaht(v: number | string) {
+  const n = Number(v || 0);
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDateTH(d: string) {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return '-';
+  return dt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+const FILTERS: Array<{ v: FilterKey; label: string }> = [
+  { v: 'all', label: 'ทั้งหมด' },
+  { v: 'pending_payment', label: 'รอชำระเงิน' },
+  { v: 'payment_review', label: 'รอตรวจสอบ' },
+  { v: 'to_ship', label: 'รอจัดส่ง' },
+  { v: 'shipping', label: 'รอรับสินค้า' },
+  { v: 'delivered', label: 'ได้รับแล้ว' },
+  { v: 'cancelled', label: 'ยกเลิก' },
+];
+
 export default function MyOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
+
+  // ✅ horizontal filter scroller (Shopee-like)
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const scrollByAmount = (dir: 'left' | 'right') => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const step = Math.max(220, Math.floor(el.clientWidth * 0.75));
+    el.scrollBy({ left: dir === 'left' ? -step : step, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}') as User;
@@ -37,23 +120,20 @@ export default function MyOrdersPage() {
       return;
     }
 
-
     const fetchOrders = async () => {
       try {
+        setLoading(true);
         const res = await apiFetch(`${API}/orders?Cid=${storedUser.Cid}`);
-        const data = await res.json();
-
-
-        const sorted = [...data].sort((a: Order, b: Order) => b.Oid - a.Oid);
-
+        const data = await res.json().catch(() => []);
+        const sorted = [...data].sort((a: Order, b: Order) => Number(b.Oid) - Number(a.Oid));
         setOrders(sorted);
       } catch (err) {
         console.error('โหลดคำสั่งซื้อผิดพลาด:', err);
+        setOrders([]);
       } finally {
         setLoading(false);
       }
     };
-
 
     fetchOrders();
   }, []);
@@ -62,208 +142,299 @@ export default function MyOrdersPage() {
     if (!confirm('ต้องการยกเลิกคำสั่งซื้อนี้ใช่หรือไม่?')) return;
 
     try {
-      const res = await apiFetch(`${API}/orders/${orderId}/cancel`, { method: "PATCH" })
-        ;
-
+      const res = await apiFetch(`${API}/orders/${orderId}/cancel`, { method: 'PATCH' });
       if (!res.ok) throw new Error('ยกเลิกไม่สำเร็จ');
 
-      // ลบออกจากหน้ารายการ หรืออัปเดตสถานะ
-      setOrders(prev =>
-        prev.map(order =>
-          order.Oid === orderId ? { ...order, Ostatus: 'cancelled' } : order
-        )
+      setOrders((prev) =>
+        prev.map((o) => (o.Oid === orderId ? { ...o, Ostatus: 'cancelled' } : o))
       );
     } catch (err) {
-      alert('เกิดข้อผิดพลาดในการยกเลิก');
       console.error(err);
+      alert('เกิดข้อผิดพลาดในการยกเลิก');
     }
   };
-  const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredOrders = statusFilter === 'all'
-    ? orders
-    : orders.filter(order => order.Ostatus === statusFilter);
+  const statusButtons = useMemo(() => {
+    return FILTERS.map((s) => ({
+      ...s,
+      count:
+        s.v === 'all'
+          ? orders.length
+          : orders.filter((o) => customerGroupKey(o) === s.v).length,
+    }));
+  }, [orders]);
 
+  const filteredOrders = useMemo(() => {
+    if (statusFilter === 'all') return orders;
+    return orders.filter((o) => customerGroupKey(o) === statusFilter);
+  }, [orders, statusFilter]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-gray-50 to-gray-50 text-black">
+        <div className="max-w-5xl mx-auto pt-28 p-6">
+          <div className="bg-white border border-emerald-100 rounded-3xl p-8 shadow-sm">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 w-64 bg-gray-200 rounded" />
+              <div className="h-4 w-96 bg-gray-200 rounded" />
+              <div className="h-12 w-full bg-gray-200 rounded-2xl" />
+              <div className="h-32 w-full bg-gray-200 rounded-3xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) return <p className="p-6 text-center">กำลังโหลดข้อมูล...</p>;
-  if (!user) return <p className="p-6 text-center text-red-600">ไม่พบข้อมูลผู้ใช้</p>;
-
-  const statusButtons = [
-    { v: 'all', label: '📦 ทั้งหมด' },
-    { v: 'pending_payment', label: '💰 รอชำระเงิน' },
-    { v: 'payment_review', label: '⌛ รอตรวจสอบ' },
-    { v: 'paid', label: '✅ ชำระแล้ว' },
-    { v: 'shipping', label: '📮 จัดส่งแล้ว' },
-    { v: 'delivered', label: '📬 ได้รับแล้ว' },
-    { v: 'cancelled', label: '❌ ยกเลิก' },
-  ].map(s => ({
-    ...s,
-    count:
-      s.v === 'all'
-        ? orders.length
-        : orders.filter(o => o.Ostatus === s.v).length,
-  }));
-
-
+  if (!user?.Cid) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-gray-50 to-gray-50 text-black">
+        <div className="max-w-5xl mx-auto pt-28 p-6">
+          <div className="bg-white border border-red-200 rounded-3xl p-8 shadow-sm">
+            <p className="text-red-600 font-semibold text-center">ไม่พบข้อมูลผู้ใช้</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
-      <div className="max-w-5xl mx-auto pt-32 p-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
-            ประวัติการสั่งซื้อ
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-gray-50 to-gray-50 text-black">
+      <div className="max-w-5xl mx-auto pt-28 p-6">
+        {/* Header (premium, green theme subtle) */}
+        <div className="mb-6">
+          <div className="bg-white/80 backdrop-blur border border-emerald-100 rounded-3xl shadow-sm p-6 md:p-7">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-xs font-semibold tracking-wide text-emerald-800">
+                    Orders
+                  </span>
+                </div>
+
+                <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mt-3">
+                  รายการสั่งซื้อของฉัน
+                </h1>
+                <p className="text-gray-500 mt-2">
+                  ดูสถานะคำสั่งซื้อ แจ้งชำระเงิน และติดตามการจัดส่งได้ที่หน้านี้
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm min-w-[200px]">
+                <div className="text-xs text-gray-500">จำนวนรายการทั้งหมด</div>
+                <div className="text-2xl font-extrabold text-gray-900 mt-1">
+                  {orders.length}
+                  <span className="text-sm font-semibold text-gray-500 ml-2">รายการ</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
-            รายการสั่งซื้อของฉัน
-          </h1>
         </div>
 
-        {/* Filter Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              🔍
+        {/* Filter bar (Shopee-like scroll + arrows) */}
+        <div className="bg-white border border-gray-200 rounded-3xl shadow-sm p-4 md:p-5 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-lg font-bold text-gray-900">กรองตามสถานะ</h2>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => scrollByAmount('left')}
+                className="h-10 w-10 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition flex items-center justify-center"
+                aria-label="เลื่อนซ้าย"
+                title="เลื่อนซ้าย"
+              >
+                <span className="text-gray-700 text-lg">‹</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollByAmount('right')}
+                className="h-10 w-10 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition flex items-center justify-center"
+                aria-label="เลื่อนขวา"
+                title="เลื่อนขวา"
+              >
+                <span className="text-gray-700 text-lg">›</span>
+              </button>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">กรองรายการ</h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div
+            ref={scrollerRef}
+            className="flex gap-2 overflow-x-auto pb-2 scroll-smooth"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            <style>{`
+              /* hide scrollbar (webkit) */
+              div::-webkit-scrollbar { display: none; }
+            `}</style>
 
             {statusButtons.map((x) => {
-              const isActive = statusFilter === x.v; // ✅ แก้ตรงนี้
+              const active = statusFilter === x.v;
               return (
                 <button
                   key={x.v}
                   type="button"
                   onClick={() => setStatusFilter(x.v)}
-                  className={`
-    flex items-center gap-2
-    h-10 px-4
-    rounded-full
-    text-sm font-semibold
-    border transition whitespace-nowrap
-    ${isActive
-                      ? 'bg-green-600 text-white border-green-600 shadow'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}
-  `}
+                  className={[
+                    'shrink-0 h-11 px-4 rounded-2xl border transition inline-flex items-center gap-2',
+                    active
+                      ? 'border-emerald-500 bg-emerald-600 text-white shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-800 hover:bg-emerald-50 hover:border-emerald-200',
+                  ].join(' ')}
                 >
-                  <span>{x.label}</span>
+                  <span className="text-sm font-semibold">{x.label}</span>
                   <span
-                    className={`
-      min-w-[20px] text-center
-      text-xs font-bold px-2 py-0.5 rounded-full
-      ${isActive
-                        ? 'bg-white text-green-700'
-                        : 'bg-gray-200 text-gray-700'}
-    `}
+                    className={[
+                      'min-w-[34px] px-2 py-0.5 rounded-full text-xs font-extrabold text-center',
+                      active ? 'bg-white/95 text-emerald-700' : 'bg-gray-100 text-gray-700',
+                    ].join(' ')}
                   >
                     {x.count}
                   </span>
                 </button>
-
               );
             })}
           </div>
         </div>
 
-        {/* Orders List */}
+        {/* Empty state */}
         {filteredOrders.length === 0 ? (
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="bg-white rounded-3xl shadow-2xl px-12 py-20 text-center border-2 border-gray-200 w-full max-w-xl">
-              <div className="w-24 h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">
-                📦
-              </div>
-              <p className="text-gray-800 text-3xl font-bold mb-3">ไม่มีรายการสั่งซื้อ</p>
-              <p className="text-gray-500 text-lg">ไปเลือกแคคตัสน่ารัก ๆ มาสั่งซื้อกันเถอะ! 🌵💚</p>
+          <div className="bg-white border border-gray-200 rounded-3xl shadow-sm p-10 text-center">
+            <div className="mx-auto mb-5 w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100" />
+            </div>
+            <p className="text-xl font-extrabold text-gray-900">ไม่มีรายการในสถานะนี้</p>
+            <p className="text-gray-500 mt-2">ลองเปลี่ยนตัวกรองด้านบน หรือกลับไปเลือกสินค้าเพิ่ม</p>
+            <div className="mt-6">
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center h-11 px-6 rounded-2xl bg-gray-900 text-white font-semibold hover:bg-black transition"
+              >
+                ไปหน้าเลือกสินค้า
+              </Link>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredOrders.map(order => (
-              <div key={order.Oid} className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200 hover:border-green-300 transition-all duration-300">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Link href={`/me/orders/${order.Oid}`}>
-                        <h3 className="text-2xl font-bold text-green-600 hover:text-green-700 cursor-pointer">
-                          คำสั่งซื้อ #{order.Oid}
-                        </h3>
-                      </Link>
+            {filteredOrders.map((order) => {
+              const meta = getOrderBadge(order.Ostatus, order.Opayment, 'customer');
+
+              const rawStatus = norm(order.Ostatus);
+              const isCod = isCodPay(order.Opayment);
+              const isBank = !isCod;
+
+              const canPay = isBank && isWaitingOrPendingPayment(rawStatus);
+              const canCancel = canPay;
+
+              return (
+                <div
+                  key={order.Oid}
+                  className="bg-white border border-gray-200 rounded-3xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                >
+                  {/* top strip subtle green */}
+                  <div className="h-1 bg-gradient-to-r from-emerald-500/70 via-emerald-400/30 to-transparent" />
+
+                  <div className="p-5 md:p-6">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-[240px]">
+                        <Link href={`/me/orders/${order.Oid}`}>
+                          <h3 className="text-xl md:text-2xl font-extrabold text-gray-900 hover:text-emerald-700 transition cursor-pointer">
+                            คำสั่งซื้อ #{order.Oid}
+                          </h3>
+                        </Link>
+                        <p className="text-sm text-gray-500 mt-1">
+                          อัปเดตสถานะและรายละเอียดอยู่ในหน้าออเดอร์
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 ml-auto">
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500">ยอดรวม</div>
+                          <div className="text-2xl font-extrabold text-gray-900">
+                            {fmtBaht(order.Oprice)}
+                            <span className="text-sm font-semibold text-gray-500 ml-1">บาท</span>
+                          </div>
+                        </div>
+
+                        <StatusBadge
+                          label={meta.label}
+                          tone={meta.tone}
+                          className="px-3 py-1.5 rounded-2xl"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1 text-gray-600">
-                      <p className="flex items-center gap-2">
-                        <span className="text-lg">📅</span>
-                        <span>วันที่สั่งซื้อ: {new Date(order.Odate).toLocaleDateString('th-TH', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}</span>
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <span className="text-lg">💰</span>
-                        <span>ยอดรวม: <span className="font-bold text-green-600">{Number(order.Oprice).toFixed(2)} บาท</span></span>
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <span className="text-lg">💳</span>
-                        <span>ชำระแบบ: <span className="font-semibold">{order.Opayment === 'cod' ? 'ชำระปลายทาง (COD)' : 'โอนเงิน'}</span></span>
-                      </p>
+
+                    {/* info grid (อ่านง่ายแบบ marketplace) */}
+                    <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                        <div className="text-xs text-gray-500">วันที่สั่งซื้อ</div>
+                        <div className="text-sm font-semibold text-gray-900 mt-1">
+                          {fmtDateTH(order.Odate)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                        <div className="text-xs text-gray-500">ช่องทางชำระเงิน</div>
+                        <div className="text-sm font-semibold text-gray-900 mt-1">
+                          {isCod ? 'ชำระปลายทาง (COD)' : 'โอนเงิน'}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                        <div className="text-xs text-emerald-800/70">คำแนะนำ</div>
+                        <div className="text-sm font-semibold text-emerald-900 mt-1">
+                          {canPay
+                            ? 'กรุณาแจ้งชำระเงินเพื่อให้ระบบตรวจสอบ'
+                            : isCod && isWaitingOrPendingPayment(rawStatus)
+                            ? 'ชำระเงินเมื่อได้รับสินค้า'
+                            : 'ติดตามสถานะในหน้ารายละเอียดออเดอร์'}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Status Badge */}
-                  <div className={`px-4 py-2 rounded-xl font-semibold text-sm ${order.Ostatus === 'paid' ? 'bg-green-100 text-green-700 border-2 border-green-300' :
-                    order.Ostatus === 'payment_review' ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300' :
-                      order.Ostatus === 'shipping' ? 'bg-blue-100 text-blue-700 border-2 border-blue-300' :
-                        order.Ostatus === 'delivered' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300' :
-                          order.Ostatus === 'cancelled' ? 'bg-red-100 text-red-700 border-2 border-red-300' :
-                            'bg-gray-100 text-gray-700 border-2 border-gray-300'
-                    }`}>
-                    {order.Ostatus === 'shipping' ? '📮 กำลังจัดส่ง' :
-                      order.Ostatus === 'paid' ? '✅ ชำระแล้ว' :
-                        order.Ostatus === 'payment_review' ? '⌛ รอตรวจสอบ' :
-                          order.Ostatus === 'delivered' ? '📬 ได้รับแล้ว' :
-                            order.Ostatus === 'cancelled' ? '❌ ยกเลิก' :
-                              order.Ostatus === 'pending_payment' ? '💰 รอชำระเงิน' :
-                                order.Ostatus}
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t-2 border-gray-100">
-                  <Link href={`/me/orders/${order.Oid}`} className="flex-1 min-w-[200px]">
-                    <button className="w-full bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg">
-                      📄 ดูรายละเอียด
-                    </button>
-                  </Link>
-
-                  {/* Bank Transfer - Pending Payment */}
-                  {order.Opayment !== 'cod' && order.Ostatus === 'pending_payment' && (
-                    <>
-                      <Link href={`/payment/${order.Oid}`} className="flex-1 min-w-[200px]">
-                        <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg">
-                          💳 แจ้งชำระเงิน
+                  {/* Actions */}
+                  <div className="px-5 md:px-6 pb-5 md:pb-6">
+                    <div className="flex flex-wrap gap-3">
+                      <Link href={`/me/orders/${order.Oid}`} className="flex-1 min-w-[200px]">
+                        <button
+                          type="button"
+                          className="w-full h-11 rounded-2xl border border-gray-200 bg-white text-gray-900 font-semibold hover:bg-gray-50 transition"
+                        >
+                          ดูรายละเอียด
                         </button>
                       </Link>
-                      <button
-                        onClick={() => handleCancel(order.Oid)}
-                        className="flex-1 min-w-[200px] bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg"
-                      >
-                        ❌ ยกเลิกคำสั่งซื้อ
-                      </button>
-                    </>
-                  )}
 
-                  {/* COD - Pending */}
-                  {order.Opayment === 'cod' && order.Ostatus === 'pending_payment' && (
-                    <div className="flex-1 min-w-[200px] bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-3 text-center">
-                      <p className="text-green-700 font-semibold">💵 รอการจัดส่ง (ชำระปลายทาง)</p>
+                      {canPay && (
+                        <Link href={`/payment/${order.Oid}`} className="flex-1 min-w-[200px]">
+                          <button
+                            type="button"
+                            className="w-full h-11 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition shadow-sm"
+                          >
+                            แจ้งชำระเงิน
+                          </button>
+                        </Link>
+                      )}
+
+                      {canCancel && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancel(order.Oid)}
+                          className="flex-1 min-w-[200px] h-11 rounded-2xl border border-red-200 bg-white text-red-700 font-semibold hover:bg-red-50 transition"
+                        >
+                          ยกเลิกคำสั่งซื้อ
+                        </button>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -12,17 +12,18 @@ interface CategoryEventDetail {
   subtypeid: number | null;
 }
 
-// ฟังก์ชันส่ง event
 const emitCategory = (detail: CategoryEventDetail) => {
   window.dispatchEvent(new CustomEvent('select-category', { detail }));
 };
 
 const Navbar = () => {
   const [username, setUsername] = useState<string | null>(null);
+  const [role, setRole] = useState<'user' | 'admin' | null>(null);
+
   const router = useRouter();
+  const pathname = usePathname();
   const { cartCount } = useCart();
 
-  // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarMode, setSidebarMode] = useState<
     'user' | 'categories' | 'search' | 'cart' | 'menu' | null
@@ -35,10 +36,14 @@ const Navbar = () => {
     setIsSidebarOpen(true);
   };
 
+  /* ===============================
+     LOAD USER (รองรับ user + admin)
+  =============================== */
   const loadUser = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
       setUsername(null);
+      setRole(null);
       return;
     }
 
@@ -48,22 +53,36 @@ const Navbar = () => {
       });
 
       if (!res.ok) {
-        if (res.status !== 401) console.warn('⚠️ /me ล้มเหลว:', res.status);
         setUsername(null);
+        setRole(null);
         return;
       }
 
       const data = await res.json();
-      if (data?.user?.Cusername) setUsername(data.user.Cusername);
+
+      if (data?.role === 'user') {
+        setUsername(data.user.Cusername);
+        setRole('user');
+      } else if (data?.role === 'admin') {
+        setUsername(data.user.Cname);
+        setRole('admin');
+      } else {
+        setUsername(null);
+        setRole(null);
+      }
     } catch (err) {
-      console.error('❌ โหลด user ผิดพลาด:', err);
+      console.error('โหลด user ผิดพลาด:', err);
       setUsername(null);
+      setRole(null);
     }
   };
 
   useEffect(() => {
     const handleLogin = () => loadUser();
-    const handleLogout = () => setUsername(null);
+    const handleLogout = () => {
+      setUsername(null);
+      setRole(null);
+    };
 
     if (localStorage.getItem('token')) loadUser();
 
@@ -78,48 +97,35 @@ const Navbar = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    setRole(null);
     window.dispatchEvent(new Event('logout-success'));
     router.push('/');
   };
 
-  const pathname = usePathname();
   const isActive = (path: string) => pathname === path;
 
   const activeClass = '!bg-green-100 !text-green-600 font-semibold';
   const inactiveClass =
     'hover:!bg-green-50 hover:!text-green-600 active:!bg-green-100 focus:!bg-green-100 focus:!text-green-600';
 
-  // ใน Navbar
   const goHome = (e: React.MouseEvent) => {
     e.preventDefault();
-    window.dispatchEvent(new Event('go-home')); // สั่ง reset state หน้า home
-    router.push('/'); // เผื่อกรณีไม่ได้อยู่หน้า /
+    window.dispatchEvent(new Event('go-home'));
+    router.push('/');
   };
+  const [mounted, setMounted] = useState(false);
+useEffect(() => setMounted(true), []);
 
   return (
     <div className="navbar bg-white shadow-sm fixed top-0 left-0 w-full z-[9999] text-sm">
+      {/* LEFT */}
       <div className="navbar-start">
-        <div>
-          <button
-            onClick={() => openSidebar('menu')}
-            className="btn btn-ghost lg:hidden btn-sm"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 6h16M4 12h8m-8 6h16"
-              />
-            </svg>
-          </button>
-        </div>
+        <button
+          onClick={() => openSidebar('menu')}
+          className="btn btn-ghost lg:hidden btn-sm"
+        >
+          ☰
+        </button>
 
         <Link
           href="/"
@@ -130,32 +136,42 @@ const Navbar = () => {
         </Link>
       </div>
 
+      {/* CENTER */}
       <div className="navbar-center hidden lg:flex">
         <ul className="menu menu-horizontal px-1 text-xs">
           <li>
             <button
               onClick={() => openSidebar('categories')}
-              className={`${pathname.startsWith('/products') ? activeClass : inactiveClass}`}
+              className={`${
+                pathname.startsWith('/products') ? activeClass : inactiveClass
+              }`}
             >
               หมวดหมู่สินค้า
             </button>
           </li>
+
           <li>
             <Link
               href="/auctions"
-              className={`${isActive('/auctions') ? activeClass : inactiveClass}`}
+              className={`${
+                isActive('/auctions') ? activeClass : inactiveClass
+              }`}
             >
               สินค้าประมูล
             </Link>
           </li>
+
           <li>
             <Link
               href="/auctionguide"
-              className={`${isActive('/auctionguide') ? activeClass : inactiveClass}`}
+              className={`${
+                isActive('/auctionguide') ? activeClass : inactiveClass
+              }`}
             >
               ขั้นตอนการประมูล
             </Link>
           </li>
+
           <li>
             <Link
               href="/FAQ"
@@ -164,14 +180,18 @@ const Navbar = () => {
               คำถามที่พบบ่อย
             </Link>
           </li>
+
           <li>
             <Link
               href="/Insurance"
-              className={`${isActive('/Insurance') ? activeClass : inactiveClass}`}
+              className={`${
+                isActive('/Insurance') ? activeClass : inactiveClass
+              }`}
             >
               การรับประกันสินค้า
             </Link>
           </li>
+
           <li>
             <Link
               href="/forum"
@@ -180,6 +200,7 @@ const Navbar = () => {
               กระทู้
             </Link>
           </li>
+
           <li>
             <Link
               href="/About"
@@ -188,72 +209,79 @@ const Navbar = () => {
               รีวิวเกี่ยวกับเรา
             </Link>
           </li>
+
+          {/* 🔥 ปุ่มเฉพาะ admin */}
+          {role === 'admin' && (
+            <li>
+              <Link
+                href="/admin/dashboard"
+                className={`className="px-3 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
+${
+                  pathname.startsWith('/admin')
+                    ? activeClass
+                    : inactiveClass
+                }`}
+              >
+                กลับไปยังแดรชบอร์ด
+              </Link>
+            </li>
+          )}
         </ul>
       </div>
 
+      {/* RIGHT */}
       <div className="navbar-end gap-2">
-        <div className="relative">
-          {/* ปุ่มค้นหา */}
-          <button
-            onClick={() => openSidebar('search')}
-            className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600"
-          >
-            <FaSearch className="text-base" />
-          </button>
-        </div>
-
-        {/* Cart */}
         <button
-          onClick={() => openSidebar('cart')}
-          className={`btn btn-ghost btn-circle btn-sm ${
-            isActive('/cart')
-              ? 'bg-green-100 text-green-600'
-              : 'hover:bg-green-50 hover:text-green-600'
-          }`}
+          onClick={() => openSidebar('search')}
+          className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600"
         >
-          <div className="indicator">
-            <FaShoppingCart className="text-base" />
-            {cartCount > 0 && (
-              <span className="badge badge-sm badge-error indicator-item text-white text-[10px] h-4 w-4 p-0 flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </div>
+          <FaSearch />
         </button>
+        <button
+  onClick={() => window.dispatchEvent(new Event("show-favorites"))}
+  className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600"
+  aria-label="รายการโปรด"
+  title="รายการโปรด"
+>
+  <FaHeart />
+</button>
 
-        {/* Favorites */}
-        <Link
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            window.dispatchEvent(new CustomEvent('show-favorites'));
-          }}
-          className={`btn btn-ghost btn-circle btn-sm ${
-            isActive('/favorites')
-              ? 'bg-green-100 text-green-600'
-              : 'hover:bg-green-50 hover:text-green-600'
-          }`}
-        >
-          <FaHeart className="text-base" />
-        </Link>
 
-        {/* Notifications */}
+        <div className="indicator">
+  {mounted && cartCount > 0 && (
+    <span
+      className="
+        indicator-item
+        badge badge-error
+        border-2 border-white
+        text-[10px] font-bold
+        min-w-[18px] h-[18px]
+        px-1
+      "
+    >
+      {cartCount > 99 ? '99+' : cartCount}
+    </span>
+  )}
+
+  <button
+    onClick={() => openSidebar('cart')}
+    className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600"
+    aria-label="ตะกร้าสินค้า"
+  >
+    <FaShoppingCart />
+  </button>
+</div>
+
+
+
         <button className="btn btn-ghost btn-circle btn-sm hover:bg-green-50 hover:text-green-600">
-          <div className="indicator">
-            <TbBellRingingFilled className="text-lg" />
-            <span className="badge badge-xs badge-primary indicator-item"></span>
-          </div>
+          <TbBellRingingFilled />
         </button>
 
-        {/* User */}
         {username ? (
           <button
             onClick={() => openSidebar('user')}
-            className={`btn btn-ghost btn-sm text-xs px-3 rounded-lg flex items-center gap-2 ${
-              isActive('/me')
-                ? 'bg-green-100 text-green-600 shadow-sm'
-                : 'hover:bg-green-50 hover:text-green-600'
-            }`}
+            className="btn btn-ghost btn-sm text-xs px-3 rounded-lg flex items-center gap-2 hover:bg-green-50 hover:text-green-600"
           >
             <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
               {username.charAt(0).toUpperCase()}
@@ -263,11 +291,7 @@ const Navbar = () => {
         ) : (
           <Link
             href="/login"
-            className={`text-xs px-4 py-2 rounded-lg border transition ${
-              isActive('/login')
-                ? 'text-green-600 border-green-600 bg-green-50'
-                : 'text-black border-gray-300 hover:text-green-600 hover:border-green-600'
-            }`}
+            className="text-xs px-4 py-2 rounded-lg border text-black border-gray-300 hover:text-green-600 hover:border-green-600"
           >
             เข้าสู่ระบบ
           </Link>
@@ -282,6 +306,7 @@ const Navbar = () => {
         username={username}
         cartCount={cartCount}
         handleLogout={handleLogout}
+        role={role}
       />
     </div>
   );

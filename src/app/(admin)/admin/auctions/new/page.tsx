@@ -19,8 +19,7 @@ export default function NewAuctionPage() {
 
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('');
   const [startPrice, setStartPrice] = useState<string>('0.00');
-  const [minIncrement, setMinIncrement] = useState<string>("1");
-
+  const [minIncrement, setMinIncrement] = useState<string>('1');
 
   const [localDT, setLocalDT] = useState('');
   const [end, setEnd] = useState('');
@@ -30,7 +29,6 @@ export default function NewAuctionPage() {
   const pad2 = (n: number) => String(n).padStart(2, '0');
   const toMySQL = (dt: string) => (dt ? dt.replace('T', ' ') + ':00' : '');
 
-  // เวลา default
   const defaultLocalDT = useMemo(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() + 30);
@@ -45,32 +43,34 @@ export default function NewAuctionPage() {
     setEnd(toMySQL(defaultLocalDT));
   }, [defaultLocalDT]);
 
-  // โหลดสินค้าพร้อมราคา (สถานะ ready)
+  // ✅ โหลดเฉพาะ ready และไม่มีรอบเปิดอยู่
   useEffect(() => {
-  setLoadingItems(true);
+    setLoadingItems(true);
 
-  const load = async () => {
-    try {
-      const res = await apiFetch(`${API}/auction-products?status=ready`);
-      if (!res.ok) {
+    const load = async () => {
+      try {
+        const res = await apiFetch(
+          `${API}/auction-products?status=ready&available=1`,
+          { cache: 'no-store' }
+        );
+
+        if (!res.ok) {
+          setProducts([]);
+          return;
+        }
+
+        const rows = await res.json();
+        setProducts(Array.isArray(rows) ? rows : []);
+      } catch {
         setProducts([]);
-        return;
+      } finally {
+        setLoadingItems(false);
       }
+    };
 
-      const rows = await res.json();
-      setProducts(Array.isArray(rows) ? rows : []);
-    } catch {
-      setProducts([]);
-    } finally {
-      setLoadingItems(false);
-    }
-  };
+    load();
+  }, []);
 
-  load();
-}, []);
-
-
-  // เมื่อเลือกสินค้า → ตั้งราคาเริ่มต้นอัตโนมัติ
   const handleSelectProduct = (value: string) => {
     if (value === '') {
       setSelectedProduct('');
@@ -81,14 +81,12 @@ export default function NewAuctionPage() {
     const id = Number(value);
     setSelectedProduct(id);
 
-    const product = products.find(p => p.PROid === id);
+    const product = products.find((p) => p.PROid === id);
     if (product) {
       setStartPrice(Number(product.PROprice).toFixed(2));
-
     }
   };
 
-  // เวลาเปลี่ยน
   const handleDateChange = (val: string) => {
     setLocalDT(val);
     setEnd(toMySQL(val));
@@ -108,8 +106,6 @@ export default function NewAuctionPage() {
     endIsFuture &&
     products.length > 0;
 
-
-  // Submit
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid || submitting) return;
@@ -125,7 +121,6 @@ export default function NewAuctionPage() {
           start_price: Number(startPrice),
           end_time: end,
           min_increment: Math.max(1, parseInt(minIncrement) || 1),
-
         }),
       });
 
@@ -150,7 +145,6 @@ export default function NewAuctionPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
       <main className="max-w-2xl mx-auto p-6 pt-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
             เปิดรอบประมูล
@@ -164,9 +158,10 @@ export default function NewAuctionPage() {
           onSubmit={submit}
           className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 p-8 space-y-6"
         >
-          {/* เลือกสินค้า */}
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">เลือกสินค้า *</label>
+            <label className="block mb-2 font-semibold text-gray-700">
+              เลือกสินค้า *
+            </label>
 
             {loadingItems ? (
               <div className="text-gray-600 border-2 border-gray-200 p-4 rounded-xl bg-gray-50 text-center">
@@ -175,8 +170,13 @@ export default function NewAuctionPage() {
               </div>
             ) : products.length === 0 ? (
               <div className="text-gray-600 border-2 border-yellow-200 p-4 rounded-xl bg-yellow-50">
-                <p className="font-semibold text-yellow-700 mb-2">⚠️ ยังไม่มีสินค้าที่พร้อมเปิดรอบ</p>
-                <a href="/admin/auction-products/new" className="text-blue-600 hover:underline font-semibold">
+                <p className="font-semibold text-yellow-700 mb-2">
+                  ⚠️ ยังไม่มีสินค้าที่พร้อมเปิดรอบ
+                </p>
+                <a
+                  href="/admin/auction-products/new"
+                  className="text-blue-600 hover:underline font-semibold"
+                >
                   → เพิ่มสินค้าประมูล
                 </a>
               </div>
@@ -197,76 +197,60 @@ export default function NewAuctionPage() {
             )}
           </div>
 
-          {/* ราคาเริ่มต้น */}
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">ราคาเริ่มต้น (บาท) *</label>
-            <div className="relative">
-              <input
-                type="number"
-                step="1"
-                min={0}
-                className="w-full p-3 pl-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none transition-colors text-gray-800 font-semibold"
-                value={startPrice}
-                onChange={(e) => setStartPrice(e.target.value)}
-                required
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">฿</span>
-            </div>
+            <label className="block mb-2 font-semibold text-gray-700">
+              ราคาเริ่มต้น (บาท) *
+            </label>
+            <input
+              type="number"
+              step="1"
+              min={0}
+              value={startPrice}
+              onChange={(e) => setStartPrice(e.target.value)}
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none"
+              required
+            />
           </div>
 
-          {/* ก้าวบิดขั้นต่ำ */}
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">ก้าวบิดขั้นต่ำ (บาท) *</label>
+            <label className="block mb-2 font-semibold text-gray-700">
+              ก้าวบิดขั้นต่ำ (บาท) *
+            </label>
             <input
               type="number"
               min={1}
               step={1}
               value={minIncrement}
               onChange={(e) => setMinIncrement(e.target.value)}
-              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none transition-colors text-gray-800 font-semibold"
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none"
               required
             />
           </div>
 
-          {/* เวลาปิด */}
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">เวลาปิดรอบ *</label>
+            <label className="block mb-2 font-semibold text-gray-700">
+              เวลาปิดรอบ *
+            </label>
             <input
               type="datetime-local"
-              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none transition-colors text-gray-800 font-semibold"
               value={localDT}
               onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full p-3 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-green-400 focus:outline-none"
               required
             />
-            {!endIsFuture && end && (
-              <p className="text-sm text-red-600 mt-2">⚠️ เวลาปิดต้องอยู่ในอนาคต</p>
-            )}
           </div>
 
-          {/* ปุ่ม */}
-          <div className="flex flex-col md:flex-row items-center gap-3 pt-4">
-            <button
-              type="submit"
-              disabled={!valid || submitting}
-              className="w-full md:flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white px-6 py-3 rounded-xl font-bold transition-all duration-300 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
-            >
-              {submitting ? '⏳ กำลังบันทึก…' : '🔨 เปิดรอบประมูล'}
-            </button>
-
-            <a
-              href="/admin/auction-products"
-              className="w-full md:w-auto px-6 py-3 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-center transition-colors"
-            >
-              ← กลับ
-            </a>
-          </div>
+          <button
+            type="submit"
+            disabled={!valid || submitting}
+            className="w-full bg-gradient-to-r from-green-500 to-emerald-600 disabled:from-gray-300 disabled:to-gray-400 text-white px-6 py-3 rounded-xl font-bold transition-all"
+          >
+            {submitting ? '⏳ กำลังบันทึก…' : '🔨 เปิดรอบประมูล'}
+          </button>
 
           {msg && (
-            <div className={`p-4 rounded-xl border-2 ${msg.includes('สำเร็จ')
-                ? 'bg-green-50 border-green-300 text-green-700'
-                : 'bg-red-50 border-red-300 text-red-700'
-              }`}>
-              <p className="font-semibold">{msg}</p>
+            <div className="p-4 rounded-xl border-2 border-gray-300">
+              {msg}
             </div>
           )}
         </form>

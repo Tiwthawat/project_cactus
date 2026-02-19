@@ -1,11 +1,11 @@
 'use client';
 
-interface AuctionGalleryProps {
+type AuctionGalleryProps = {
   pics: string[];
   mainImage: string;
-  setMainImage: (img: string) => void;
+  setMainImage: React.Dispatch<React.SetStateAction<string>>;
   productName: string;
-}
+};
 
 export default function AuctionGallery({
   pics,
@@ -17,22 +17,25 @@ export default function AuctionGallery({
 
   return (
     <div className="w-full">
-      <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden shadow">
-  {mainImgFull ? (
-    <img
-      src={mainImgFull}
-      alt={productName}
-      className="absolute inset-0 w-full h-full object-cover"
-    />
-  ) : (
-    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-gray-400">
-      ไม่มีรูป
-    </div>
-  )}
-</div>
+      {/* Main */}
+      <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-gray-200 bg-white">
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-emerald-700/70" />
 
-      {/* Thumbnail */}
-      {pics.length > 0 && (
+        {mainImgFull ? (
+          <img
+            src={mainImgFull}
+            alt={productName}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
+            ไม่มีรูป
+          </div>
+        )}
+      </div>
+
+      {/* Thumbs */}
+      {pics.length > 1 && (
         <div className="flex gap-2 mt-4 flex-wrap">
           {pics.map((full, i) => {
             const active = mainImgFull === full;
@@ -41,11 +44,19 @@ export default function AuctionGallery({
                 key={i}
                 type="button"
                 onClick={() => setMainImage(full)}
-                className={`relative w-20 h-20 rounded overflow-hidden border
-                            ${active ? 'ring-2 ring-red-500' : 'hover:border-red-500'}`}
+                className={[
+                  'relative w-20 h-20 rounded-xl overflow-hidden border bg-white transition',
+                  active
+                    ? 'border-emerald-600 ring-2 ring-emerald-600/30'
+                    : 'border-gray-200 hover:border-emerald-600/60',
+                ].join(' ')}
                 aria-label={`thumbnail-${i + 1}`}
               >
-                <img src={full} alt={`thumb-${i}`} className="w-full h-full object-cover" />
+                <img
+                  src={full}
+                  alt={`thumb-${i}`}
+                  className="w-full h-full object-cover"
+                />
               </button>
             );
           })}

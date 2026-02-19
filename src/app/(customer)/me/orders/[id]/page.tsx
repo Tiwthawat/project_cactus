@@ -1,19 +1,40 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch } from "@/app/lib/apiFetch";
+import { apiFetch } from '@/app/lib/apiFetch';
 import { FaStar } from 'react-icons/fa';
 
-const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
+import StatusBadge from '@/app/component/StatusBadge';
+import { getOrderBadge, statusLabel } from '@/app/lib/status';
 
-// ✅ แก้ตรงนี้ให้ตรงกับระบบจริง (สถานะที่ "อนุญาตแนบสลิป")
-const SLIP_ALLOWED_STATUS = 'pending'; // เช่น 'pending_payment'
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
+function norm(v: unknown) {
+  return String(v ?? '').trim().toLowerCase();
+}
+
+function isCodPay(p: unknown) {
+  const x = norm(p);
+  return x === 'cod' || x === 'cash_on_delivery' || x === 'cashondelivery';
+}
+
+// ✅ โอนเท่านั้น: สถานะที่ "อนุญาตแนบสลิป"
+function isSlipAllowedStatus(s: unknown) {
+  const v = String(s ?? '').trim();
+  return v === 'pending_payment' || v === 'waiting';
+}
+
+// ✅ สถานะที่ "ไม่ควรทำอะไรแล้ว" (final/blocked)
+function isFinalBlockedStatus(s: unknown) {
+  const v = String(s ?? '').trim();
+  return ['cancelled', 'failed', 'refunded'].includes(v);
+}
 
 interface Item {
   Pid: number;
   Pname: string;
-  Ppicture: string;
+  Ppicture: string; // อาจเป็น "a.jpg,b.jpg"
   Oquantity: number;
   Oprice: number;
 }
@@ -32,6 +53,21 @@ interface Review {
   stars: number;
   text: string;
   images?: string[];
+}
+
+function toImgUrl(path: string) {
+  if (!path) return '/no-image.png';
+  const clean = String(path).trim();
+  if (clean.startsWith('http')) return clean;
+  if (clean.startsWith('/')) return `${API}${clean}`;
+  return `${API}/${clean}`;
+}
+
+function fmtBaht(n: number) {
+  return Number(n || 0).toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export default function OrderDetailPage() {
@@ -60,23 +96,39 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (!id) return;
 
+    let mounted = true;
+
     const load = async () => {
       try {
+        setLoading(true);
+
         const res = await apiFetch(`${API}/orders/${id}`);
         const data = await res.json();
+        if (!mounted) return;
         setOrder(data);
 
         const reviewRes = await apiFetch(`${API}/orders/${id}/review`);
-        const reviewData = await reviewRes.json();
-        if (reviewData) setReview(reviewData);
+        const reviewData = await reviewRes.json().catch(() => null);
+        if (!mounted) return;
+        setReview(reviewData || null);
       } catch (err) {
         console.error('โหลดคำสั่งซื้อผิดพลาด:', err);
+        if (mounted) setOrder(null);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     load();
+
+    return () => {
+      mounted = false;
+      // cleanup previews
+      setReviewPreviews((prev) => {
+        prev.forEach((u) => URL.revokeObjectURL(u));
+        return [];
+      });
+    };
   }, [id]);
 
   // -----------------------------
@@ -101,31 +153,39 @@ export default function OrderDetailPage() {
   };
 
   // -----------------------------
-  // Upload slip (✅ กันสถานะทุกเคส)
+  // Upload slip
   // -----------------------------
   const handleSlipUpload = async () => {
     if (!order || !id) return;
 
-    // ✅ กัน: ยกเลิก/ล้มเหลว/รับของแล้ว = ห้ามแนบสลิป
-    if (['cancelled', 'failed', 'delivered'].includes(order.Ostatus)) {
-      alert('สถานะออเดอร์นี้ไม่สามารถแนบสลิปได้');
-      return;
-    }
+    const isCod = isCodPay(order.Opayment);
 
-    // ✅ กัน: COD ห้ามแนบสลิป
-    if (order.Opayment === 'cod') {
+    // COD = ห้ามแนบสลิป
+    if (isCod) {
       alert('ออเดอร์ปลายทางไม่ต้องแนบสลิป');
       return;
     }
 
-    // ✅ กัน: เคยแนบแล้ว
+    // สถานะ final/blocked = ห้ามแนบสลิป
+    if (isFinalBlockedStatus(order.Ostatus)) {
+      alert('สถานะออเดอร์นี้ไม่สามารถแนบสลิปได้');
+      return;
+    }
+
+    // delivered = ไม่ควรแนบสลิปแล้ว
+    if (String(order.Ostatus || '').trim() === 'delivered') {
+      alert('ออเดอร์นี้ปิดงานแล้ว');
+      return;
+    }
+
+    // เคยแนบแล้ว
     if (order.Oslip) {
       alert('คุณส่งสลิปไปแล้ว');
       return;
     }
 
-    // ✅ กัน: แนบได้เฉพาะสถานะที่กำหนด
-    if (order.Ostatus !== SLIP_ALLOWED_STATUS) {
+    // แนบได้เฉพาะ pending_payment / waiting
+    if (!isSlipAllowedStatus(order.Ostatus)) {
       alert('แนบสลิปได้เฉพาะออเดอร์ที่รอชำระเงินเท่านั้น');
       return;
     }
@@ -163,7 +223,7 @@ export default function OrderDetailPage() {
         return;
       }
 
-      const updated = await apiFetch(`${API}/orders/${id}`).then(res => res.json());
+      const updated = await apiFetch(`${API}/orders/${id}`).then((res) => res.json());
       setOrder(updated);
       setSlipFile(null);
       setPreview(null);
@@ -182,13 +242,23 @@ export default function OrderDetailPage() {
     const ok = window.confirm('ยืนยันว่าคุณได้รับสินค้าแล้ว?');
     if (!ok || !id) return;
 
-    await apiFetch(`${API}/orders/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'delivered' }),
-    });
+    try {
+      const res = await apiFetch(`${API}/orders/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'delivered' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err?.message || 'อัปเดตสถานะไม่สำเร็จ');
+        return;
+      }
 
-    const updated = await apiFetch(`${API}/orders/${id}`).then(res => res.json());
-    setOrder(updated);
+      const updated = await apiFetch(`${API}/orders/${id}`).then((r) => r.json());
+      setOrder(updated);
+    } catch (e) {
+      console.error(e);
+      alert('อัปเดตสถานะไม่สำเร็จ');
+    }
   };
 
   // -----------------------------
@@ -201,18 +271,15 @@ export default function OrderDetailPage() {
     const remain = 5 - reviewFiles.length;
     const selected = files.slice(0, remain);
 
-    setReviewFiles(prev => [...prev, ...selected]);
-    setReviewPreviews(prev => [
-      ...prev,
-      ...selected.map(f => URL.createObjectURL(f)),
-    ]);
+    setReviewFiles((prev) => [...prev, ...selected]);
+    setReviewPreviews((prev) => [...prev, ...selected.map((f) => URL.createObjectURL(f))]);
 
     e.target.value = '';
   };
 
   const removeReviewImage = (index: number) => {
-    setReviewFiles(prev => prev.filter((_, i) => i !== index));
-    setReviewPreviews(prev => {
+    setReviewFiles((prev) => prev.filter((_, i) => i !== index));
+    setReviewPreviews((prev) => {
       const target = prev[index];
       if (target) URL.revokeObjectURL(target);
       return prev.filter((_, i) => i !== index);
@@ -220,45 +287,51 @@ export default function OrderDetailPage() {
   };
 
   const clearReviewImages = () => {
-    reviewPreviews.forEach(url => URL.revokeObjectURL(url));
+    reviewPreviews.forEach((url) => URL.revokeObjectURL(url));
     setReviewFiles([]);
     setReviewPreviews([]);
   };
 
   // -----------------------------
-  // Review submit (with images)
+  // Review submit
   // -----------------------------
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
 
+    if (!comment.trim()) {
+      alert('กรุณาเขียนความคิดเห็นก่อน');
+      return;
+    }
+
     try {
       const fd = new FormData();
-      fd.append("stars", String(rating));
-      fd.append("text", comment);
-      reviewFiles.forEach((f) => fd.append("images", f));
+      fd.append('stars', String(rating));
+      fd.append('text', comment.trim());
+      reviewFiles.forEach((f) => fd.append('images', f));
 
       const res = await apiFetch(`${API}/orders/${id}/review`, {
-        method: "POST",
+        method: 'POST',
         body: fd,
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(err?.message || "ส่งรีวิวไม่สำเร็จ");
+        alert(err?.message || 'ส่งรีวิวไม่สำเร็จ');
         return;
       }
 
-      alert("ส่งรีวิวสำเร็จ!");
       const reviewRes = await apiFetch(`${API}/orders/${id}/review`);
-      setReview(await reviewRes.json());
+      setReview(await reviewRes.json().catch(() => null));
 
       clearReviewImages();
-      setComment("");
+      setComment('');
       setRating(5);
+
+      alert('ส่งรีวิวสำเร็จ');
     } catch (err) {
       console.error(err);
-      alert("ส่งรีวิวไม่สำเร็จ");
+      alert('ส่งรีวิวไม่สำเร็จ');
     }
   };
 
@@ -270,9 +343,7 @@ export default function OrderDetailPage() {
     if (!ok || !id) return;
 
     try {
-      const res = await apiFetch(`${API}/orders/${id}/review`, {
-        method: 'DELETE',
-      });
+      const res = await apiFetch(`${API}/orders/${id}/review`, { method: 'DELETE' });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -291,7 +362,7 @@ export default function OrderDetailPage() {
   const handleBuyAgain = () => {
     if (!order) return;
 
-    const newCart = order.items.map(item => ({
+    const newCart = order.items.map((item) => ({
       Pid: item.Pid,
       Pname: item.Pname,
       Ppicture: item.Ppicture,
@@ -300,7 +371,6 @@ export default function OrderDetailPage() {
     }));
 
     localStorage.setItem('cart', JSON.stringify(newCart));
-    alert('เพิ่มสินค้าเข้าตะกร้าแล้ว');
     router.push('/cart');
   };
 
@@ -310,216 +380,344 @@ export default function OrderDetailPage() {
   if (loading) return <p className="p-6 text-center">กำลังโหลดข้อมูล...</p>;
   if (!order) return <p className="p-6 text-center text-red-600">ไม่พบคำสั่งซื้อ</p>;
 
+  const isCod = isCodPay(order.Opayment);
+
+  // ✅ status label สำหรับ “ลูกค้า”
+  const orderMeta = getOrderBadge(order.Ostatus, order.Opayment, 'customer');
+
+  // รวมยอดแบบจาก items (ไว้แสดง breakdown)
   const itemsSubtotal =
     order.items?.reduce((sum, it) => sum + Number(it.Oprice) * Number(it.Oquantity), 0) ?? 0;
 
+  // NOTE: ถ้าระบบจริงค่าส่งมาจาก backend ให้เปลี่ยนไปใช้ field นั้นแทน
   const shippingFee = itemsSubtotal >= 1000 ? 0 : 50;
   const grandTotal = itemsSubtotal + shippingFee;
 
-  const statusTH: Record<string, string> = {
-    pending: "รอชำระเงิน",
-    paid: "ชำระเงินแล้ว",
-    processing: "กำลังเตรียมสินค้า",
-    shipping: "จัดส่งแล้ว",
-    delivered: "ได้รับสินค้าแล้ว",
-    cancelled: "ยกเลิก",
-    failed: "ล้มเหลว",
-  };
-
-  const paymentTH: Record<string, string> = {
-    cod: "ชำระปลายทาง",
-    bank: "โอนเงิน",
-    transfer: "โอนเงิน",
-  };
-
-  // ✅ logic รวม: สถานะที่บล็อกการแนบสลิป
-  const isFinalOrBlocked =
-    ['cancelled', 'failed', 'delivered'].includes(order.Ostatus);
-
-  // ✅ อนุญาตแนบสลิปไหม
+  // ✅ กันแนบสลิป: โอนเท่านั้น + ยังไม่เคยแนบ + ยังไม่ final + อยู่ในสถานะที่อนุญาต
   const canUploadSlip =
-    order.Opayment !== 'cod' &&
+    !isCod &&
     !order.Oslip &&
-    !isFinalOrBlocked &&
-    order.Ostatus === SLIP_ALLOWED_STATUS;
+    !isFinalBlockedStatus(order.Ostatus) &&
+    String(order.Ostatus || '').trim() !== 'delivered' &&
+    isSlipAllowedStatus(order.Ostatus);
+
+  // ✅ ปุ่มยืนยันรับ: ควรขึ้นตอน "shipping" เท่านั้น (ลูกค้าเห็นเป็น "รอรับสินค้า")
+  const canConfirmReceived = String(order.Ostatus || '').trim() === 'shipping';
+
+const cover = toImgUrl(
+  String(order.items?.[0]?.Ppicture || '').split(',')[0] || ''
+);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 text-black">
-      <div className="max-w-4xl mx-auto pt-32 p-6">
+      <div className="max-w-5xl mx-auto pt-28 md:pt-32 p-4 md:p-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
-            รายละเอียดออเดอร์
+        <div className="mb-6 md:mb-8">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900">
+                รายละเอียดคำสั่งซื้อ
+              </h1>
+              <p className="text-gray-500 mt-1">
+                เลขที่คำสั่งซื้อ <span className="font-semibold">#{order.Oid}</span>
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <StatusBadge
+                label={orderMeta.label}
+                tone={orderMeta.tone}
+                className="px-4 py-2 rounded-xl"
+              />
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-4">
-            คำสั่งซื้อ #{order.Oid}
-          </h1>
         </div>
 
-        {/* Order Info Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              📋
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">ข้อมูลคำสั่งซื้อ</h2>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">วันที่สั่งซื้อ:</span>
-              <span className="font-semibold">{new Date(order.Odate).toLocaleDateString('th-TH')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">สถานะ:</span>
-              <span className="font-semibold text-blue-600">
-                {statusTH[order.Ostatus] ?? order.Ostatus}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">ชำระแบบ:</span>
-              <span className="font-semibold">
-                {paymentTH[order.Opayment] ?? order.Opayment}
-              </span>
-            </div>
-          </div>
+        {/* Top summary card */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+          <div className="grid md:grid-cols-[240px,1fr]">
+            <div className="bg-gray-50 p-4 md:p-5 border-b md:border-b-0 md:border-r border-gray-200">
+              <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white border border-gray-200">
+                <img src={cover} alt="cover" className="w-full h-full object-cover" />
+              </div>
+              <div className="mt-3 text-sm text-gray-600">
+                <div className="flex items-center justify-between">
+                  <span>วันที่สั่งซื้อ</span>
+                  <span className="font-semibold text-gray-800">
+                    {new Date(order.Odate).toLocaleDateString('th-TH', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
 
-          {order.Ostatus === 'shipping' && (
-            <button
-              onClick={handleConfirmReceived}
-              className="w-full mt-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              ✅ ยืนยันรับสินค้า
-            </button>
-          )}
+                <div className="flex items-center justify-between mt-2">
+                  <span>ชำระแบบ</span>
+                  <span className="font-semibold text-gray-800">
+                    {isCod ? 'ชำระปลายทาง (COD)' : 'โอนเงิน'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg md:text-xl font-bold text-gray-900">สรุปยอด</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    ตรวจสอบรายการสินค้าและยอดรวมของคำสั่งซื้อนี้
+                  </p>
+                </div>
+
+                {canConfirmReceived && (
+                  <button
+                    onClick={handleConfirmReceived}
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition"
+                  >
+                    ยืนยันรับสินค้า
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 grid sm:grid-cols-3 gap-3">
+                <div className="rounded-xl border border-gray-200 p-4 bg-white">
+                  <div className="text-xs text-gray-500">ยอดรวมสินค้า</div>
+                  <div className="text-lg font-extrabold text-gray-900 mt-1">
+                    {fmtBaht(itemsSubtotal)} บาท
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4 bg-white">
+                  <div className="text-xs text-gray-500">ค่าส่ง</div>
+                  <div className="text-lg font-extrabold text-gray-900 mt-1">
+                    {shippingFee === 0 ? 'ฟรี' : `${fmtBaht(shippingFee)} บาท`}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-200 p-4 bg-emerald-50">
+                  <div className="text-xs text-emerald-700">ยอดสุทธิ</div>
+                  <div className="text-xl font-extrabold text-emerald-800 mt-1">
+                    {fmtBaht(grandTotal)} บาท
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Items Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-              🛍️
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">รายการสินค้า</h2>
+        {/* Items list */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 md:p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg md:text-xl font-bold text-gray-900">รายการสินค้า</h2>
+            <span className="text-sm text-gray-500">
+              {order.items?.length || 0} รายการ
+            </span>
           </div>
 
-          <div className="space-y-4">
+          <div className="mt-4 space-y-3">
             {order.items?.map((item) => {
               const itemTotal = Number(item.Oprice) * Number(item.Oquantity);
+              const pic = (item.Ppicture || '').split(',')[0] || '';
+              const img = toImgUrl(pic);
 
               return (
                 <div
                   key={item.Pid}
-                  className="flex gap-4 items-center p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border-2 border-gray-200"
+                  className="flex gap-4 items-center p-4 rounded-xl border border-gray-200 bg-white"
                 >
-                  <img
-                    src={`http://localhost:3000${item.Ppicture.split(',')[0]}`}
-                    alt={item.Pname}
-                    className="w-20 h-20 object-cover rounded-xl shadow-sm"
-                  />
+                  <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                    <img src={img} alt={item.Pname} className="w-full h-full object-cover" />
+                  </div>
 
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-800 text-lg">{item.Pname}</p>
-                    <p className="text-gray-600">จำนวน: {item.Oquantity} ชิ้น</p>
-                    <p className="text-green-600 font-semibold">
-                      ราคาต่อชิ้น: {Number(item.Oprice).toFixed(2)} บาท
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 truncate">{item.Pname}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      จำนวน <span className="font-semibold text-gray-800">{item.Oquantity}</span>
                     </p>
-                    <p className="text-gray-800 font-bold mt-1">
-                      รวม: {itemTotal.toFixed(2)} บาท
-                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">ราคาต่อชิ้น</p>
+                    <p className="font-bold text-gray-900">{fmtBaht(Number(item.Oprice))}</p>
+                    <p className="text-sm text-gray-500 mt-1">รวม</p>
+                    <p className="font-extrabold text-emerald-700">{fmtBaht(itemTotal)}</p>
                   </div>
                 </div>
               );
             })}
+          </div>
 
-            <div className="border-t-2 border-gray-200 pt-4 mt-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">ยอดรวมสินค้า:</span>
-                <span className="font-semibold">{itemsSubtotal.toFixed(2)} บาท</span>
-              </div>
+          <div className="mt-5 pt-4 border-t border-gray-200 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            <button
+              onClick={() => router.push('/me/orders')}
+              className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold transition"
+            >
+              กลับไปหน้ารายการ
+            </button>
 
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">ค่าส่ง:</span>
-                <span className={`font-semibold ${shippingFee === 0 ? 'text-green-600' : ''}`}>
-                  {shippingFee === 0 ? 'ฟรี' : `${shippingFee.toFixed(2)} บาท`}
-                </span>
-              </div>
-
-              {shippingFee === 0 && (
-                <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
-                  ✅ ส่งฟรีเมื่อยอดสินค้า 1,000 บาทขึ้นไป
-                </p>
-              )}
-
-              <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                <span className="text-lg font-bold text-gray-800">ยอดสุทธิ:</span>
-                <span className="text-2xl font-bold text-green-600">
-                  {grandTotal.toFixed(2)} บาท
-                </span>
-              </div>
-            </div>
+            {String(order.Ostatus || '').trim() === 'delivered' && (
+              <button
+                onClick={handleBuyAgain}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition"
+              >
+                สั่งซื้ออีกครั้ง
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Review Form */}
-        {order.Ostatus === 'delivered' && !review && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-                ⭐
+        {/* Payment / Slip section (โอนเท่านั้น) */}
+        {!isCod && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 md:p-6 mb-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg md:text-xl font-bold text-gray-900">การชำระเงิน</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  แนบสลิปได้เฉพาะสถานะ “รอชำระเงิน”
+                </p>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">ให้คะแนนสินค้า</h2>
+
+              {order.Oslip && (
+                <div className="shrink-0">
+                  <StatusBadge label="ส่งสลิปแล้ว" tone="green" className="px-4 py-2 rounded-xl" />
+                </div>
+              )}
             </div>
 
-            <form onSubmit={handleReviewSubmit} className="space-y-4">
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2">คะแนน:</label>
+            {order.Oslip ? (
+              <div className="mt-4">
+                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                  <img src={toImgUrl(order.Oslip)} alt="slip" className="w-full h-auto block" />
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  สถานะ: <span className="font-semibold">{statusLabel(order.Ostatus)}</span>
+                </p>
+              </div>
+            ) : isFinalBlockedStatus(order.Ostatus) || String(order.Ostatus || '').trim() === 'delivered' ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-red-700 font-semibold">
+                  ไม่สามารถแนบสลิปได้ในสถานะนี้ ({statusLabel(order.Ostatus)})
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <div className="grid md:grid-cols-[1fr,320px] gap-4 items-start">
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="block w-full border border-gray-300 p-3 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition"
+                      disabled={!canUploadSlip}
+                    />
 
-                <div className="flex items-center gap-2">
-                  <div className="flex">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        className="focus:outline-none"
-                      >
-                        <FaStar
-                          className={`text-2xl transition-colors ${star <= rating ? 'text-yellow-400' : 'text-gray-300'}`}
-                        />
-                      </button>
-                    ))}
+                    {!canUploadSlip && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        ตอนนี้ยังแนบสลิปไม่ได้ (ต้องเป็น “รอชำระเงิน” และยังไม่เคยแนบ)
+                      </p>
+                    )}
+
+                    <button
+                      onClick={handleSlipUpload}
+                      disabled={!slipFile || !canUploadSlip}
+                      className="mt-3 w-full md:w-auto px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50 transition"
+                    >
+                      อัปโหลดสลิป
+                    </button>
                   </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                    {preview ? (
+                      <img src={preview} alt="preview" className="w-full h-auto block" />
+                    ) : (
+                      <div className="p-6 text-center text-sm text-gray-500">
+                        ยังไม่ได้เลือกรูปสลิป
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* COD notice */}
+        {isCod && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 md:p-6 mb-6">
+            <h2 className="text-lg md:text-xl font-bold text-gray-900">การชำระเงิน</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              คำสั่งซื้อนี้เป็นแบบชำระปลายทาง (COD) ไม่ต้องแนบสลิป
+            </p>
+          </div>
+        )}
+
+        {/* Review */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 md:p-6">
+          <h2 className="text-lg md:text-xl font-bold text-gray-900">รีวิวสินค้า</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            รีวิวได้เมื่อคำสั่งซื้ออยู่สถานะ “ได้รับแล้ว”
+          </p>
+
+          {/* form */}
+          {String(order.Ostatus || '').trim() === 'delivered' && !review && (
+            <form onSubmit={handleReviewSubmit} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  คะแนน
+                </label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      className="focus:outline-none"
+                      aria-label={`ให้คะแนน ${star}`}
+                    >
+                      <FaStar
+                        className={`text-2xl transition-colors ${
+                          star <= rating ? 'text-yellow-400' : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-sm text-gray-500 ml-2">{rating}/5</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-gray-700 font-semibold mb-2">ความคิดเห็น:</label>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  ความคิดเห็น
+                </label>
                 <textarea
-                  placeholder="เขียนรีวิวเพิ่มเติม..."
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors min-h-[100px]"
+                  placeholder="แชร์ประสบการณ์การสั่งซื้อของคุณ"
+                  className="w-full p-3 border border-gray-300 rounded-xl bg-gray-50 focus:border-emerald-400 focus:outline-none transition min-h-[110px]"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-semibold mb-2">แนบรูป (ได้สูงสุด 5 รูป):</label>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  แนบรูป (สูงสุด 5 รูป)
+                </label>
                 <input
                   type="file"
                   accept="image/*"
                   multiple
                   onChange={handleReviewFiles}
-                  className="block w-full border-2 border-gray-200 p-3 rounded-xl cursor-pointer bg-gray-50"
+                  className="block w-full border border-gray-300 p-3 rounded-xl cursor-pointer bg-gray-50"
                   disabled={reviewFiles.length >= 5}
                 />
 
-                <div className="flex justify-between mt-2 text-sm">
-                  <span className="text-gray-600">{reviewFiles.length}/5 รูป</span>
+                <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                  <span>{reviewFiles.length}/5 รูป</span>
                   {reviewFiles.length > 0 && (
                     <button
                       type="button"
                       onClick={clearReviewImages}
-                      className="text-red-600 hover:underline"
+                      className="text-red-600 hover:underline font-semibold"
                     >
                       ล้างรูปทั้งหมด
                     </button>
@@ -527,24 +725,21 @@ export default function OrderDetailPage() {
                 </div>
 
                 {reviewPreviews.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 mt-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
                     {reviewPreviews.map((src, i) => (
                       <div
                         key={i}
-                        className="relative aspect-square rounded-lg border bg-gray-100 overflow-hidden flex items-center justify-center"
+                        className="relative aspect-square rounded-xl border border-gray-200 bg-gray-50 overflow-hidden"
                       >
-                        <img
-                          src={src}
-                          alt={`preview-${i}`}
-                          className="w-full h-full object-contain block"
-                        />
+                        <img src={src} alt={`preview-${i}`} className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => removeReviewImage(i)}
                           className="absolute top-1 right-1 bg-black/60 text-white w-7 h-7 rounded-full flex items-center justify-center hover:bg-black/80"
                           title="ลบรูป"
+                          aria-label="ลบรูป"
                         >
-                          ✕
+                          ×
                         </button>
                       </div>
                     ))}
@@ -554,159 +749,61 @@ export default function OrderDetailPage() {
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="w-full sm:w-auto px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition"
               >
                 ส่งรีวิว
               </button>
             </form>
-          </div>
-        )}
+          )}
 
-        {/* Display Review */}
-        {review && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-                ⭐
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">รีวิวของคุณ</h2>
-            </div>
-
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex space-x-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <FaStar
-                    key={star}
-                    className={`text-xl ${star <= review.stars ? 'text-yellow-400' : 'text-gray-200'}`}
-                  />
-                ))}
-              </div>
-              <span className="text-sm text-gray-400 font-medium">{review.stars}/5</span>
-            </div>
-
-            <p className="text-gray-700 bg-gray-50 p-4 rounded-xl">"{review.text}"</p>
-
-            {review.images?.length ? (
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                {review.images.map((img, i) => (
-                  <div
-                    key={i}
-                    className="aspect-square rounded-lg border bg-gray-100 overflow-hidden flex items-center justify-center"
-                  >
-                    <img
-                      src={`${API}${img}`}
-                      alt={`review-img-${i}`}
-                      className="w-full h-full object-contain block"
+          {/* display review */}
+          {review && (
+            <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <FaStar
+                      key={star}
+                      className={`text-lg ${star <= review.stars ? 'text-yellow-400' : 'text-gray-300'}`}
                     />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <button
-              onClick={handleDeleteReview}
-              className="mt-4 bg-red-50 hover:bg-red-100 text-red-600 px-6 py-2 rounded-xl font-semibold transition-colors"
-            >
-              ลบรีวิว
-            </button>
-          </div>
-        )}
-
-        {order.Ostatus === 'delivered' && (
-          <button
-            onClick={handleBuyAgain}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold"
-          >
-            🔁 สั่งซื้ออีกครั้ง
-          </button>
-        )}
-
-        {/* Upload Slip (✅ แสดงตามเงื่อนไขจริง) */}
-        {order.Opayment !== 'cod' && (
-          order.Oslip ? (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6 mb-6">
-              <p className="text-green-700 font-semibold">
-                ✅ คุณได้ส่งสลิปแล้ว รอแอดมินตรวจสอบ
-              </p>
-            </div>
-          ) : isFinalOrBlocked ? (
-            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-6">
-              <p className="text-red-700 font-semibold">
-                ❌ ออเดอร์สถานะ "{statusTH[order.Ostatus] ?? order.Ostatus}" ไม่สามารถแนบสลิปได้
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-                  📎
+                  ))}
+                  <span className="text-sm text-gray-600">{review.stars}/5</span>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800">แนบสลิปโอนเงิน</h2>
+
+                <button
+                  onClick={handleDeleteReview}
+                  className="px-4 py-2 rounded-xl border border-red-200 text-red-700 hover:bg-red-50 font-semibold transition"
+                >
+                  ลบรีวิว
+                </button>
               </div>
 
-              {/* ✅ เพิ่มข้อความกำกับว่าตอนไหนแนบได้ */}
-              <p className="text-sm text-gray-500 mb-3">
-                แนบสลิปได้เฉพาะสถานะ: <span className="font-semibold">{statusTH[SLIP_ALLOWED_STATUS] ?? SLIP_ALLOWED_STATUS}</span>
+              <p className="text-gray-800 mt-3 whitespace-pre-wrap">
+                {review.text || '—'}
               </p>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="block w-full border-2 border-gray-200 p-3 rounded-xl cursor-pointer bg-gray-50 hover:border-green-300 transition-colors mb-4"
-                disabled={!canUploadSlip}
-              />
-
-              {preview && (
-                <img
-                  src={preview}
-                  alt="preview"
-                  className="w-full h-auto rounded-xl shadow-lg border-2 border-gray-200 mb-4"
-                />
-              )}
-
-              <button
-                onClick={handleSlipUpload}
-                disabled={!slipFile || !canUploadSlip}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl font-semibold disabled:opacity-50"
-              >
-                อัปโหลดสลิป
-              </button>
-
-              {!canUploadSlip && (
-                <p className="mt-3 text-xs text-red-600">
-                  * ตอนนี้ยังแนบสลิปไม่ได้ (ตรวจสถานะออเดอร์ / วิธีชำระเงิน / เคยแนบแล้ว)
-                </p>
-              )}
+              {review.images?.length ? (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4">
+                  {review.images.map((img, i) => (
+                    <div
+                      key={i}
+                      className="aspect-square rounded-xl border border-gray-200 bg-white overflow-hidden"
+                    >
+                      <img src={toImgUrl(img)} alt={`review-img-${i}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          )
-        )}
+          )}
 
-        {order.Opayment === 'cod' && (
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6 mb-6">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">💵</span>
-              <p className="text-green-700 font-semibold text-lg">คำสั่งซื้อแบบชำระปลายทาง</p>
+          {/* if not delivered */}
+          {String(order.Ostatus || '').trim() !== 'delivered' && !review && (
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              ยังรีวิวไม่ได้จนกว่าจะอยู่สถานะ “ได้รับแล้ว”
             </div>
-          </div>
-        )}
-
-        {/* Display Uploaded Slip */}
-        {order.Oslip && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xl shadow-md">
-                ✅
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">สลิปที่แนบไว้</h2>
-            </div>
-            <img
-              src={`http://localhost:3000${order.Oslip}`}
-              alt="slip"
-              className="w-full h-auto rounded-xl border-2 border-gray-200 shadow-lg"
-            />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

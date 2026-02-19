@@ -1,7 +1,11 @@
 'use client';
+
 import { apiFetch } from '@/app/lib/apiFetch';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+
+import StatusBadge from '@/app/component/StatusBadge';
+import { getMeta, PRODUCT_STATUS } from '@/app/lib/status';
 
 interface Product {
   Pid: number;
@@ -12,12 +16,61 @@ interface Product {
   Pstatus: string;
   Pdetail: string;
   Ppicture: string;
- Typeid: number;    
+  Typeid: number;
   typenproduct: string;
   subname: string;
 }
 
 type TypeFilter = number | 'all';
+
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
+/** --------------------------
+ *  Image helpers (รองรับหลายรูปแบบ)
+ * -------------------------- */
+type PictureLike = string | string[] | null | undefined;
+
+const getImageUrl = (path: string | null | undefined) => {
+  if (!path) return '/no-image.png';
+  const clean = String(path).trim();
+  if (!clean) return '/no-image.png';
+  if (clean.startsWith('http')) return clean;
+  if (clean.startsWith('/')) return `${API}${clean}`;
+  return `${API}/${clean}`;
+};
+
+const toPictures = (raw: PictureLike): string[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+  }
+
+  const s = String(raw).trim();
+  if (!s) return [];
+
+  if (s.startsWith("[")) {
+    try {
+      const arr: unknown = JSON.parse(s);
+      if (Array.isArray(arr)) {
+        return arr.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (s.includes(",")) {
+    return s
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0);
+  }
+
+  return [s];
+};
+
+
+const firstPicture = (raw: PictureLike) => toPictures(raw)[0] ?? null;
 
 export default function AdminProducts() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -28,13 +81,13 @@ export default function AdminProducts() {
   const fetchAllProducts = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('http://localhost:3000/product');
+      const res = await apiFetch(`${API}/product`);
       if (!res.ok) {
         setAllProducts([]);
         return;
       }
-      const data = await res.json().catch(() => []);
-      setAllProducts(Array.isArray(data) ? data : []);
+      const data: unknown = await res.json().catch(() => []);
+      setAllProducts(Array.isArray(data) ? (data as Product[]) : []);
     } catch (err) {
       console.error('❌ โหลด products fail:', err);
       setAllProducts([]);
@@ -48,25 +101,24 @@ export default function AdminProducts() {
   }, []);
 
   const products = useMemo(() => {
-  if (typeFilter === 'all') return allProducts;
-  return allProducts.filter(p => p.Typeid === typeFilter);
-}, [allProducts, typeFilter]);
+    if (typeFilter === 'all') return allProducts;
+    return allProducts.filter((p) => p.Typeid === typeFilter);
+  }, [allProducts, typeFilter]);
 
-const counts = useMemo(() => {
-  return {
-    total: allProducts.length,
-    t1: allProducts.filter(p => p.Typeid === 1).length,
-    t2: allProducts.filter(p => p.Typeid === 2).length,
-    t3: allProducts.filter(p => p.Typeid === 3).length,
-    t4: allProducts.filter(p => p.Typeid === 4).length,
-  };
-}, [allProducts]);
-
+  const counts = useMemo(() => {
+    return {
+      total: allProducts.length,
+      t1: allProducts.filter((p) => p.Typeid === 1).length,
+      t2: allProducts.filter((p) => p.Typeid === 2).length,
+      t3: allProducts.filter((p) => p.Typeid === 3).length,
+      t4: allProducts.filter((p) => p.Typeid === 4).length,
+    };
+  }, [allProducts]);
 
   const deleteProduct = async (id: number) => {
     if (!confirm('คุณแน่ใจว่าต้องการลบสินค้านี้?')) return;
 
-    const res = await apiFetch(`http://localhost:3000/product/${id}`, {
+    const res = await apiFetch(`${API}/product/${id}`, {
       method: 'DELETE',
     });
 
@@ -138,9 +190,7 @@ const counts = useMemo(() => {
             🔍
           </div>
           <h2 className="text-2xl font-bold text-gray-800">กรองสินค้า</h2>
-          {loading ? (
-            <span className="text-sm text-gray-400">กำลังโหลด...</span>
-          ) : null}
+          {loading ? <span className="text-sm text-gray-400">กำลังโหลด...</span> : null}
         </div>
 
         {/* Filter buttons + counts */}
@@ -209,8 +259,11 @@ const counts = useMemo(() => {
                   </tr>
                 ) : (
                   products.map((p, index) => {
-                    const firstPic = p.Ppicture?.split(',')[0] ?? '';
+                    const main = firstPicture(p.Ppicture);
                     const code = `pro:${String(p.Pid).padStart(4, '0')}`;
+
+                    // ✅ ใช้ status กลาง
+                    const st = getMeta(PRODUCT_STATUS, p.Pstatus);
 
                     return (
                       <tr
@@ -222,9 +275,9 @@ const counts = useMemo(() => {
                         </td>
 
                         <td className="p-4 text-center">
-                          {firstPic ? (
+                          {main ? (
                             <img
-                              src={`http://localhost:3000${firstPic}`}
+                              src={getImageUrl(main)}
                               className="h-20 w-20 mx-auto object-cover rounded-xl shadow-md"
                               alt={p.Pname}
                             />
@@ -237,7 +290,9 @@ const counts = useMemo(() => {
 
                         <td className="p-4">
                           <div className="space-y-1">
-                            <div className="font-bold text-gray-900 text-base">{p.Pname}</div>
+                            <div className="font-bold text-gray-900 text-base">
+                              {p.Pname}
+                            </div>
                             <div className="text-xs text-gray-500">
                               <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
                                 {code}
@@ -285,15 +340,7 @@ const counts = useMemo(() => {
                         </td>
 
                         <td className="p-4 text-center">
-                          {p.Pstatus === 'In stock' ? (
-                            <span className="px-3 py-1.5 rounded-full text-sm font-semibold bg-green-100 text-green-700 border-2 border-green-300 whitespace-nowrap">
-                              ✅ มีสินค้า
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1.5 rounded-full text-sm font-semibold bg-red-100 text-red-700 border-2 border-red-300 whitespace-nowrap">
-                              ❌ หมด
-                            </span>
-                          )}
+                          <StatusBadge label={st.label} tone={st.tone} />
                         </td>
 
                         <td className="p-4">

@@ -71,7 +71,7 @@ useEffect(() => {
     const fetchFavorites = async () => {
       const res = await fetch("http://localhost:3000/favorites", {
         headers: {
-          "Authorization": `Bearer ${token}`,     // ⭐ เพิ่มบรรทัดนี้
+          "Authorization": `Bearer ${token}`,   
         },
         credentials: "include",
       });
@@ -138,11 +138,19 @@ if (storedUser) {
     router.push("/checkout?type=buynow");
   };
 
-  const addToCart = (product: Product) => {
-    contextAddToCart(product);
-    setShowAlert(true);
-    setTimeout(() => setShowAlert(false), 3000);
-  };
+ const addToCart = (product: Product) => {
+  contextAddToCart(
+    {
+      ...product,
+      Pnumproduct: Number(product.Pnumproduct ?? 0), // ส่ง stock เข้าไปให้ context เก็บ
+    },
+    1
+  );
+
+  setShowAlert(true);
+  setTimeout(() => setShowAlert(false), 3000);
+};
+
 
   // ⭐ ถ้ามี filterFavorites → กรองสินค้าเฉพาะที่ถูกใจ
   const visibleProducts = filterFavorites?.length

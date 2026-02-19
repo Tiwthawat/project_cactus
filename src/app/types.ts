@@ -50,6 +50,7 @@ export interface ForumQuestion {
   Cname: string;
   Cprofile: string | null;
   ReplyCount: number;
+  Askimages?: string[] | string | null;
 }
 
 export interface ForumReply {
@@ -60,6 +61,9 @@ export interface ForumReply {
   Replydate: string;
   Cname: string;
   Cprofile: string | null;
+   Replyrole?: "user" | "admin";
+  Replyimages?: string[] | string | null;
+  Adminid?: number | null;
 }
 
 export interface ForumTopicDetail {

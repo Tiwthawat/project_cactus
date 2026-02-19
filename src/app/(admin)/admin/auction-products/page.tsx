@@ -1,75 +1,98 @@
-'use client';
-import { apiFetch } from '@/app/lib/apiFetch';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+"use client";
 
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+import { apiFetch } from "@/app/lib/apiFetch";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import StatusBadge from "@/app/component/StatusBadge";
+import { AUCTION_PRODUCT_STATUS, getMeta } from "@/app/lib/status";
 
-/** ใช้สถานะทั้งหมดตามจริง */
-type Status = 'all' | 'ready' | 'auction' | 'paid' | 'unsold';
+const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
+
+/** ฟิลเตอร์บนหน้า */
+type StatusFilter = "all" | "ready" | "auction" | "paid" | "unsold";
+
+/** สถานะจริงใน DB / API (ของ auction_products.PROstatus) */
+type AuctionProductStatus =
+  | "ready"
+  | "auction"
+  | "pending_payment"
+  | "payment_review"
+  | "paid"
+  | "shipping"
+  | "delivered"
+  | "unsold";
 
 interface Row {
   PROid: number;
   PROname: string;
-  PROpicture: string;
+  PROpicture: string; // อาจเป็น "a,b,c" หรือ "/x.jpg"
   PROprice: number;
-  PROstatus: string;
+  PROstatus: AuctionProductStatus | string;
+
   active_aid: number | null;
   active_end_time: string | null;
   active_current_price: number | null;
+}
+
+function fmtBaht(n: number) {
+  return Number(n || 0).toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function isStatusFilter(x: unknown): x is StatusFilter {
+  return x === "all" || x === "ready" || x === "auction" || x === "paid" || x === "unsold";
+}
+
+function toFirstPicPath(raw: string): string {
+  const first = String(raw || "").split(",")[0]?.trim() || "";
+  return first;
+}
+
+function toImgUrl(path: string): string {
+  const clean = String(path || "").trim();
+  if (!clean) return "/no-image.png";
+  if (clean.startsWith("http")) return clean;
+  if (clean.startsWith("/")) return `${API}${clean}`;
+  return `${API}/${clean}`;
 }
 
 export default function AdminAuctionProductsPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
-
-
-  const [status, setStatus] = useState<Status>('ready');
-  const [q, setQ] = useState('');
-
+  const [status, setStatus] = useState<StatusFilter>("ready");
+  const [q, setQ] = useState("");
 
   const [items, setItems] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
   const timerRef = useRef<number | null>(null);
-
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('status', status); // ✅ ใส่เสมอ แม้เป็น all
-    if (q.trim()) params.set('q', q.trim());
-
-
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      const qs = params.toString();
-      router.replace(`/admin/auction-products?${qs}`, { scroll: false });
-
-    }, 300);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [status, q, router]);
-
+  const didInitRef = useRef(false);
 
   /** load data */
-  const fetchData = async (s: Status, query: string) => {
+  const fetchData = async (s: StatusFilter, query: string) => {
     try {
       setLoading(true);
-      const p = new URLSearchParams();
-      p.set('status', 'all');
-      if (query.trim()) p.set('q', query.trim());
 
-      const res = await apiFetch(`${API}/auction-products?${p.toString()}`, { cache: 'no-store' });
+      const p = new URLSearchParams();
+      // ✅ ส่ง status ตามจริง ไม่ hardcode all
+      p.set("status", s);
+      if (query.trim()) p.set("q", query.trim());
+
+      const res = await apiFetch(`${API}/auction-products?${p.toString()}`, {
+        cache: "no-store",
+      });
+
       if (!res.ok) {
         setItems([]);
         return;
       }
-      const data: Row[] = await res.json();
-      setItems(Array.isArray(data) ? data : []);
+
+      const data: unknown = await res.json();
+      setItems(Array.isArray(data) ? (data as Row[]) : []);
     } catch (e) {
       console.error(e);
       setItems([]);
@@ -78,66 +101,94 @@ export default function AdminAuctionProductsPage() {
     }
   };
 
-  /** re-fetch when URL changes */
+  /** 1) init from URL (ครั้งแรกเท่านั้น) */
   useEffect(() => {
-    const s = (sp.get('status') as Status) || 'ready';
-    const query = sp.get('q') ?? '';
+    if (didInitRef.current) return;
+
+    const sRaw = sp.get("status");
+    const qRaw = sp.get("q") ?? "";
+
+    const s: StatusFilter = isStatusFilter(sRaw) ? sRaw : "ready";
+
     setStatus(s);
-    setQ(query);
-    fetchData(s, query);
+    setQ(qRaw);
+    fetchData(s, qRaw);
+
+    didInitRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp]);
 
-  /** ฟิลเตอร์จริง (logic อยู่ฝั่ง frontend) */
+  /** 2) sync state -> URL (debounce) + fetch */
+  useEffect(() => {
+    if (!didInitRef.current) return;
+
+    const params = new URLSearchParams();
+    params.set("status", status);
+    if (q.trim()) params.set("q", q.trim());
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      const qs = params.toString();
+      router.replace(`/admin/auction-products?${qs}`, { scroll: false });
+      fetchData(status, q);
+    }, 250);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [status, q, router]);
+
+  /** ฟิลเตอร์จริงในหน้า: mapping filter -> statuses */
   const filtered = useMemo(() => {
     return items.filter((p) => {
-      if (status === 'all') return true;
-      if (status === 'ready') return p.PROstatus === 'ready';
-      if (status === 'auction') return p.PROstatus === 'auction';
+      const st = String(p.PROstatus).trim();
 
-      /** “ชำระแล้ว” → paid / shipping / delivered */
-      if (status === 'paid')
-        return ['paid', 'shipping', 'delivered'].includes(p.PROstatus);
+      if (status === "all") return true;
+      if (status === "ready") return st === "ready";
+      if (status === "auction") return st === "auction";
 
-      if (status === 'unsold') return p.PROstatus === 'unsold';
+      // “ชำระแล้ว” → paid / shipping / delivered (ตามที่ตะเอ๊งใช้)
+      if (status === "paid") return ["paid", "shipping", "delivered"].includes(st);
+
+      if (status === "unsold") return st === "unsold";
       return true;
     });
   }, [items, status]);
 
   const delProduct = async (id: number) => {
-    if (!confirm('ลบสินค้านี้?')) return;
-    const res = await apiFetch(`${API}/auction-products/${id}`, { method: 'DELETE' });
+    if (!confirm("ลบสินค้านี้?")) return;
+
+    const res = await apiFetch(`${API}/auction-products/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      alert('ลบไม่สำเร็จ');
+      alert("ลบไม่สำเร็จ");
       return;
     }
     fetchData(status, q);
   };
 
-  const fmtBaht = (n: number) =>
-    n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   /** นับจำนวนแต่ละสถานะ (นับจาก items ที่ดึงมาจาก API) */
   const counts = useMemo(() => {
-    const c = { all: 0, ready: 0, auction: 0, paid: 0, unsold: 0 };
+    const c: Record<StatusFilter, number> = { all: 0, ready: 0, auction: 0, paid: 0, unsold: 0 };
 
     for (const p of items) {
       c.all += 1;
 
-      if (p.PROstatus === 'ready') c.ready += 1;
-      else if (p.PROstatus === 'auction') c.auction += 1;
-      else if (['paid', 'shipping', 'delivered'].includes(p.PROstatus)) c.paid += 1;
-      else if (p.PROstatus === 'unsold') c.unsold += 1;
+      const st = String(p.PROstatus).trim();
+      if (st === "ready") c.ready += 1;
+      else if (st === "auction") c.auction += 1;
+      else if (["paid", "shipping", "delivered"].includes(st)) c.paid += 1;
+      else if (st === "unsold") c.unsold += 1;
     }
-
     return c;
   }, [items]);
 
-  useEffect(() => {
-    fetchData(status, q);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-
+  const filterButtons: Array<{ v: StatusFilter; label: string; active: string }> = [
+    { v: "ready", label: "✅ พร้อมเปิดรอบ", active: "from-green-500 to-green-600" },
+    { v: "auction", label: "🔨 กำลังประมูล", active: "from-blue-500 to-blue-600" },
+    { v: "paid", label: "💰 ชำระแล้ว", active: "from-purple-500 to-purple-600" },
+    { v: "unsold", label: "❌ ไม่ถูกขาย", active: "from-red-500 to-red-600" },
+    { v: "all", label: "📦 ทั้งหมด", active: "from-gray-700 to-gray-900" },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
@@ -147,11 +198,16 @@ export default function AdminAuctionProductsPage() {
           <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold mb-4">
             จัดการสินค้าประมูล
           </div>
+
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
               🔨 สินค้าสำหรับประมูล
             </h1>
-            <Link href="/admin/auction-products/new" className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl text-center">
+
+            <Link
+              href="/admin/auction-products/new"
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl text-center"
+            >
               + เพิ่มสินค้า
             </Link>
           </div>
@@ -159,28 +215,18 @@ export default function AdminAuctionProductsPage() {
 
         {/* Filters Card */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-gray-200">
-          
-
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Status Filter Buttons */}
             <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  { v: 'ready', label: '✅ พร้อมเปิดรอบ', active: 'from-green-500 to-green-600' },
-                  { v: 'auction', label: '🔨 กำลังประมูล', active: 'from-blue-500 to-blue-600' },
-                  { v: 'paid', label: '💰 ชำระแล้ว', active: 'from-purple-500 to-purple-600' },
-                  { v: 'unsold', label: '❌ ไม่ถูกขาย', active: 'from-red-500 to-red-600' },
-                  { v: 'all', label: '📦 ทั้งหมด', active: 'from-gray-700 to-gray-900' },
-                ] as const
-              ).map((x) => {
+              {filterButtons.map((x) => {
                 const isActive = status === x.v;
 
                 const base =
-                  'px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg border-2 inline-flex items-center gap-2';
+                  "px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg border-2 inline-flex items-center gap-2";
                 const active = `bg-gradient-to-r ${x.active} text-white border-transparent`;
-                const idle = 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
+                const idle = "bg-white text-gray-700 border-gray-300 hover:bg-gray-50";
 
-                const n = counts[x.v]; // ✅ จำนวนตามสถานะ
+                const n = counts[x.v];
 
                 return (
                   <button
@@ -191,12 +237,13 @@ export default function AdminAuctionProductsPage() {
                   >
                     <span>{x.label}</span>
 
-                    {/* badge จำนวน */}
                     <span
                       className={[
-                        'min-w-[28px] h-6 px-2 rounded-full text-xs font-bold flex items-center justify-center',
-                        isActive ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700 border border-gray-200',
-                      ].join(' ')}
+                        "min-w-[28px] h-6 px-2 rounded-full text-xs font-bold flex items-center justify-center",
+                        isActive
+                          ? "bg-white/25 text-white"
+                          : "bg-gray-100 text-gray-700 border border-gray-200",
+                      ].join(" ")}
                       aria-label={`จำนวน ${x.v}: ${n}`}
                     >
                       {n}
@@ -204,10 +251,9 @@ export default function AdminAuctionProductsPage() {
                   </button>
                 );
               })}
-
             </div>
 
-            {/* Search Input */}
+            {/* Search (เปิดใช้เมื่ออยากใช้) */}
             {/* <div className="flex-1 min-w-[240px]">
               <input
                 className="w-full p-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:border-green-400 focus:outline-none transition-colors placeholder-gray-400"
@@ -219,11 +265,10 @@ export default function AdminAuctionProductsPage() {
           </div>
         </div>
 
-
         {/* Table */}
         {loading ? (
           <div className="bg-white rounded-2xl shadow-lg p-10 text-center border-2 border-gray-200">
-            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-gray-600 text-lg">กำลังโหลด...</p>
           </div>
         ) : filtered.length === 0 ? (
@@ -252,67 +297,83 @@ export default function AdminAuctionProductsPage() {
 
                 <tbody>
                   {filtered.map((p) => {
-                    const img = p.PROpicture?.split(',')[0] ?? '';
-                    const fullImg = img ? `${API}${img.startsWith('/') ? '' : '/'}${img}` : '';
-                    const code = `aucpro:${String(p.PROid).padStart(4, '0')}`;
+                    const firstPic = toFirstPicPath(p.PROpicture);
+                    const fullImg = toImgUrl(firstPic);
+                    const code = `aucpro:${String(p.PROid).padStart(4, "0")}`;
+
+                    // badge สถานะ: ใช้ map กลาง
+                    const st = String(p.PROstatus).trim();
+                    const meta = getMeta(AUCTION_PRODUCT_STATUS, st);
 
                     return (
-                      <tr key={p.PROid} className="border-b border-gray-200 hover:bg-green-50 transition-colors">
+                      <tr
+                        key={p.PROid}
+                        className="border-b border-gray-200 hover:bg-green-50 transition-colors"
+                      >
                         <td className="p-4 text-center hidden md:table-cell">
-                          {fullImg ? <img src={fullImg} className="h-16 w-16 mx-auto rounded-lg object-cover shadow-md" alt={p.PROname} /> : '—'}
+                          {fullImg ? (
+                            <img
+                              src={fullImg}
+                              className="h-16 w-16 mx-auto rounded-lg object-cover shadow-md"
+                              alt={p.PROname}
+                            />
+                          ) : (
+                            "—"
+                          )}
                         </td>
 
                         <td className="p-4 text-center font-mono text-sm bg-gray-50">{code}</td>
 
                         <td className="p-4">
                           <div className="font-semibold text-gray-900">{p.PROname}</div>
+
                           <div className="text-xs mt-1">
-                            {p.PROstatus === 'auction' ? (
+                            {st === "auction" ? (
                               <span className="text-blue-600">
-                                🔨 กำลังประมูล • ปิด{' '}
+                                🔨 กำลังประมูล • ปิด{" "}
                                 {p.active_end_time
-                                  ? new Date(p.active_end_time.replace(' ', 'T')).toLocaleString('th-TH')
-                                  : '-'}
+                                  ? new Date(p.active_end_time.replace(" ", "T")).toLocaleString("th-TH")
+                                  : "-"}
                               </span>
-                            ) : p.PROstatus === 'ready' ? (
+                            ) : st === "ready" ? (
                               <span className="text-gray-500">✅ พร้อมเปิดรอบ</span>
-                            ) : ['paid', 'shipping', 'delivered'].includes(p.PROstatus) ? (
+                            ) : ["paid", "shipping", "delivered"].includes(st) ? (
                               <span className="text-purple-600">
-                                💰 ปิดการขายแล้ว • ราคาขายจริง {p.active_current_price ? `${fmtBaht(p.active_current_price)} ฿` : '-'}
+                                💰 ปิดการขายแล้ว • ราคาขายจริง{" "}
+                                {p.active_current_price ? `${fmtBaht(p.active_current_price)} ฿` : "-"}
                               </span>
-                            ) : p.PROstatus === 'unsold' ? (
+                            ) : st === "unsold" ? (
                               <span className="text-red-600">❌ ปิดแล้ว • ไม่ถูกขาย</span>
                             ) : (
                               <span className="text-gray-400">—</span>
                             )}
                           </div>
-
                         </td>
 
-                        <td className="p-4 text-right font-semibold text-gray-700">{fmtBaht(p.PROprice)} ฿</td>
+                        <td className="p-4 text-right font-semibold text-gray-700">
+                          {fmtBaht(p.PROprice)} ฿
+                        </td>
 
                         <td className="p-4 text-right font-semibold text-green-600 hidden lg:table-cell">
                           {p.active_current_price ? `${fmtBaht(p.active_current_price)} ฿` : "-"}
                         </td>
 
                         <td className="p-4 text-center">
-                          {p.PROstatus === 'ready' && <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700 border-2 border-green-300">✅ พร้อมเปิดรอบ</span>}
-                          {p.PROstatus === 'auction' && <span className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700 border-2 border-blue-300">🔨 กำลังประมูล</span>}
-                          {['paid', 'shipping', 'delivered'].includes(p.PROstatus) && (
-                            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-700 border-2 border-purple-300">💰 ชำระแล้ว</span>
-                          )}
-                          {p.PROstatus === 'unsold' && <span className="px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-700 border-2 border-red-300">❌ ไม่ถูกขาย</span>}
+                          <StatusBadge label={meta.label} tone={meta.tone} />
                         </td>
 
                         <td className="p-4 text-center">
                           <div className="flex flex-col gap-2">
                             {p.active_aid ? (
-                              <Link href={`/admin/auctions/${p.active_aid}`} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap">
+                              <Link
+                                href={`/admin/auctions/${p.active_aid}`}
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap"
+                              >
                                 ดูรอบ
                               </Link>
                             ) : (
                               <>
-                                {p.PROstatus === 'ready' ? (
+                                {st === "ready" ? (
                                   <Link
                                     href={`/admin/auctions/new?proid=${p.PROid}`}
                                     className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap"
@@ -325,7 +386,10 @@ export default function AdminAuctionProductsPage() {
                               </>
                             )}
 
-                            <button onClick={() => delProduct(p.PROid)} className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap">
+                            <button
+                              onClick={() => delProduct(p.PROid)}
+                              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap"
+                            >
                               ลบ
                             </button>
                           </div>

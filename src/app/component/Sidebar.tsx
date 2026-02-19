@@ -18,6 +18,7 @@ import {
     FaHome
 } from 'react-icons/fa';
 import Link from 'next/link';
+import CartPanel from '../(customer)/cart/CartPanel';
 
 interface CategoryEventDetail {
     typeid: number | null;
@@ -38,6 +39,7 @@ interface SidebarProps {
     cartCount: number;
     handleLogout: () => void;
     setMode: (mode: 'user' | 'categories' | 'search' | 'cart' | 'menu' | null) => void;
+    role: 'user' | 'admin' | null; 
 }
 
 const categories = [
@@ -197,47 +199,11 @@ const Sidebar = ({ isOpen, onClose, mode, username, cartCount, handleLogout, set
                 );
 
             case 'cart':
-                return (
-                    <div className="sidebar-content-wrapper cart-wrapper">
-                        <div className="section-header">
-                            <div className="section-header-icon cart-icon-header">
-                                <FaShoppingCart />
-                                {cartCount > 0 && <span className="cart-badge-header">{cartCount}</span>}
-                            </div>
-                            <div>
-                                <span className="section-title">ตะกร้าสินค้า</span>
-                                <span className="section-subtitle">{cartCount > 0 ? `${cartCount} รายการรอคุณอยู่` : 'ยังไม่มีสินค้า'}</span>
-                            </div>
-                        </div>
-
-                        <div className="cart-body">
-                            {cartCount > 0 ? (
-                                <div className="cart-filled">
-                                    <div className="cart-visual">
-                                        <div className="cart-icon-big">
-                                            <FaShoppingCart />
-                                        </div>
-                                        <div className="cart-count-badge">{cartCount}</div>
-                                    </div>
-                                    <p className="cart-desc">สินค้า {cartCount} รายการรอการสั่งซื้อ</p>
-                                    <Link href="/cart" onClick={onClose} className="cart-cta-btn">
-                                        ดูตะกร้าสินค้า
-                                        <span className="cta-arrow">→</span>
-                                    </Link>
-                                </div>
-                            ) : (
-                                <div className="cart-empty">
-                                    <div className="empty-icon">🛒</div>
-                                    <p className="empty-title">ตะกร้าของคุณว่างเปล่า</p>
-                                    <p className="empty-sub">ยังไม่มีสินค้าในตะกร้า</p>
-                                    <Link href="/" onClick={onClose} className="browse-btn">
-                                        ไปเลือกซื้อสินค้า →
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
+  return (
+    <div className="sidebar-content-wrapper cart-wrapper">
+      <CartPanel variant="drawer" />
+    </div>
+  );
 
             case 'menu':
                 return (
@@ -851,13 +817,16 @@ const Sidebar = ({ isOpen, onClose, mode, username, cartCount, handleLogout, set
 
             {/* Sidebar Panel */}
             <div
-                className={`fixed top-0 right-0 h-full w-[300px] bg-white z-[70] flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-                style={{
-                    borderRadius: '24px 0 0 24px',
-                    boxShadow: '-24px 0 80px -12px rgba(0,0,0,0.12), -4px 0 24px -6px rgba(0,0,0,0.07)',
-                    borderLeft: '1px solid rgba(229,231,235,0.6)',
-                }}
-            >
+  className={`fixed top-0 right-0 h-full 
+    w-[360px] sm:w-[400px] md:w-[420px]
+    bg-white z-[70] flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+  style={{
+    borderRadius: '28px 0 0 28px',
+    boxShadow: '-24px 0 80px -12px rgba(0,0,0,0.12), -4px 0 24px -6px rgba(0,0,0,0.07)',
+    borderLeft: '1px solid rgba(229,231,235,0.6)',
+  }}
+>
+
                 {/* Scrollable Area */}
                 <div className="flex-1 overflow-y-auto sidebar-scroll px-2 pb-2">
                     {renderContent()}

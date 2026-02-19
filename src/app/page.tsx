@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import CactusItems from './component/cactusitems';
 import Navbar from './component/Navbar';
 import AuctionItems from './component/AuctionItems';
@@ -14,32 +14,82 @@ type CategoryDetail = {
   subtypeid: number | null;
 };
 
-const SectionTitle = ({
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+
+function cn(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(' ');
+}
+
+/* ---------------------------
+  Premium Section Header
+----------------------------*/
+function SectionHeader({
   title,
   subtitle,
   badge,
+  right,
 }: {
   title: string;
   subtitle?: string;
   badge?: string;
-}) => (
-  <div className="text-center my-14 md:my-16">
-    {badge && (
-      <div className="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full text-sm font-semibold shadow mb-4">
-        {badge}
-      </div>
-    )}
-    <h2 className="text-4xl md:text-5xl font-extrabold text-green-600 tracking-wide">
-      {title}
-    </h2>
-    {subtitle && (
-      <p className="mt-2 text-lg md:text-xl text-gray-700 tracking-widest">
-        {subtitle}
-      </p>
-    )}
-  </div>
-);
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-4 mb-4">
+      <div className="min-w-0">
+        {badge ? (
+          <div className="inline-flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold border border-emerald-100 bg-emerald-50 text-emerald-700">
+              {badge}
+            </span>
+          </div>
+        ) : null}
 
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 truncate">
+            {title}
+          </h2>
+          <span className="hidden md:block h-1 w-10 rounded-full bg-gradient-to-r from-emerald-500 to-green-500" />
+        </div>
+
+        {subtitle ? (
+          <p className="mt-1 text-sm md:text-base text-gray-600">
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+
+      {right ? <div className="shrink-0">{right}</div> : null}
+    </div>
+  );
+}
+
+/* ---------------------------
+  Premium Card Wrapper
+----------------------------*/
+function SectionCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        'bg-white rounded-3xl border border-gray-200 shadow-sm',
+        'px-4 sm:px-6 py-5 sm:py-6',
+        className
+      )}
+    >
+      {children}
+    </section>
+  );
+}
+
+/* ---------------------------
+  Home Page
+----------------------------*/
 const HomePage = () => {
   const [username, setUsername] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -51,6 +101,7 @@ const HomePage = () => {
   const token =
     typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
+  // เลือกหมวดหมู่จาก Navbar/Sidebar (event)
   useEffect(() => {
     const handleCategory = (e: Event) => {
       const custom = e as CustomEvent<CategoryDetail>;
@@ -70,7 +121,7 @@ const HomePage = () => {
     if (!t) return;
 
     try {
-      const res = await fetch('http://localhost:3000/me', {
+      const res = await fetch(`${API}/me`, {
         headers: { Authorization: `Bearer ${t}` },
       });
       if (!res.ok) return;
@@ -84,40 +135,6 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    const handleShowFavorites = async () => {
-      // reset ทุก state ก่อน
-      setKeyword('');
-      setSelectedType(null);
-      setSelectedSubtype(null);
-      setShowFavorites(false); // reset ก่อนเพื่อบังคับ re-render
-
-      if (!token) {
-        alert('กรุณาเข้าสู่ระบบก่อนดูรายการโปรด ❤️');
-        return;
-      }
-
-      const res = await fetch('http://localhost:3000/favorites', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data: unknown = await res.json();
-      if (Array.isArray(data)) {
-        setFavoriteIds(
-          data
-            .map((item: any) => Number(item?.product_id))
-            .filter((n) => Number.isFinite(n))
-        );
-
-        // ⭐ สำคัญ — ต้อง delay setShowFavorites
-        setTimeout(() => setShowFavorites(true), 0);
-      }
-    };
-
-    window.addEventListener('show-favorites', handleShowFavorites);
-    return () => window.removeEventListener('show-favorites', handleShowFavorites);
-  }, [token]);
-
-  useEffect(() => {
     if (localStorage.getItem('token')) loadUser();
     window.addEventListener('login-success', loadUser);
     const onLogout = () => setUsername(null);
@@ -127,9 +144,10 @@ const HomePage = () => {
       window.removeEventListener('login-success', loadUser);
       window.removeEventListener('logout-success', onLogout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ฟัง event ค้นหา — ไม่มี any
+  // ฟัง event ค้นหา
   useEffect(() => {
     const handleSearch = (e: Event) => {
       const custom = e as SearchEvent;
@@ -143,98 +161,254 @@ const HomePage = () => {
     return () => window.removeEventListener('do-search', handleSearch);
   }, []);
 
+  // ไปหน้า Home (reset filter)
+  useEffect(() => {
+    const handleGoHome = () => {
+      setKeyword('');
+      setSelectedType(null);
+      setSelectedSubtype(null);
+      setShowFavorites(false);
+    };
+
+    window.addEventListener('go-home', handleGoHome);
+    return () => window.removeEventListener('go-home', handleGoHome);
+  }, []);
+
+  // โชว์รายการโปรด
+  useEffect(() => {
+    const handleShowFavorites = async () => {
+      setKeyword('');
+      setSelectedType(null);
+      setSelectedSubtype(null);
+      setShowFavorites(false);
+
+      if (!token) {
+        alert('กรุณาเข้าสู่ระบบก่อนดูรายการโปรด');
+        return;
+      }
+
+      const res = await fetch(`${API}/favorites`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data: unknown = await res.json();
+      if (Array.isArray(data)) {
+        setFavoriteIds(
+          data
+            .map((item: any) => Number(item?.product_id))
+            .filter((n) => Number.isFinite(n))
+        );
+
+        // บังคับให้ re-render
+        setTimeout(() => setShowFavorites(true), 0);
+      }
+    };
+
+    window.addEventListener('show-favorites', handleShowFavorites);
+    return () => window.removeEventListener('show-favorites', handleShowFavorites);
+  }, [token]);
+
   const isFiltered =
     showFavorites || !!keyword || selectedType !== null || selectedSubtype !== null;
 
-    useEffect(() => {
-  const handleGoHome = () => {
-    setKeyword("");
-    setSelectedType(null);
-    setSelectedSubtype(null);
-    setShowFavorites(false);
-  };
-
-  window.addEventListener("go-home", handleGoHome);
-  return () => window.removeEventListener("go-home", handleGoHome);
-}, []);
-
+  const topTitle = useMemo(() => {
+    if (showFavorites) return { title: 'รายการโปรดของคุณ', subtitle: 'FAVORITES', badge: 'รายการโปรด' };
+    if (keyword) return { title: `ผลการค้นหา: ${keyword}`, subtitle: 'SEARCH', badge: 'ค้นหา' };
+    if (selectedType !== null || selectedSubtype !== null)
+      return { title: 'หมวดหมู่สินค้า', subtitle: 'CATEGORY', badge: 'หมวดหมู่' };
+    return null;
+  }, [showFavorites, keyword, selectedType, selectedSubtype]);
 
   return (
     <>
       <Navbar />
 
- 
+      <main className="pt-16 min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-white text-black">
+        {/* container */}
+        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+          {/* Banner (เฉพาะหน้า home ที่ยังไม่ filter) */}
+          {!isFiltered && (
+            <div className="rounded-3xl overflow-hidden border border-emerald-100 bg-white shadow-sm">
+              <BannerSlider />
+            </div>
+          )}
 
-      <main className="pt-16 flex flex-col min-h-screen bg-white text-black px-6 space-y-10">
-      {!isFiltered && <BannerSlider />}
+          {/* Filtered Views */}
+          {showFavorites ? (
+            <>
+              <SectionCard>
+                <SectionHeader
+                  title="รายการโปรดของคุณ"
+                  subtitle="รายการที่คุณกดหัวใจไว้"
+                  badge="Favorites"
+                />
+                <CactusItems filterFavorites={favoriteIds} />
+              </SectionCard>
+            </>
+          ) : keyword ? (
+            <>
+              <SectionCard>
+                <SectionHeader
+                  title={`ผลการค้นหา: ${keyword}`}
+                  subtitle="ค้นหาสินค้าที่เกี่ยวข้อง"
+                  badge="Search"
+                  right={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeyword('');
+                      }}
+                      className="px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
+                    >
+                      ล้างการค้นหา
+                    </button>
+                  }
+                />
+                <CactusItems search={keyword} />
+              </SectionCard>
+            </>
+          ) : selectedType !== null || selectedSubtype !== null ? (
+            <>
+              <SectionCard>
+                <SectionHeader
+                  title="หมวดหมู่สินค้า"
+                  subtitle="เลือกดูเฉพาะหมวดที่ต้องการ"
+                  badge="Category"
+                  right={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedType(null);
+                        setSelectedSubtype(null);
+                      }}
+                      className="px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
+                    >
+                      ล้างตัวกรอง
+                    </button>
+                  }
+                />
+                <CactusItems
+                  typeid={selectedType ?? undefined}
+                  subtypeid={selectedSubtype ?? undefined}
+                />
+              </SectionCard>
+            </>
+          ) : (
+            <>
+              {/* AUCTION */}
+              <SectionCard className="border-emerald-100">
+                <SectionHeader
+                  title="กำลังประมูล"
+                  subtitle="รายการที่กำลังเปิดให้เสนอราคา"
+                  badge="Auction"
+                  right={
+                    <Link
+                      href="/auctions"
+                      className="
+                        inline-flex items-center gap-2
+                        px-4 py-2 rounded-full
+                        bg-emerald-600 text-white text-sm font-semibold
+                        shadow-sm hover:bg-emerald-700 transition
+                      "
+                    >
+                      ดูทั้งหมด
+                      <span className="opacity-90">→</span>
+                    </Link>
+                  }
+                />
 
-      {showFavorites ? (
-        <>
-          <SectionTitle title="รายการโปรดของคุณ" subtitle="FAVORITES" badge="❤️ รายการโปรด" />
-          <CactusItems filterFavorites={favoriteIds} />
-        </>
-        ) : keyword ? (
-          <>
-            <SectionTitle
-              title={`ผลการค้นหา: ${keyword}`}
-              subtitle="SEARCH RESULTS"
-              badge="🔍 ค้นหา"
-            />
-            <CactusItems search={keyword} />
-          </>
-        ) : selectedType !== null || selectedSubtype !== null ? (
-          <>
-            <SectionTitle title="หมวดหมู่สินค้า" subtitle="PRODUCT CATEGORY" badge="📦 หมวดหมู่" />
-            <CactusItems
-              typeid={selectedType ?? undefined}
-              subtypeid={selectedSubtype ?? undefined}
-            />
-          </>
-        ) : (
-          <>
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-semibold">🔥 กำลังประมูล</h2>
+                <AuctionItems limit={4} />
 
-                <Link href="/auctions" className="text-green-600 text-sm hover:underline">
-                  ดูทั้งหมด →
-                </Link>
-              </div>
+                {/* ปุ่มใหญ่แบบ marketplace (ถ้าต้องการให้เด่นจริง) */}
+                <div className="mt-6 flex justify-center">
+                  <Link
+                    href="/auctions"
+                    className="
+                      inline-flex items-center justify-center gap-2
+                      px-7 py-3 rounded-2xl
+                      bg-gradient-to-r from-emerald-600 to-green-600
+                      text-white font-semibold
+                      shadow-md shadow-emerald-200
+                      hover:shadow-lg hover:scale-[1.01]
+                      active:scale-[0.99]
+                      transition
+                    "
+                  >
+                    ดูรายการประมูลทั้งหมด
+                    <span className="text-white/90">→</span>
+                  </Link>
+                </div>
+              </SectionCard>
 
-              <AuctionItems limit={4} />
-            </section>
+              {/* NEW ARRIVALS */}
+              <SectionCard>
+                <SectionHeader
+                  title="สินค้ามาใหม่"
+                  subtitle="NEW ARRIVALS"
+                  badge="New"
+                />
+                <CactusItems type="latest" />
+              </SectionCard>
 
-            <section>
-              <SectionTitle title="สินค้ามาใหม่" subtitle="NEW ARRIVALS" />
-              <CactusItems type="latest" />
-            </section>
+              {/* SHORT SPINE */}
+              <SectionCard>
+                <SectionHeader
+                  title="แคคตัสหนามสั้น"
+                  subtitle="CACTUS SHORT SPINE"
+                  badge="Collection"
+                />
+                <CactusItems typeid={1} />
+              </SectionCard>
 
-            <section>
-              <SectionTitle title="แคคตัสหนามสั้น" subtitle="CACTUS SHORT SPINE" />
-              <CactusItems typeid={1} />
-            </section>
+              {/* LONG SPINE */}
+              <SectionCard>
+                <SectionHeader
+                  title="แคคตัสหนามยาว"
+                  subtitle="CACTUS LONG SPINE"
+                  badge="Collection"
+                />
+                <CactusItems typeid={2} />
+              </SectionCard>
 
-            <section>
-              <SectionTitle title="แคคตัสหนามยาว" subtitle="CACTUS LONG SPINE" />
-              <CactusItems typeid={2} />
-            </section>
+              {/* SUCCULENT */}
+              <SectionCard>
+                <SectionHeader
+                  title="ไม้อวบน้ำ"
+                  subtitle="SUCCULENT"
+                  badge="Collection"
+                />
+                <CactusItems typeid={3} />
+              </SectionCard>
 
-            <section>
-              <SectionTitle title="ไม้อวบน้ำ" subtitle="SUCCULENT" />
-              <CactusItems typeid={3} />
-            </section>
+              {/* POT DECOR */}
+              <SectionCard>
+                <SectionHeader
+                  title="ของตกแต่งกระถาง"
+                  subtitle="POT DECOR"
+                  badge="Decor"
+                />
+                <CactusItems typeid={4} />
+              </SectionCard>
 
-            <section>
-              <SectionTitle title="ของตกแต่งกระถาง" subtitle="POT DECOR" />
-              <CactusItems typeid={4} />
-            </section>
+              {/* ALL */}
+              <SectionCard>
+                <SectionHeader
+                  title="สินค้าทั้งหมด"
+                  subtitle="ALL PRODUCTS"
+                  badge="All"
+                />
+                <CactusItems />
+              </SectionCard>
+            </>
+          )}
 
-            <section>
-              <SectionTitle title="สินค้าทั้งหมด" subtitle="ALL PRODUCTS" />
-              <CactusItems />
-            </section>
-          </>
-        )}
+          {/* ถ้าอยากมี title ด้านบนตอน filter (แบบไม่รก) */}
+          {topTitle ? (
+            <div className="sr-only">
+              {topTitle.title} {topTitle.subtitle} {topTitle.badge}
+            </div>
+          ) : null}
+        </div>
       </main>
     </>
   );

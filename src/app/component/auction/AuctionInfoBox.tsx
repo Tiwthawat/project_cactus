@@ -46,70 +46,123 @@ export default function AuctionInfoBox({
   winnerName,
 }: Props) {
   return (
-    <div className="w-full lg:w-1/2 flex flex-col gap-6">
-      {/* โปรดอ่าน */}
-      <div className="bg-yellow-100 border border-yellow-300 p-4 rounded shadow">
-        <p className="text-sm font-medium text-red-600">📌 โปรดอ่าน</p>
-        <ul className="text-sm text-gray-700 list-disc ml-4 mt-1">
-          <li>ผู้ประมูลควรตรวจรายละเอียดและภาพสินค้าให้ชัดเจนก่อนตัดสินใจ</li>
-          <li>เมื่อชนะการประมูลแล้ว ไม่สามารถยกเลิกได้</li>
-        </ul>
-      </div>
-
-      {/* ข้อมูลร้านค้า */}
-      <div className="bg-pink-100 p-4 rounded border border-pink-300 shadow">
-        <p className="font-medium text-gray-800 border-b pb-1 mb-2">ข้อมูลร้านค้า</p>
-        <div className="flex items-center gap-2">
-          <span>👥</span>
-          <p>{data.seller_name ?? 'ไม่ระบุ'}</p>
+    <div className="w-full flex flex-col gap-5">
+      {/* Notice: ลดสีจัด ให้แพง */}
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="h-[2px] bg-emerald-700/70" />
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-9 w-9 rounded-xl border border-emerald-200 bg-emerald-50 flex items-center justify-center">
+              <span className="text-emerald-800">i</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-extrabold text-gray-900">โปรดอ่านก่อนประมูล</p>
+              <ul className="mt-2 text-sm text-gray-600 list-disc ml-5 space-y-1">
+                <li>ตรวจรายละเอียดและภาพสินค้าให้ชัดเจนก่อนตัดสินใจ</li>
+                <li>เมื่อชนะแล้ว ไม่สามารถยกเลิกได้</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* กล่องประมูล */}
-      <div className="space-y-3 rounded-lg border p-4">
-        {/* แสดงตอนเปิดประมูล */}
-        {!closed && (
-          leader ? (
-            <div className={`p-3 rounded border ${isMeLeader ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-              🥇 ผู้ที่บิดสูงสุดตอนนี้:{' '}
-              <b>{leader.username} ({baht(leader.amount)})</b>
-              {isMeLeader && <span className="ml-2 text-green-700">คุณนำอยู่!</span>}
+    
+
+      {/* Auction box */}
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="h-[2px] bg-emerald-700/70" />
+
+        <div className="p-4 space-y-4">
+          {/* Leader (ตอนเปิด) */}
+          {!closed && (
+            leader ? (
+              <div
+                className={[
+                  'rounded-xl border px-4 py-3 text-sm',
+                  isMeLeader
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border-red-200 bg-red-50 text-red-800',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">
+                    {isMeLeader ? 'คุณกำลังนำอยู่' : 'คุณถูกแซงแล้ว'}
+                  </span>
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full border
+                    border-gray-200 bg-white text-gray-600">
+                    LIVE
+                  </span>
+                </div>
+
+                <div className="mt-2 text-sm">
+                  ผู้ที่บิดสูงสุดตอนนี้: <b>{leader.username}</b>{' '}
+                  <span className="font-extrabold">({baht(leader.amount)})</span>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                ยังไม่มีการบิด
+              </div>
+            )
+          )}
+
+          {/* Price / Timer */}
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold tracking-wide text-gray-500">CURRENT PRICE</p>
+              <div className="mt-1 text-2xl font-extrabold tracking-tight text-gray-900">
+                {baht(cur)}
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                ขั้นต่ำเพิ่มครั้งละ <span className="font-semibold text-gray-800">{step.toLocaleString('th-TH')}</span> บาท
+              </div>
             </div>
-          ) : (
-            <div className="p-3 rounded border bg-gray-50 text-gray-600">ยังไม่มีการบิด</div>
-          )
-        )}
 
-        {/* ราคา/เวลา */}
-        <h2 className="text-xl font-bold">
-          ประมูลตอนนี้ที่ <span className="text-red-600 text-2xl">{baht(cur)}</span>
-        </h2>
-        <div className="text-sm text-gray-700">
-          เวลาคงเหลือ:{' '}
-          <span className={`font-mono ${closed ? 'text-red-600' : ''}`}>
-            {closed ? 'ปิดแล้ว' : left}
-          </span>
-        </div>
-
-        {/* ผู้ชนะเมื่อปิดประมูล */}
-        {closed && (
-          winnerName ? (
-            <div className="p-3 rounded border bg-green-50 border-green-200">
-              🏆 ผู้ชนะรอบนี้: <b>{winnerName}</b>
-              <span className="ml-2 text-red-600">ราคาปิด: {baht(cur)}</span>
+            <div className="text-right">
+              <p className="text-xs font-semibold tracking-wide text-gray-500">TIME LEFT</p>
+              <div className={`mt-1 font-mono text-sm ${closed ? 'text-red-700' : 'text-emerald-800'}`}>
+                {closed ? 'ปิดแล้ว' : left}
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">🛑 รอบนี้ไม่มีผู้ชนะ</p>
-          )
-        )}
+          </div>
 
-        {/* ฟอร์มบิด (ซ่อนถ้าปิดแล้ว) */}
-        {!closed && (
-          <form onSubmit={submitBid} noValidate className="space-y-2">
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-gray-700">
-                ต้องบิดขั้นต่ำ: <b className="text-red-600">≥ {step} บาท</b>
-              </p>
+          {/* Winner (ตอนปิด) */}
+          {closed && (
+            winnerName ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-extrabold text-emerald-900">🏆 ผู้ชนะรอบนี้</span>
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full border border-emerald-200 bg-white text-emerald-800">
+                    CLOSED
+                  </span>
+                </div>
+                <div className="mt-2 text-sm text-emerald-900">
+                  <b>{winnerName}</b> <span className="text-emerald-900/80">• ราคาปิด</span>{' '}
+                  <span className="font-extrabold">{baht(cur)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                🛑 รอบนี้ไม่มีผู้ชนะ
+              </div>
+            )
+          )}
+
+          {/* Bid form */}
+          {!closed && (
+            <form onSubmit={submitBid} noValidate className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>
+                  ขั้นต่ำที่ต้องบิด:{" "}
+                  <span className="font-semibold text-gray-900">
+                    {requiredMin.toLocaleString('th-TH')} บาท
+                  </span>
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-700/70" />
+                  secure bid
+                </span>
+              </div>
 
               <div className="flex gap-2">
                 <input
@@ -125,32 +178,42 @@ export default function AuctionInfoBox({
                     else setAmount(v);
                   }}
                   disabled={posting}
-                  className="w-full px-3 py-2 rounded border bg-white text-black
-                             focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900
+                             focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600
                              disabled:opacity-50"
                 />
+
                 <button
                   type="submit"
                   disabled={posting}
-                  className="shrink-0 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded"
+                  className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-extrabold
+                             bg-emerald-900 text-white hover:bg-emerald-950
+                             shadow-sm disabled:opacity-60"
                 >
                   {posting ? 'กำลังบิด…' : 'ประมูลตอนนี้'}
                 </button>
               </div>
-            </div>
 
-            {err && <p className="text-red-600 text-sm">{err}</p>}
-            {!cid && <p className="text-amber-700 text-xs">(ยังไม่พบ Cid ในเครื่อง — โปรดเข้าสู่ระบบก่อน)</p>}
-          </form>
-        )}
+              {err && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {err}
+                </div>
+              )}
 
-        <div className="text-sm text-gray-700">
-          ขั้นต่ำต้อง ≥ {requiredMin.toLocaleString('th-TH')} บาท
+              {!cid && (
+                <p className="text-amber-700 text-xs">
+                  (ยังไม่พบ Cid ในเครื่อง — โปรดเข้าสู่ระบบก่อน)
+                </p>
+              )}
+            </form>
+          )}
+
+          {/* Footer meta */}
+          <div className="pt-2 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+            <p>รหัสสินค้า: <span className="font-semibold text-gray-800">cac:{String(data.PROid).padStart(4, '0')}</span></p>
+            <p>สถานะรอบ: <span className="font-semibold text-gray-800">{closed ? 'closed' : 'open'}</span></p>
+          </div>
         </div>
-        <p className="text-xs text-gray-700">
-          รหัสสินค้า: cac:{String(data.PROid).padStart(4, '0')}
-        </p>
-        <p className="text-xs text-gray-700">สถานะ: {closed ? 'closed' : 'open'}</p>
       </div>
     </div>
   );

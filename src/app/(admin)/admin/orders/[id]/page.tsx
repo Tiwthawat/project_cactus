@@ -5,6 +5,9 @@ import { useParams } from "next/navigation";
 import { apiFetch } from "@/app/lib/apiFetch";
 import Link from "next/link";
 
+import StatusBadge from "@/app/component/StatusBadge";
+import { getMeta, ORDER_STATUS } from "@/app/lib/status";
+
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
 /** --------------------------
@@ -64,36 +67,6 @@ type OrderStatus =
   | "shipping"
   | "delivered"
   | "cancelled";
-
-const statusBadge = (status: OrderStatus) => {
-  const map: Record<OrderStatus, { cls: string; label: string }> = {
-    pending_payment: {
-      cls: "bg-red-100 text-red-800 border-red-200",
-      label: "รอชำระเงิน",
-    },
-    payment_review: {
-      cls: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      label: "รอตรวจสอบสลิป",
-    },
-    paid: {
-      cls: "bg-green-100 text-green-800 border-green-200",
-      label: "ชำระเงินแล้ว",
-    },
-    shipping: {
-      cls: "bg-blue-100 text-blue-800 border-blue-200",
-      label: "กำลังจัดส่ง",
-    },
-    delivered: {
-      cls: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      label: "จัดส่งสำเร็จ",
-    },
-    cancelled: {
-      cls: "bg-gray-200 text-gray-800 border-gray-300",
-      label: "ยกเลิกแล้ว",
-    },
-  };
-  return map[status];
-};
 
 function fmtBaht(n: number) {
   return Number(n || 0).toLocaleString("th-TH", {
@@ -169,13 +142,15 @@ export default function OrderDetailPage() {
   if (!order) return <p className="p-6">ไม่พบข้อมูลคำสั่งซื้อ</p>;
 
   const isCOD = order.Opayment === "cod";
-  const badge = statusBadge(order.Ostatus);
 
-  // ✅ UI label สำหรับ COD: pending_payment ให้แสดง “รอจัดส่ง (COD)”
-  const uiStatusLabel =
+  // ✅ ใช้สถานะ “อันหลัก” จาก status.ts
+  const meta = getMeta(ORDER_STATUS, order.Ostatus);
+
+  // ✅ UI label สำหรับ COD: pending_payment ให้แสดง “รอจัดส่ง (COD)” (แต่สีตามอันหลัก)
+  const uiMeta =
     isCOD && order.Ostatus === "pending_payment"
-      ? "รอจัดส่ง (COD)"
-      : badge.label;
+      ? { ...meta, label: "รอจัดส่ง (COD)" }
+      : meta;
 
   // ---- เงื่อนไขปุ่มตาม flow (ไปข้างหน้าเป็นหลัก) ----
   const canCancel =
@@ -290,6 +265,8 @@ export default function OrderDetailPage() {
     }
   };
 
+  const shipStatusMeta = getMeta(ORDER_STATUS, order.Ostatus);
+
   return (
     <div className="p-6 max-w-7xl mx-auto text-black">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -337,12 +314,7 @@ export default function OrderDetailPage() {
 
               <p className="flex items-center gap-2">
                 <b>สถานะ:</b>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-semibold border ${badge.cls}`}
-                  title={order.Ostatus}
-                >
-                  {uiStatusLabel}
-                </span>
+                <StatusBadge label={uiMeta.label} tone={uiMeta.tone} />
               </p>
             </div>
           </div>
@@ -356,10 +328,7 @@ export default function OrderDetailPage() {
               const main = firstPicture(item.Ppicture);
 
               return (
-                <div
-                  key={item.Oiid}
-                  className="border-b py-4 last:border-b-0"
-                >
+                <div key={item.Oiid} className="border-b py-4 last:border-b-0">
                   <div className="flex gap-4">
                     <img
                       src={getImageUrl(main)}
@@ -464,11 +433,7 @@ export default function OrderDetailPage() {
           {order.Oslip && (
             <div className="bg-white p-6 rounded-xl shadow border">
               <h3 className="font-semibold mb-2">สลิปการโอน</h3>
-              <img
-                src={getImageUrl(order.Oslip)}
-                className="w-full rounded border"
-                alt="สลิป"
-              />
+              <img src={getImageUrl(order.Oslip)} className="w-full rounded border" alt="สลิป" />
             </div>
           )}
 
@@ -477,7 +442,7 @@ export default function OrderDetailPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">ข้อมูลจัดส่ง</h3>
 
-              {hasShippingInfo && order.Ostatus !== "delivered" && (
+              {canEditShipping && (
                 <button
                   onClick={() => setEditShip((v) => !v)}
                   className="text-blue-600 hover:underline font-semibold text-xs"
@@ -527,22 +492,10 @@ export default function OrderDetailPage() {
             {/* แสดงข้อมูลจัดส่ง + โหมดแก้ไข */}
             {hasShippingInfo && (
               <div className="text-sm space-y-2">
-                <span
-                  className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
-                    order.Ostatus === "delivered"
-                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                      : order.Ostatus === "shipping"
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-gray-100 text-gray-800 border-gray-200"
-                  }`}
-                >
-                  🚚{" "}
-                  {order.Ostatus === "delivered"
-                    ? "จัดส่งสำเร็จ"
-                    : order.Ostatus === "shipping"
-                    ? "กำลังจัดส่ง"
-                    : "—"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <StatusBadge label={shipStatusMeta.label} tone={shipStatusMeta.tone} />
+                  <span className="text-xs text-gray-500">({order.Ostatus})</span>
+                </div>
 
                 {!editShip ? (
                   <>

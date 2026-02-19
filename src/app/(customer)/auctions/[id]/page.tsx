@@ -4,12 +4,9 @@ import AuctionGallery from '@/app/component/auction/AuctionGallery';
 import AuctionInfoBox from '@/app/component/auction/AuctionInfoBox';
 
 import { Auction, Leader } from '@/app/types';
-import { apiFetch } from "@/app/lib/apiFetch";
+import { apiFetch } from '@/app/lib/apiFetch';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-
-
-
 
 const API = process.env.NEXT_PUBLIC_API_BASE as string;
 
@@ -22,8 +19,6 @@ const toPics = (s?: string) =>
     .map((p) =>
       /^https?:\/\//.test(p) ? p : `${API}${p.startsWith('/') ? '' : '/'}${p}`
     );
-
-
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,18 +37,14 @@ export default function AuctionDetailPage() {
   const pics = toPics(data?.PROpicture);
   const [mainImage, setMainImage] = useState<string>('');
 
-
   // clock สำหรับนับถอยหลังแบบวิ่งทุกวินาที
   const [now, setNow] = useState(() => Date.now());
 
-  const [winnerName, setWinnerName] = useState<string>("");
   const [leader, setLeader] = useState<Leader | null>(null);
+
   const isWinner = data?.winner_id && cid && data.winner_id === cid;
 
-
-
-
-
+  // โหลด leader แยก + poll
   useEffect(() => {
     if (!id) return;
     const loadLeader = async () => {
@@ -71,15 +62,7 @@ export default function AuctionDetailPage() {
     return () => clearInterval(t);
   }, [id]);
 
-
-
-
-
-
-
-
-
-
+  // clock tick
   useEffect(() => {
     if (!data) return;
     if (new Date(data.end_time).getTime() <= Date.now()) return;
@@ -100,19 +83,15 @@ export default function AuctionDetailPage() {
     }
   }, []);
 
-  // โหลดรายละเอียด + poll ทุก 3 วิ
+  // โหลดรายละเอียด + poll
   useEffect(() => {
     let t: any;
     const load = async () => {
       try {
-        const res = await apiFetch(`${API}/auction/${id}`, {
-          // แผน A ไม่ต้องใช้คุกกี้
-          // credentials: 'omit',
-        });
+        const res = await apiFetch(`${API}/auction/${id}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: Auction = await res.json();
 
-        // แปลงค่า numeric ที่มาจาก backend
         const cur = Number(json.current_price ?? 0);
         const step = Math.max(1, Number(json.min_increment ?? 1));
         const startBid = cur + step;
@@ -121,7 +100,6 @@ export default function AuctionDetailPage() {
         setErr('');
         setAmount((prev) => (prev === '' ? startBid : prev));
 
-        // ตั้งรูปหลัก
         const arr = toPics(json.PROpicture);
         setMainImage(arr[0] || '');
       } catch (e: any) {
@@ -130,43 +108,45 @@ export default function AuctionDetailPage() {
         setLoading(false);
       }
     };
+
     load();
     t = setInterval(load, 3000);
     return () => clearInterval(t);
   }, [id]);
 
-  // ค่า numeric ที่ใช้ใน UI
   const cur = Number(data?.current_price ?? 0);
   const step = Math.max(1, Number(data?.min_increment ?? 1));
   const requiredMin = cur + step;
 
-  // นับถอยหลัง (อัปเดตทุกวินาทีด้วย state now)
+  // นับถอยหลัง
   const left = useMemo(() => {
     if (!data) return '';
     const ms = Math.max(0, new Date(data.end_time).getTime() - now);
     const s = Math.floor(ms / 1000);
 
-    const d = Math.floor(s / 86400);                // วัน
-    const h = Math.floor((s % 86400) / 3600);       // ชั่วโมงที่เหลือ
-    const m = Math.floor((s % 3600) / 60);          // นาที
-    const ss = s % 60;                              // วินาที
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
 
     if (d > 0) {
-      // ถ้ามีวัน โชว์เป็น "X วัน HH:MM:SS"
-      return `${d} วัน ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-    } else {
-      // ถ้าวัน = 0 โชว์แค่ HH:MM:SS
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+      return `${d} วัน ${String(h).padStart(2, '0')}:${String(m).padStart(
+        2,
+        '0'
+      )}:${String(ss).padStart(2, '0')}`;
     }
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(
+      2,
+      '0'
+    )}:${String(ss).padStart(2, '0')}`;
   }, [data?.end_time, now]);
-
 
   const closedByTime = data
     ? new Date(data.end_time).getTime() <= Date.now()
     : false;
   const closed = data?.status === 'closed' || closedByTime;
 
-  // ส่งบิด (แผน A: ส่ง Cid ใน body)
+  // ส่งบิด
   const submitBid = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!data || amount === '') return;
@@ -177,13 +157,12 @@ export default function AuctionDetailPage() {
     }
 
     // ถ้ากำลังเป็นผู้นำอยู่แล้ว → ถามยืนยัน
-if (leader && cid && leader.user_id === cid) {
-  const ok = window.confirm(
-    "คุณเป็นผู้บิดราคาสูงสุดอยู่แล้ว ต้องการบิดซ้ำเพื่อเพิ่มราคาจริงหรือไม่?"
-  );
-  if (!ok) return;
-}
-
+    if (leader && cid && leader.user_id === cid) {
+      const ok = window.confirm(
+        'คุณเป็นผู้บิดสูงสุดอยู่แล้ว ต้องการบิดซ้ำเพื่อเพิ่มราคาจริงหรือไม่?'
+      );
+      if (!ok) return;
+    }
 
     const min = cur + step;
     if (Number(amount) < min) {
@@ -196,9 +175,6 @@ if (leader && cid && leader.user_id === cid) {
       setErr('');
       const res = await apiFetch(`${API}/auctions/${data.Aid}/bid`, {
         method: 'POST',
-
-        // แผน A ไม่ใช้ cookie/token
-        // credentials: 'omit',
         body: JSON.stringify({ amount, Cid: cid }),
       });
       const json = await res.json().catch(() => ({}));
@@ -219,13 +195,38 @@ if (leader && cid && leader.user_id === cid) {
     }
   };
 
-  if (loading) return <main className="pt-36 px-6">กำลังโหลด…</main>;
-  if (!data)
+  if (loading) {
     return (
-      <main className="pt-36 px-6 text-red-600">
-        {err || 'ไม่พบรอบนี้'}
+      <main className="min-h-screen bg-white">
+        {/* ลดช่องบน: pt-24 */}
+        <div className="max-w-6xl mx-auto px-4 pt-24 pb-10">
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="h-[2px] bg-emerald-700/70" />
+            <div className="p-6">
+              <div className="animate-pulse space-y-4">
+                <div className="h-6 w-1/2 bg-gray-100 rounded" />
+                <div className="h-64 bg-gray-100 rounded-xl" />
+                <div className="h-10 w-1/3 bg-gray-100 rounded" />
+              </div>
+              <p className="mt-4 text-sm text-gray-500">กำลังโหลด…</p>
+            </div>
+          </div>
+        </div>
       </main>
     );
+  }
+
+  if (!data) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="max-w-6xl mx-auto px-4 pt-24 pb-10">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+            {err || 'ไม่พบรอบนี้'}
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const product = {
     Pname: data.PROname,
@@ -237,62 +238,107 @@ if (leader && cid && leader.user_id === cid) {
   };
 
   return (
-    <div className="p-10 pt-40 max-w-6xl mx-auto bg-white text-black space-y-8">
-      <div className="flex flex-col lg:flex-row gap-10 items-start">
-        {/* ✅ ฝั่งซ้าย */}
-        <div className="w-full lg:w-1/2">
-          <h1 className="text-2xl font-bold mb-4">{product.Pname}</h1>
+    <main className="min-h-screen bg-white text-gray-900">
+      {/* ลดช่องบนจากเดิม pt-40 → pt-24 */}
+      <div className="max-w-6xl mx-auto px-4 pt-24 pb-12 space-y-8">
+        {/* Header: minimal accent */}
+        <div className="flex flex-col gap-2">
+          <div className="inline-flex items-center gap-2 w-fit">
+            <span className="h-2 w-2 rounded-full bg-emerald-700/70" />
+            <span className="text-xs font-semibold tracking-widest text-gray-500">
+              AUCTION DETAIL
+            </span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+            {product.Pname}
+          </h1>
+          <div className="h-[2px] w-24 bg-emerald-700/70 rounded" />
+        </div>
 
-          {closed && isWinner && (
-            <div className="bg-green-100 border border-green-500 text-green-700 px-4 py-3 rounded mb-4 font-semibold shadow">
-              🎉 คุณเป็นผู้ชนะการประมูลรายการนี้!
+        {/* Winner / Loser banner */}
+        {closed && isWinner && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 overflow-hidden">
+            <div className="h-[2px] bg-emerald-700/70" />
+            <div className="p-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-extrabold text-emerald-900">
+                  🏆 คุณเป็นผู้ชนะการประมูลรายการนี้
+                </p>
+                <p className="text-sm text-emerald-900/80 mt-1">
+                  ราคาปิด: <span className="font-extrabold">{cur.toLocaleString('th-TH')}</span> บาท
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200 bg-white text-emerald-800">
+                WINNER
+              </span>
             </div>
-          )}
+          </div>
+        )}
 
-          {closed && !isWinner && data?.winner_id && (
-            <div className="bg-red-100 border border-red-500 text-red-700 px-4 py-3 rounded mb-4 font-semibold shadow">
-              ⚠ ผู้ชนะประมูลคือ: {data.winnerName ?? "ไม่ทราบชื่อ"}
+        {closed && !isWinner && data?.winner_id && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 overflow-hidden">
+            <div className="h-[2px] bg-red-600/70" />
+            <div className="p-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-extrabold text-red-800">
+                  คุณแพ้การประมูลรายการนี้
+                </p>
+                <p className="text-sm text-red-800/80 mt-1">
+                  ผู้ชนะ: <span className="font-extrabold">{data.winnerName ?? 'ไม่ทราบชื่อ'}</span>
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-3 py-1 rounded-full border border-red-200 bg-white text-red-700">
+                LOST
+              </span>
             </div>
-          )}
+          </div>
+        )}
 
+        {/* Main layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Left: Gallery */}
+          <div className="space-y-4">
+            <AuctionGallery
+              pics={pics}
+              mainImage={mainImage}
+              setMainImage={setMainImage}
+              productName={product.Pname}
+            />
 
-          <AuctionGallery
-            pics={pics}
-            mainImage={mainImage}
-            setMainImage={setMainImage}
-            productName={product.Pname}
+            {/* Detail box (premium) */}
+            <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+              <div className="h-[2px] bg-emerald-700/70" />
+              <div className="p-5">
+                <p className="text-xs font-semibold tracking-widest text-gray-500">
+                  PRODUCT DETAIL
+                </p>
+                <div className="mt-3 whitespace-pre-line text-sm leading-relaxed text-gray-700">
+                  {product.Pdetail || '-'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Info box */}
+          <AuctionInfoBox
+            data={data}
+            cid={cid}
+            cur={cur}
+            step={step}
+            requiredMin={requiredMin}
+            left={left}
+            closed={closed}
+            amount={amount}
+            setAmount={setAmount}
+            submitBid={submitBid}
+            posting={posting}
+            err={err}
+            leader={leader}
+            isMeLeader={!!(leader && cid && leader.user_id === cid)}
+            winnerName={data.winnerName ?? ''}
           />
-
-
-        </div>
-
-        {/* ✅ ฝั่งขวา */}
-        <AuctionInfoBox
-          data={data}
-          cid={cid}
-          cur={cur}
-          step={step}
-          requiredMin={requiredMin}
-          left={left}
-          closed={closed}
-          amount={amount}
-          setAmount={setAmount}
-          submitBid={submitBid}
-          posting={posting}
-          err={err}
-          leader={leader}
-          isMeLeader={!!(leader && cid && leader.user_id === cid)}
-          winnerName={data.winnerName ?? ""}
-        />
-      </div>
-
-      {/* รายละเอียดสินค้า */}
-      <div>
-        <h2 className="font-semibold text-xl mb-2">รายละเอียดสินค้า</h2>
-        <div className="whitespace-pre-line p-3 border bg-slate-50 rounded text-sm text-gray-800">
-          {product.Pdetail || '-'}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import StatusBadge from '@/app/component/StatusBadge';
+import { getMeta, ORDER_STATUS } from '@/app/lib/status';
+
 interface Order {
   Oid: number;
   Oprice: number;
@@ -49,25 +52,6 @@ function isTransferPay(p: string) {
   return ['transfer', 'bank', 'bank_transfer', 'bank-transfer'].includes(pay);
 }
 
-function statusBadge(status: string) {
-  switch (status) {
-    case 'pending_payment':
-      return { label: '⏳ รอชำระเงิน', cls: 'bg-amber-100 text-amber-800 border-amber-200' };
-    case 'payment_review':
-      return { label: '🔍 รอตรวจสอบสลิป', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
-    case 'paid':
-      return { label: '✅ ชำระแล้ว', cls: 'bg-green-100 text-green-800 border-green-200' };
-    case 'shipping':
-      return { label: '🚚 กำลังจัดส่ง', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
-    case 'delivered':
-      return { label: '📦 ส่งสำเร็จ', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-    case 'cancelled':
-      return { label: '❌ ยกเลิก', cls: 'bg-rose-100 text-rose-800 border-rose-200' };
-    default:
-      return { label: status || '—', cls: 'bg-gray-100 text-gray-800 border-gray-200' };
-  }
-}
-
 type PayFilter = 'all' | 'transfer' | 'cod';
 type StatusFilter =
   | 'all'
@@ -89,7 +73,8 @@ export default function OrdersPage() {
   // ✅ เริ่มเป็น null ก่อน เพื่อกัน “ปีปัจจุบันทับ URL”
   const [year, setYear] = useState<number | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filterStatus, setFilterStatus] = useState<StatusFilter>('pending_payment');
+  const [filterStatus, setFilterStatus] =
+    useState<StatusFilter>('pending_payment');
   const [filterPay, setFilterPay] = useState<PayFilter>('all');
   const [loading, setLoading] = useState(true);
 
@@ -165,11 +150,13 @@ export default function OrdersPage() {
     load();
   }, [year]);
 
-  const makeCode = (prefix: string, id: number) => `${prefix}:${String(id).padStart(4, '0')}`;
+  const makeCode = (prefix: string, id: number) =>
+    `${prefix}:${String(id).padStart(4, '0')}`;
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      const matchStatus = filterStatus === 'all' ? true : o.Ostatus === filterStatus;
+      const st = String(o.Ostatus || '').trim();
+      const matchStatus = filterStatus === 'all' ? true : st === filterStatus;
 
       const pay = normalizePay(o.Opayment);
       const matchPay =
@@ -183,6 +170,7 @@ export default function OrdersPage() {
     });
   }, [orders, filterStatus, filterPay]);
 
+  // ✅ นับจำนวน “ตามช่องทางจ่าย” ที่เลือก + กัน COD ไปโผล่ใน “รอชำระเงิน” (all/transfer)
   const statusCounts = useMemo(() => {
     const base: Record<StatusFilter, number> = {
       all: 0,
@@ -195,23 +183,55 @@ export default function OrdersPage() {
     };
 
     for (const o of orders) {
+      const pay = normalizePay(o.Opayment);
+
+      const matchPay =
+        filterPay === 'all'
+          ? true
+          : filterPay === 'transfer'
+          ? isTransferPay(pay)
+          : pay === 'cod';
+
+      if (!matchPay) continue;
+
       base.all += 1;
-      const s = o.Ostatus as StatusFilter;
+
+      const st = String(o.Ostatus || '').trim();
+
+      // ✅ COD + (pending_payment|waiting) => ไม่ควรไปนับเป็น “รอชำระเงิน” ถ้าไม่ได้ดูโหมด COD
+      if (
+        (st === 'pending_payment' || st === 'waiting') &&
+        pay === 'cod' &&
+        filterPay !== 'cod'
+      ) {
+        continue;
+      }
+
+      const s = st as StatusFilter;
       if (s in base) base[s] += 1;
     }
 
     return base;
-  }, [orders]);
+  }, [orders, filterPay]);
 
-  const statusButtons: Array<{ v: StatusFilter; label: string; count: number }> = [
-    { v: 'pending_payment', label: '⏳ รอชำระเงิน', count: statusCounts.pending_payment },
-    { v: 'payment_review', label: '🔍 รอตรวจสอบสลิป', count: statusCounts.payment_review },
-    { v: 'paid', label: '✅ ชำระแล้ว', count: statusCounts.paid },
-    { v: 'shipping', label: '🚚 กำลังจัดส่ง', count: statusCounts.shipping },
-    { v: 'delivered', label: '📦 ส่งสำเร็จ', count: statusCounts.delivered },
-    { v: 'cancelled', label: '❌ ยกเลิก', count: statusCounts.cancelled },
-    { v: 'all', label: '📦 ทั้งหมด', count: statusCounts.all },
-  ];
+  const statusButtons: Array<{ v: StatusFilter; label: string; count: number }> =
+    [
+      {
+        v: 'pending_payment',
+        label: filterPay === 'cod' ? ' รอจัดส่ง' : '⏳ รอชำระเงิน',
+        count: statusCounts.pending_payment,
+      },
+      {
+        v: 'payment_review',
+        label: ' รอตรวจสอบสลิป',
+        count: statusCounts.payment_review,
+      },
+      { v: 'paid', label: ' ชำระแล้ว', count: statusCounts.paid },
+      { v: 'shipping', label: ' กำลังจัดส่ง', count: statusCounts.shipping },
+      { v: 'delivered', label: ' ส่งสำเร็จ', count: statusCounts.delivered },
+      { v: 'cancelled', label: ' ยกเลิก', count: statusCounts.cancelled },
+      { v: 'all', label: ' ทั้งหมด', count: statusCounts.all },
+    ];
 
   const payButtons: Array<{ v: PayFilter; label: string }> = [
     { v: 'all', label: '💳 ทุกช่องทาง' },
@@ -252,7 +272,9 @@ export default function OrdersPage() {
               <button
                 type="button"
                 disabled={year <= MIN_YEAR || loading}
-                onClick={() => setYear((y) => Math.max(MIN_YEAR, (y ?? nowYear) - 1))}
+                onClick={() =>
+                  setYear((y) => Math.max(MIN_YEAR, (y ?? nowYear) - 1))
+                }
                 className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ◀
@@ -265,7 +287,9 @@ export default function OrdersPage() {
               <button
                 type="button"
                 disabled={year >= MAX_YEAR || loading}
-                onClick={() => setYear((y) => Math.min(MAX_YEAR, (y ?? nowYear) + 1))}
+                onClick={() =>
+                  setYear((y) => Math.min(MAX_YEAR, (y ?? nowYear) + 1))
+                }
                 className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ▶
@@ -285,12 +309,20 @@ export default function OrdersPage() {
                   type="button"
                   onClick={() => setFilterStatus(x.v)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold border transition
-                    ${isActive ? 'bg-green-600 text-white border-green-600 shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}`}
+                    ${
+                      isActive
+                        ? 'bg-green-600 text-white border-green-600 shadow'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
+                    }`}
                 >
                   {x.label}
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full
-                      ${isActive ? 'bg-white text-green-700' : 'bg-gray-200 text-gray-700'}`}
+                      ${
+                        isActive
+                          ? 'bg-white text-green-700'
+                          : 'bg-gray-200 text-gray-700'
+                      }`}
                   >
                     {x.count}
                   </span>
@@ -308,7 +340,11 @@ export default function OrdersPage() {
                   type="button"
                   onClick={() => setFilterPay(x.v)}
                   className={`px-4 py-2 rounded-xl font-semibold border transition
-                    ${isActive ? 'bg-gray-900 text-white border-gray-900 shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    ${
+                      isActive
+                        ? 'bg-gray-900 text-white border-gray-900 shadow'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
                 >
                   {x.label}
                 </button>
@@ -349,19 +385,41 @@ export default function OrdersPage() {
                 ) : (
                   filteredOrders.map((o) => {
                     const code = makeCode('ord', o.Oid);
-                    const st = statusBadge(o.Ostatus);
+
+                    const pay = normalizePay(o.Opayment);
+                    const isCod = pay === 'cod';
+                    const st = String(o.Ostatus || '').trim();
+
+                    let meta = getMeta(ORDER_STATUS, st);
+
+                    // ✅ COD + (pending_payment|waiting) => แสดงเป็น “รอจัดส่ง” แทน “รอชำระเงิน”
+                    if (isCod && (st === 'pending_payment' || st === 'waiting')) {
+                      meta = { ...meta, label: ' รอจัดส่ง' }; // หรือ 'รอยืนยัน COD'
+                    }
 
                     return (
-                      <tr key={o.Oid} className="border-b border-gray-200 hover:bg-green-50 transition-colors">
-                        <td className="p-4 text-center font-mono text-sm bg-gray-50">{code}</td>
-                        <td className="p-4 font-semibold text-gray-900">{o.Cname}</td>
+                      <tr
+                        key={o.Oid}
+                        className="border-b border-gray-200 hover:bg-green-50 transition-colors"
+                      >
+                        <td className="p-4 text-center font-mono text-sm bg-gray-50">
+                          {code}
+                        </td>
+
+                        <td className="p-4 font-semibold text-gray-900">
+                          {o.Cname}
+                        </td>
 
                         <td className="p-4 text-center text-sm text-gray-700">
                           {formatThaiDateOnlyFromMysql(o.Odate)}
                         </td>
 
                         <td className="p-4 text-center text-sm text-gray-700">
-                          {isTransferPay(o.Opayment) ? '🏦 โอน' : normalizePay(o.Opayment) === 'cod' ? '📦 COD' : o.Opayment || '—'}
+                          {isTransferPay(o.Opayment)
+                            ? '🏦 โอน'
+                            : pay === 'cod'
+                            ? '📦 COD'
+                            : o.Opayment || '—'}
                         </td>
 
                         <td className="p-4 text-right font-bold text-lg text-green-600">
@@ -369,9 +427,7 @@ export default function OrdersPage() {
                         </td>
 
                         <td className="p-4 text-center">
-                          <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-semibold border ${st.cls}`}>
-                            {st.label}
-                          </span>
+                          <StatusBadge label={meta.label} tone={meta.tone} />
                         </td>
 
                         <td className="p-4 text-center">

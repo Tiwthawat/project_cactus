@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch } from '@/app/lib/apiFetch';
 
@@ -30,29 +30,58 @@ interface WinDetail {
   transfer?: TransferInfo | null;
 }
 
+function toImgUrl(path?: string) {
+  if (!path) return '/no-image.png';
+  const clean = String(path).trim();
+  if (!clean) return '/no-image.png';
+  if (clean.startsWith('http')) return clean;
+  if (clean.startsWith('/')) return `${API}${clean}`;
+  return `${API}/${clean}`;
+}
+
+function fmtMoney(n: number) {
+  return Number(n || 0).toLocaleString('th-TH', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('th-TH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
 export default function AuctionWinDetailPage() {
-  const { Aid } = useParams<{ Aid: string }>();
+  const params = useParams();
+  const Aid = (params as any)?.Aid as string;
 
   const [data, setData] = useState<WinDetail | null>(null);
   const [loading, setLoading] = useState(true);
+
   const [file, setFile] = useState<File | null>(null);
   const [msg, setMsg] = useState('');
-  const [showQr, setShowQr] = useState(false);
 
+  const [showQr, setShowQr] = useState(false);
 
   const load = async () => {
     try {
+      setMsg('');
       const res = await apiFetch(`/me/my-auction-wins/${Aid}`);
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setMsg(json.message || 'เกิดข้อผิดพลาด');
+        setMsg(json?.message || 'เกิดข้อผิดพลาด');
+        setData(null);
         return;
       }
 
       setData(json);
     } catch {
       setMsg('โหลดข้อมูลไม่สำเร็จ');
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -61,10 +90,14 @@ export default function AuctionWinDetailPage() {
   useEffect(() => {
     if (!Aid) return;
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Aid]);
 
   const uploadSlip = async () => {
-    if (!file) return;
+    if (!file) {
+      setMsg('กรุณาเลือกไฟล์สลิปก่อน');
+      return;
+    }
 
     const form = new FormData();
     form.append('Aid', String(Aid));
@@ -75,251 +108,448 @@ export default function AuctionWinDetailPage() {
       body: form,
     });
 
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
 
     if (!res.ok) {
-      setMsg(json.message || 'อัปโหลดไม่สำเร็จ');
+      setMsg(json?.message || 'อัปโหลดไม่สำเร็จ');
       return;
     }
 
     setMsg('✔ อัปโหลดสลิปสำเร็จ รอตรวจสอบ');
-    load();
+    setFile(null);
+    await load();
   };
 
   const confirmDelivered = async () => {
-    const res = await apiFetch(
-      `/me/my-auction-wins/${Aid}/received`,
-      { method: 'PATCH' }
-    );
+    const res = await apiFetch(`/me/my-auction-wins/${Aid}/received`, {
+      method: 'PATCH',
+    });
 
-    const json = await res.json();
+    const json = await res.json().catch(() => null);
     if (!res.ok) {
-      alert(json.error || 'อัปเดตไม่สำเร็จ');
+      alert(json?.error || 'อัปเดตไม่สำเร็จ');
       return;
     }
 
     alert('✔ ยืนยันได้รับสินค้าแล้ว');
-    load();
+    await load();
   };
 
-  if (loading)
-    return <p className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล…</p>;
+  const paymentMeta = useMemo(() => {
+    const s = data?.payment_status;
+    if (s === 'pending_payment')
+      return {
+        label: 'รอชำระเงิน',
+        cls: 'border-amber-200 bg-white text-amber-700',
+        dot: 'bg-amber-500',
+      };
+    if (s === 'payment_review')
+      return {
+        label: 'รอตรวจสอบ',
+        cls: 'border-sky-200 bg-white text-sky-700',
+        dot: 'bg-sky-500',
+      };
+    if (s === 'paid')
+      return {
+        label: 'ชำระเงินแล้ว',
+        cls: 'border-emerald-200 bg-white text-emerald-700',
+        dot: 'bg-emerald-600',
+      };
+    return {
+      label: '—',
+      cls: 'border-gray-200 bg-white text-gray-700',
+      dot: 'bg-gray-400',
+    };
+  }, [data?.payment_status]);
 
-  if (!data)
-    return <p className="p-10 text-center text-red-500">{msg}</p>;
-
-  const img = data.PROpicture?.split(',')[0] || '';
-
-  const paymentBadge = () => {
-    if (data.payment_status === 'pending_payment')
-      return 'bg-orange-100 text-orange-600';
-    if (data.payment_status === 'payment_review')
-      return 'bg-blue-100 text-blue-600';
-    return 'bg-green-100 text-green-600';
-  };
-
-  const paymentLabel = () => {
-    if (data.payment_status === 'pending_payment') return 'รอชำระเงิน';
-    if (data.payment_status === 'payment_review') return 'รอตรวจสอบ';
-    return 'ชำระเงินแล้ว';
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-
-      <h1 className="text-3xl font-bold text-center">
-        รายละเอียดการประมูล #{data.Aid}
-      </h1>
-
-      {/* Payment Summary */}
-      <div className="bg-white rounded-xl shadow-md p-6 border space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="font-semibold text-lg">สถานะการชำระเงิน</span>
-          <span className={`px-4 py-1 rounded-full text-sm font-medium ${paymentBadge()}`}>
-            {paymentLabel()}
-          </span>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="max-w-4xl mx-auto px-6 pt-24 pb-12">
+          <div className="animate-pulse space-y-6">
+            <div className="h-5 w-40 bg-gray-200 rounded" />
+            <div className="h-10 w-72 bg-gray-200 rounded" />
+            <div className="h-28 bg-gray-100 rounded-2xl border border-gray-200" />
+            <div className="h-48 bg-gray-100 rounded-2xl border border-gray-200" />
+            <div className="h-40 bg-gray-100 rounded-2xl border border-gray-200" />
+          </div>
         </div>
-
-        <p>
-          <span className="font-semibold">ราคาที่ชนะ:</span>{' '}
-          {data.current_price.toLocaleString()} บาท
-        </p>
-
-        <p>
-          <span className="font-semibold">ปิดประมูล:</span>{' '}
-          {new Date(data.end_time).toLocaleDateString('th-TH')}
-        </p>
       </div>
+    );
+  }
 
-      {/* Product Section */}
-      <div className="bg-white rounded-xl shadow-md p-6 border">
-        <h2 className="text-xl font-semibold mb-4">ข้อมูลสินค้า</h2>
-
-        <div className="flex gap-5 items-center">
-          <img
-            src={`${API}${img}`}
-            className="w-32 h-32 rounded-lg border object-cover"
-          />
-          <div className="space-y-1">
-            <p className="text-lg font-semibold">{data.PROname}</p>
-            <p className="text-gray-600">
-              ราคา: {data.current_price.toLocaleString()} บาท
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="max-w-4xl mx-auto px-6 pt-24 pb-12">
+          <div className="rounded-2xl border border-red-200 bg-white p-6">
+            <div className="flex items-center gap-3">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+              <p className="text-sm font-semibold text-red-700">{msg || 'ไม่พบข้อมูล'}</p>
+            </div>
+            <p className="mt-2 text-sm text-gray-600">
+              ลองย้อนกลับไปหน้า “สินค้าที่ชนะประมูล” แล้วเข้ามาใหม่อีกที
             </p>
           </div>
         </div>
       </div>
+    );
+  }
 
-     {/* Transfer Info */}
-{data.payment_status === 'pending_payment' && data.transfer && (
-  <div className="bg-white rounded-2xl shadow-lg border p-6 space-y-6">
+  const firstPic = (data.PROpicture?.split(',')[0] || '').trim();
+  const productImg = toImgUrl(firstPic);
 
-    <h2 className="text-2xl font-bold text-green-700">
-      💳 ชำระเงินผ่านบัญชีธนาคาร
-    </h2>
+  return (
+    <div className="min-h-screen bg-white text-gray-900">
+      <div className="max-w-4xl mx-auto px-6 pt-24 pb-12 space-y-6">
+        {/* Header (Winner vibe) */}
+        <div className="rounded-2xl border border-emerald-200 bg-white overflow-hidden">
+          {/* accent line */}
+          <div className="h-[3px] bg-emerald-600" />
 
-    {/* Bank Info */}
-    <div className="bg-green-50 rounded-xl p-5 border space-y-4">
+          <div className="p-6 sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                  <span className="text-xs font-semibold tracking-wide text-emerald-800">
+                    WINNER ORDER
+                  </span>
+                </div>
 
-      <div>
-        <p className="text-sm text-gray-500">ธนาคาร</p>
-        <p className="font-semibold text-lg">{data.transfer.Tname}</p>
-      </div>
+                <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+                  รายละเอียดผู้ชนะประมูล
+                </h1>
+                <p className="mt-1 text-sm text-gray-600">
+                  รายการ #{data.Aid} • ปิดประมูล {fmtDate(data.end_time)}
+                </p>
+              </div>
 
-      <div>
-        <p className="text-sm text-gray-500">ชื่อบัญชี</p>
-        <p className="font-medium">{data.transfer.Taccount}</p>
-      </div>
+              <span
+                className={[
+                  'shrink-0 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold',
+                  paymentMeta.cls,
+                ].join(' ')}
+              >
+                <span className={`h-2 w-2 rounded-full ${paymentMeta.dot}`} />
+                {paymentMeta.label}
+              </span>
+            </div>
 
-      <div>
-        <p className="text-sm text-gray-500">เลขบัญชี</p>
-        <div className="flex items-center gap-3">
-          <p className="text-2xl font-bold tracking-widest text-green-800">
-            {data.transfer.Tnum}
-          </p>
-
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(data.transfer!.Tnum);
-              alert("คัดลอกเลขบัญชีแล้ว");
-            }}
-            className="text-sm bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition"
-          >
-            คัดลอก
-          </button>
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <MiniStat label="ราคาที่ชนะ" value={`${fmtMoney(data.current_price)} บาท`} />
+              <MiniStat label="สถานะจัดส่ง" value={shipLabel(data.shipping_status)} />
+              <MiniStat
+                label="เลขพัสดุ"
+                value={data.tracking_number ? data.tracking_number : '—'}
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <p className="text-sm text-gray-500">สาขา</p>
-        <p>{data.transfer.Tbranch || '-'}</p>
-      </div>
+        {/* Product Card */}
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <div className="p-6 sm:p-7">
+            <div className="flex items-start justify-between">
+              <h2 className="text-lg font-extrabold tracking-tight text-gray-900">
+                ข้อมูลสินค้า
+              </h2>
+              <span className="text-xs text-gray-500">Auction Item</span>
+            </div>
 
-    </div>
+            <div className="mt-4 flex flex-col sm:flex-row gap-5">
+              <div className="w-full sm:w-44">
+                <div className="aspect-square rounded-2xl overflow-hidden border border-gray-200 bg-gray-50">
+                  <img
+                    src={productImg}
+                    alt={data.PROname}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
 
-    {data.transfer.Tqr && (
-  <div className="text-center space-y-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-xl font-extrabold text-gray-900 line-clamp-2">
+                  {data.PROname}
+                </div>
 
-    <p className="text-sm text-gray-500">
-      แตะ QR เพื่อขยาย
-    </p>
+                <div className="mt-2 text-sm text-gray-600">
+                  ราคาชนะ:{' '}
+                  <span className="font-semibold text-gray-900">
+                    {fmtMoney(data.current_price)} บาท
+                  </span>
+                </div>
 
-    <img
-      src={`${API}${data.transfer.Tqr}`}
-      alt="QR Code"
-      className="mx-auto w-52 rounded-xl border shadow-md cursor-pointer hover:scale-105 transition"
-      onClick={() => setShowQr(true)}
-    />
-
-  </div>
-)}
-
-  </div>
-)}
-
-
-      {/* Upload Slip */}
-      {data.payment_status === 'pending_payment' && (
-        <div className="bg-white rounded-xl shadow-md p-6 border space-y-4">
-
-          <h2 className="text-xl font-semibold">แนบสลิปการโอนเงิน</h2>
-
-          <input
-            type="file"
-            accept="image/*"
-            className="w-full border rounded-lg p-2"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-
-          <button
-            onClick={uploadSlip}
-            className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
-          >
-            อัปโหลดสลิป
-          </button>
-
-          {msg && (
-            <p className="text-center text-sm text-green-600">{msg}</p>
-          )}
+                <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                    <p className="text-sm font-semibold text-emerald-800">
+                      สิทธิ์ผู้ชนะของคุณได้รับการบันทึกแล้ว
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-600">
+                    ถ้าสถานะยัง “รอชำระเงิน” ให้โอนตามข้อมูลด้านล่างและแนบสลิปได้เลย
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Shipping Section */}
-      {data.payment_status === 'paid' && (
-        <div className="bg-white rounded-xl shadow-md p-6 border space-y-4">
+        {/* Transfer (Only pending) */}
+        {data.payment_status === 'pending_payment' && data.transfer && (
+          <div className="rounded-2xl border border-emerald-200 bg-white overflow-hidden">
+            <div className="h-[3px] bg-emerald-600" />
+            <div className="p-6 sm:p-7 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-extrabold text-gray-900">
+                    ชำระเงินผ่านบัญชีธนาคาร
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    โอนให้ตรงชื่อบัญชี แล้วแนบสลิปเพื่อให้แอดมินตรวจสอบ
+                  </p>
+                </div>
+                <span className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                  Bank Transfer
+                </span>
+              </div>
 
-          <h2 className="text-xl font-semibold">การจัดส่งสินค้า</h2>
+              {/* Bank info panel */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="ธนาคาร" value={data.transfer.Tname} />
+                  <Field label="ชื่อบัญชี" value={data.transfer.Taccount} />
+                  <div className="sm:col-span-2">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold tracking-wide text-gray-500">
+                          เลขบัญชี
+                        </div>
+                        <div className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-widest text-emerald-900">
+                          {data.transfer.Tnum}
+                        </div>
+                      </div>
 
-          <p>ขนส่ง: <b>{data.shipping_company || '—'}</b></p>
-          <p>เลขพัสดุ: <b>{data.tracking_number || '—'}</b></p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(data.transfer!.Tnum);
+                          setMsg('✔ คัดลอกเลขบัญชีแล้ว');
+                        }}
+                        className="shrink-0 rounded-xl bg-emerald-800 px-4 py-2 text-sm font-semibold text-white border border-emerald-900 hover:bg-emerald-900 transition"
+                      >
+                        คัดลอก
+                      </button>
+                    </div>
+                  </div>
+                  <Field label="สาขา" value={data.transfer.Tbranch || '—'} />
+                  <Field label="หมายเหตุ" value="โอนยอดตามราคาชนะ แล้วแนบสลิป" />
+                </div>
+              </div>
 
-          <p>
-            สถานะ:{' '}
-            <span className={
-              data.shipping_status === 'shipping'
-                ? 'text-blue-600'
-                : data.shipping_status === 'delivered'
-                ? 'text-green-600'
-                : 'text-gray-500'
-            }>
-              {data.shipping_status === 'pending'
-                ? 'รอจัดส่ง'
-                : data.shipping_status === 'shipping'
-                ? 'กำลังจัดส่ง'
-                : data.shipping_status === 'delivered'
-                ? 'จัดส่งสำเร็จแล้ว'
-                : '—'}
-            </span>
-          </p>
+              {/* QR */}
+              {data.transfer.Tqr && (
+                <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">QR สำหรับโอน</div>
+                      <div className="mt-1 text-xs text-gray-600">
+                        แตะที่ QR เพื่อขยายให้สแกนง่าย ๆ
+                      </div>
+                    </div>
+                    <span className="h-2 w-2 rounded-full bg-emerald-600 mt-2" />
+                  </div>
 
-          {data.shipping_status === 'shipping' && (
-            <button
-              onClick={confirmDelivered}
-              className="w-full bg-green-700 text-white py-2 rounded-lg hover:bg-green-800 transition"
+                  <button
+                    type="button"
+                    onClick={() => setShowQr(true)}
+                    className="mt-4 mx-auto block rounded-2xl border border-emerald-200 bg-white p-3 hover:border-emerald-300 transition"
+                    title="กดเพื่อขยาย QR"
+                  >
+                    <img
+                      src={toImgUrl(data.transfer.Tqr)}
+                      alt="QR Code"
+                      className="w-56 sm:w-64 rounded-xl"
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Upload Slip */}
+        {data.payment_status === 'pending_payment' && (
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="p-6 sm:p-7 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-extrabold text-gray-900">แนบสลิปการโอนเงิน</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    แนบภาพสลิปชัด ๆ แล้วกดอัปโหลด ระบบจะเปลี่ยนเป็น “รอตรวจสอบ”
+                  </p>
+                </div>
+                <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700">
+                  Slip Upload
+                </span>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="w-full text-sm file:mr-4 file:rounded-xl file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-semibold file:text-emerald-800 hover:file:bg-emerald-100"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+
+                <button
+                  type="button"
+                  onClick={uploadSlip}
+                  className="mt-4 w-full rounded-2xl bg-emerald-800 py-3 text-sm font-semibold text-white border border-emerald-900 hover:bg-emerald-900 transition disabled:opacity-50"
+                  disabled={!file}
+                >
+                  อัปโหลดสลิป
+                </button>
+
+                {msg && (
+                  <div className="mt-3 text-center text-sm text-emerald-700 font-semibold">
+                    {msg}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Shipping Section */}
+        {data.payment_status === 'paid' && (
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="p-6 sm:p-7 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-extrabold text-gray-900">การจัดส่งสินค้า</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    เมื่อสถานะเป็น “กำลังจัดส่ง” คุณจะกดยืนยันรับสินค้าได้
+                  </p>
+                </div>
+
+                <span className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                  Shipping
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="ขนส่ง" value={data.shipping_company || '—'} />
+                <Field label="เลขพัสดุ" value={data.tracking_number || '—'} />
+                <div className="sm:col-span-2">
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold tracking-wide text-gray-500">
+                        สถานะ
+                      </div>
+                      <div className={`mt-1 text-sm font-semibold ${shipColor(data.shipping_status)}`}>
+                        {shipLabel(data.shipping_status)}
+                      </div>
+                    </div>
+                    <span className="h-2 w-2 rounded-full bg-emerald-600 opacity-70" />
+                  </div>
+                </div>
+              </div>
+
+              {data.shipping_status === 'shipping' && (
+                <button
+                  type="button"
+                  onClick={confirmDelivered}
+                  className="w-full rounded-2xl bg-emerald-800 py-3 text-sm font-semibold text-white border border-emerald-900 hover:bg-emerald-900 transition"
+                >
+                  ✔ ยืนยันได้รับสินค้าแล้ว
+                </button>
+              )}
+
+              {data.shipping_status === 'delivered' && (
+                <div className="rounded-2xl border border-emerald-200 bg-white p-4 text-center">
+                  <div className="text-sm font-semibold text-emerald-800">
+                    ✔ คุณยืนยันการรับสินค้าแล้ว
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* QR Modal */}
+        {showQr && data.transfer?.Tqr && (
+          <div
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowQr(false)}
+          >
+            <div
+              className="max-w-3xl w-full"
+              onClick={(e) => e.stopPropagation()}
             >
-              ✔ ยืนยันได้รับสินค้าแล้ว
-            </button>
-          )}
+              <div className="rounded-2xl overflow-hidden border border-white/10 bg-white">
+                <div className="h-[3px] bg-emerald-600" />
+                <div className="p-4 sm:p-6">
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <div className="text-sm font-extrabold text-gray-900">QR สำหรับชำระเงิน</div>
+                      <div className="mt-1 text-xs text-gray-600">
+                        สแกนให้ตรงยอด {fmtMoney(data.current_price)} บาท
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowQr(false)}
+                      className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition"
+                    >
+                      ปิด
+                    </button>
+                  </div>
 
-          {data.shipping_status === 'delivered' && (
-            <p className="text-green-600 font-semibold text-center">
-              ✔ คุณยืนยันการรับสินค้าแล้ว
-            </p>
-          )}
-        </div>
-      )}
-      {showQr && (
-  <div
-    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
-    onClick={() => setShowQr(false)}
-  >
-    <img
-      src={`${API}${data.transfer?.Tqr}`}
-      alt="QR Full"
-      className="max-w-[90%] max-h-[90%] rounded-xl shadow-2xl"
-    />
-  </div>
-)}
-
+                  <img
+                    src={toImgUrl(data.transfer.Tqr)}
+                    alt="QR Full"
+                    className="w-full max-h-[75vh] object-contain rounded-xl bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
+
+  function MiniStat({ label, value }: { label: string; value: string }) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="text-xs font-semibold tracking-wide text-gray-500">{label}</div>
+        <div className="mt-1 text-sm font-semibold text-gray-900">{value}</div>
+      </div>
+    );
+  }
+
+  function Field({ label, value }: { label: string; value: string }) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="text-xs font-semibold tracking-wide text-gray-500">{label}</div>
+        <div className="mt-1 text-sm font-semibold text-gray-900 break-words">{value}</div>
+      </div>
+    );
+  }
+
+  function shipLabel(s?: WinDetail['shipping_status'] | null) {
+    if (s === 'pending') return 'รอจัดส่ง';
+    if (s === 'shipping') return 'กำลังจัดส่ง';
+    if (s === 'delivered') return 'จัดส่งสำเร็จแล้ว';
+    return '—';
+  }
+
+  function shipColor(s?: WinDetail['shipping_status'] | null) {
+    if (s === 'shipping') return 'text-sky-700';
+    if (s === 'delivered') return 'text-emerald-700';
+    if (s === 'pending') return 'text-gray-700';
+    return 'text-gray-600';
+  }
 }
