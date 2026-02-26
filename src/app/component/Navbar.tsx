@@ -11,7 +11,7 @@ interface CategoryEventDetail {
   typeid: number | null;
   subtypeid: number | null;
 }
-
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 const emitCategory = (detail: CategoryEventDetail) => {
   window.dispatchEvent(new CustomEvent('select-category', { detail }));
 };
@@ -35,6 +35,15 @@ const Navbar = () => {
     setSidebarMode(mode);
     setIsSidebarOpen(true);
   };
+  const [profile, setProfile] = useState<string | null>(null);
+
+
+
+const getProfileUrl = (filename: string | null) => {
+  if (!filename) return '/default-profile.png';
+  if (filename.startsWith('http')) return filename;
+  return `${API}/profiles/${filename}`;
+};
 
   /* ===============================
      LOAD USER (รองรับ user + admin)
@@ -61,15 +70,18 @@ const Navbar = () => {
       const data = await res.json();
 
       if (data?.role === 'user') {
-        setUsername(data.user.Cusername);
-        setRole('user');
-      } else if (data?.role === 'admin') {
-        setUsername(data.user.Cname);
-        setRole('admin');
-      } else {
-        setUsername(null);
-        setRole(null);
-      }
+  setUsername(data.user.Cusername);
+  setRole('user');
+  setProfile(data.user.Cprofile ?? null);
+} else if (data?.role === 'admin') {
+  setUsername(data.user.Cname);
+  setRole('admin');
+  setProfile(data.user.Cprofile ?? null);
+} else {
+  setUsername(null);
+  setRole(null);
+  setProfile(null);
+}
     } catch (err) {
       console.error('โหลด user ผิดพลาด:', err);
       setUsername(null);
@@ -82,6 +94,7 @@ const Navbar = () => {
     const handleLogout = () => {
       setUsername(null);
       setRole(null);
+      setProfile(null);
     };
 
     if (localStorage.getItem('token')) loadUser();
@@ -283,9 +296,16 @@ ${
             onClick={() => openSidebar('user')}
             className="btn btn-ghost btn-sm text-xs px-3 rounded-lg flex items-center gap-2 hover:bg-green-50 hover:text-green-600"
           >
-            <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
-              {username.charAt(0).toUpperCase()}
-            </div>
+            <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-gray-200 bg-white">
+  <img
+    src={getProfileUrl(profile)}
+    alt="profile"
+    className="w-full h-full object-cover"
+    onError={(e) => {
+      (e.currentTarget as HTMLImageElement).src = '/default-profile.png';
+    }}
+  />
+</div>
             {username}
           </button>
         ) : (
@@ -304,6 +324,7 @@ ${
         mode={sidebarMode}
         setMode={setSidebarMode}
         username={username}
+         profile={profile}
         cartCount={cartCount}
         handleLogout={handleLogout}
         role={role}
