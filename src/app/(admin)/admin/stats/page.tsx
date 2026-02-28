@@ -1,7 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/app/lib/apiFetch';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ResponsiveContainer,
@@ -219,7 +219,7 @@ const COLOR_LOW = '#ef4444';
 
 const PIE_COLORS = [COLOR_BANK, COLOR_COD, COLOR_AUCTION];
 
-export default function AdminStatsPage() {
+function Inner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -1568,6 +1568,36 @@ function TypeRevenueTooltip({ active, payload }: any) {
   );
 }
 
+// function StockTooltip({ active, payload }: any) {
+//   if (!active || !payload?.length) return null;
+//   const p = payload[0]?.payload;
+//   const title = String(p?.name ?? '-');
+//   const stock = fmtInt(p?.stock ?? 0);
+//   const low = fmtInt(p?.low ?? 0);
+
+//   return (
+//     <TooltipCard
+//       title={title}
+//       lines={[
+//         { label: 'สต็อกรวม', value: stock, color: COLOR_STOCK },
+//         { label: `ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD})`, value: low, color: COLOR_LOW },
+//       ]}
+//     />
+//   );
+
+
+ 
+// }
+
+
+
+// export default function Page() {
+//   return (
+//     <Suspense fallback={<div className="p-4">Loading...</div>}>
+//       <Inner />
+//     </Suspense>
+//   )
+// }
 function StockTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const p = payload[0]?.payload;
@@ -1583,5 +1613,13 @@ function StockTooltip({ active, payload }: any) {
         { label: `ใกล้หมด (≤ ${LOW_STOCK_THRESHOLD})`, value: low, color: COLOR_LOW },
       ]}
     />
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <Inner />
+    </Suspense>
   );
 }
