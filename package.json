@@ -15,7 +15,7 @@
     "@mui/material": "^5.15.11",
     "@mui/styled-engine-sc": "^6.0.0-alpha.17",
     "@mui/x-charts": "^6.19.5",
-    "@mui/x-date-pickers": "^8.5.2",
+    "@mui/x-date-pickers": "6.19.0",
     "@types/react-icons": "^3.0.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
