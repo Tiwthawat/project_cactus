@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import CactusItems from './component/cactusitems';
 import Navbar from './component/Navbar';
 import AuctionItems from './component/AuctionItems';
@@ -60,9 +60,7 @@ function SectionHeader({
         </div>
 
         {subtitle ? (
-          <p className="mt-1 text-sm md:text-base text-gray-600">
-            {subtitle}
-          </p>
+          <p className="mt-1 text-sm md:text-base text-gray-600">{subtitle}</p>
         ) : null}
       </div>
 
@@ -95,9 +93,9 @@ function SectionCard({
 }
 
 /* ---------------------------
-  Home Page
+  ✅ Inner (ใช้ useSearchParams ได้)
 ----------------------------*/
-const HomePage = () => {
+function HomeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -114,14 +112,12 @@ const HomePage = () => {
     typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   /* -----------------------------------------
-    ✅ 1) Sync filter from URL (?typeid=&subtypeid=)
-    - ทำให้กดจากหน้าอื่นแล้วกลับมาฟิลเตอร์ได้
+    1) Sync filter from URL (?typeid=&subtypeid=)
   ------------------------------------------*/
   useEffect(() => {
     const t = toNumOrNull(searchParams.get('typeid'));
     const st = toNumOrNull(searchParams.get('subtypeid'));
 
-    // ถ้ามี query หมวด -> เปิดโหมด category filter
     if (t !== null || st !== null) {
       setSelectedType(t);
       setSelectedSubtype(st);
@@ -129,18 +125,10 @@ const HomePage = () => {
       setShowFavorites(false);
       return;
     }
-
-    // ถ้าไม่มี query หมวด -> ไม่บังคับ reset ทุกอย่าง
-    // (ปล่อยให้ event search/favorites คุมเอง)
-    // แต่ถ้าตะเองอยากให้กลับหน้า home แล้ว reset เสมอ ค่อยเปิดบล็อกนี้
-    // setSelectedType(null);
-    // setSelectedSubtype(null);
   }, [searchParams]);
 
   /* -----------------------------------------
     2) เลือกหมวดหมู่จาก Navbar/Sidebar (event เดิม)
-    - ทำให้ Navbar ที่ยัง dispatch event อยู่ ใช้ได้เหมือนเดิม
-    - และอัปเดต URL ด้วย (ให้เป็นระบบเดียวกัน)
   ------------------------------------------*/
   useEffect(() => {
     const handleCategory = (e: Event) => {
@@ -148,13 +136,11 @@ const HomePage = () => {
       const typeid = custom.detail.typeid;
       const subtypeid = custom.detail.subtypeid;
 
-      // set state
       setSelectedType(typeid);
       setSelectedSubtype(subtypeid);
       setKeyword('');
       setShowFavorites(false);
 
-      // ✅ update URL ให้ shareable + ทำให้มาจากหน้าไหนก็เหมือนกัน
       const qs = new URLSearchParams();
       if (typeid !== null) qs.set('typeid', String(typeid));
       if (subtypeid !== null) qs.set('subtypeid', String(subtypeid));
@@ -197,7 +183,7 @@ const HomePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ฟัง event ค้นหา (ยังใช้แบบเดิม)
+  // ฟัง event ค้นหา
   useEffect(() => {
     const handleSearch = (e: Event) => {
       const custom = e as SearchEvent;
@@ -205,8 +191,6 @@ const HomePage = () => {
       setShowFavorites(false);
       setSelectedType(null);
       setSelectedSubtype(null);
-
-      // ล้าง query หมวดออกจาก URL (กันสับสน)
       router.replace('/');
     };
 
@@ -221,7 +205,6 @@ const HomePage = () => {
       setSelectedType(null);
       setSelectedSubtype(null);
       setShowFavorites(false);
-
       router.push('/');
     };
 
@@ -237,7 +220,6 @@ const HomePage = () => {
       setSelectedSubtype(null);
       setShowFavorites(false);
 
-      // ล้าง query หมวดออกจาก URL
       router.replace('/');
 
       if (!token) {
@@ -312,9 +294,7 @@ const HomePage = () => {
                 right={
                   <button
                     type="button"
-                    onClick={() => {
-                      setKeyword('');
-                    }}
+                    onClick={() => setKeyword('')}
                     className="px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
                   >
                     ล้างการค้นหา
@@ -335,7 +315,7 @@ const HomePage = () => {
                     onClick={() => {
                       setSelectedType(null);
                       setSelectedSubtype(null);
-                      router.push('/'); // ✅ ล้าง query ด้วย
+                      router.push('/');
                     }}
                     className="px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition"
                   >
@@ -420,6 +400,15 @@ const HomePage = () => {
       </main>
     </>
   );
-};
+}
 
-export default HomePage;
+/* ---------------------------
+  ✅ Page ครอบ Suspense
+----------------------------*/
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <HomeInner />
+    </Suspense>
+  );
+}
