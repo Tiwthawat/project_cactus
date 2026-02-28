@@ -6,6 +6,7 @@ interface ReviewModalProps {
   onClose: () => void;
   onSubmitted: () => void;
 }
+const API = process.env.NEXT_PUBLIC_API_BASE;
 
 export default function ReviewModal({ orderId, onClose, onSubmitted }: ReviewModalProps) {
   const [text, setText] = useState('');
@@ -20,7 +21,7 @@ export default function ReviewModal({ orderId, onClose, onSubmitted }: ReviewMod
 
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/orders/${orderId}/review`, {
+      const res = await fetch(`${API}/orders/${orderId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, stars }),

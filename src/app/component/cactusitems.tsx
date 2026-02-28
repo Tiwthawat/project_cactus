@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FaHeart, FaRegHeart, FaShoppingCart } from "react-icons/fa";
 import { IoFlashSharp } from "react-icons/io5";
 import { useCart } from "../context/CartContext";
+const API = process.env.NEXT_PUBLIC_API_BASE;
 
 interface Product {
   Pid: number;
@@ -44,10 +45,10 @@ useEffect(() => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        let url = "http://localhost:3000/product";
+        let url = `${API}/product`;
 
         if (type === "latest") {
-          url = "http://localhost:3000/product/latest";
+          url = `${API}/product/latest`;
         } else {
           const params = new URLSearchParams();
           if (typeid) params.append("typeid", String(typeid));
@@ -69,7 +70,7 @@ useEffect(() => {
 
 
     const fetchFavorites = async () => {
-      const res = await fetch("http://localhost:3000/favorites", {
+      const res = await fetch(`${API}/favorites`, {
         headers: {
           "Authorization": `Bearer ${token}`,   
         },
@@ -110,7 +111,7 @@ if (storedUser) {
 
   // สลับรายการโปรด
   const toggleFavorite = async (productId: number) => {
-    const res = await fetch("http://localhost:3000/favorites", {
+    const res = await fetch(`${API}/favorites`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -230,7 +231,7 @@ if (storedUser) {
 
 
                   <img
-                    src={`http://localhost:3000${product.Ppicture.split(",")[0].trim()}`}
+                    src={`${API}${product.Ppicture.split(",")[0].trim()}`}
                     alt={product.Pname}
                     className={`w-full h-full object-cover transition-transform duration-500 
                     ${hoveredProduct === product.Pid ? "scale-110" : "scale-100"}

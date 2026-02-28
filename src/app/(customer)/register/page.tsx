@@ -6,6 +6,8 @@ import ReactDatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
+const API = process.env.NEXT_PUBLIC_API_BASE;
+
 interface RegisterForm {
   Cname: string;
   Cusername: string;
@@ -90,7 +92,7 @@ export default function Register() {
       if (form.Czipcode.length === 5) {
         try {
           const res = await fetch(
-            `http://localhost:3000/zipcode/${form.Czipcode}`
+            `${API}/zipcode/${form.Czipcode}`
           );
           const data = await res.json();
           if (res.ok) {
@@ -132,7 +134,7 @@ export default function Register() {
       Object.entries(form).forEach(([key, value]) => formData.append(key, value));
       if (profileFile) formData.append('profile', profileFile);
 
-      const res = await fetch('http://localhost:3000/register', {
+      const res = await fetch(`${API}/register`, {
         method: 'POST',
         body: formData,
       });
@@ -141,10 +143,10 @@ export default function Register() {
 
       if (!res.ok) {
         const err = await res.json();
-        return alert(`❌ สมัครไม่สำเร็จ: ${err.message}`);
+        return alert(` สมัครไม่สำเร็จ: ${err.message}`);
       }
 
-      alert('✅ สมัครสมาชิกสำเร็จ!');
+      alert(' สมัครสมาชิกสำเร็จ!');
       router.push('/login');
     } catch (err) {
       setLoading(false);

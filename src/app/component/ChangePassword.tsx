@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { apiFetch } from '../lib/apiFetch';
 
+
+const API = process.env.NEXT_PUBLIC_API_BASE;
 export default function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -11,7 +13,8 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
 
   const handleSubmit = async () => {
     
-    const res = await apiFetch('http://localhost:3000/change-password', {
+    
+    const res = await apiFetch(`${API}/change-password`, {
       method: 'PATCH',
       body: JSON.stringify({ oldPassword, newPassword }),
     });

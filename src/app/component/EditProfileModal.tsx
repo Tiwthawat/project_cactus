@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/apiFetch';
 
+const API = process.env.NEXT_PUBLIC_API_BASE;
+
 interface UserInfo {
   Csubdistrict: string;
   Cdistrict: string;
@@ -56,7 +58,7 @@ export default function EditProfileModal({ user, onClose }: Props) {
     const fetchAddress = async () => {
       if ((formData.Czipcode ?? '').length === 5) {
         try {
-          const res = await fetch(`http://localhost:3000/zipcode/${formData.Czipcode}`);
+          const res = await fetch(`${API}/zipcode/${formData.Czipcode}`);
           if (res.ok) {
             const data = await res.json();
             setFormData((prev) => ({
@@ -122,7 +124,7 @@ export default function EditProfileModal({ user, onClose }: Props) {
         <div className="flex flex-col items-center mb-6">
           <div className="w-32 h-32 rounded-full overflow-hidden shadow-lg ring-4 ring-emerald-200">
             <img
-              src={previewUrl || (user.Cprofile ? `http://localhost:3000/profiles/${user.Cprofile}` : `/default-profile.png`)}
+              src={previewUrl || (user.Cprofile ? `${API}/profiles/${user.Cprofile}` : `/default-profile.png`)}
               alt="Profile"
               className="w-full h-full object-cover"
             />
