@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CartPanel from '../(customer)/cart/CartPanel';
+import { TbBellRingingFilled } from 'react-icons/tb';
 
 import {
   X,
@@ -29,7 +30,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 
-type SidebarMode = 'user' | 'categories' | 'search' | 'cart' | 'menu' | null;
+type SidebarMode = 'user' | 'categories' | 'search' | 'cart' | 'menu' | 'notifications' | null;
 
 interface SidebarProps {
   isOpen: boolean;
@@ -42,6 +43,18 @@ interface SidebarProps {
   profile: string | null;
   role: 'user' | 'admin' | null;
 }
+
+type NotiItem = {
+  Nid: number;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  is_read: 0 | 1;
+  created_at: string;
+};
+
+type NotiListResponse = { items: NotiItem[] };
 
 const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
 
@@ -75,7 +88,12 @@ function IconBadge({
   } as const;
 
   return (
-    <span className={['inline-flex h-10 w-10 items-center justify-center rounded-xl ring-1', map[tone]].join(' ')}>
+    <span
+      className={[
+        'inline-flex h-10 w-10 items-center justify-center rounded-xl ring-1',
+        map[tone],
+      ].join(' ')}
+    >
       {children}
     </span>
   );
@@ -139,6 +157,15 @@ function Header({
   );
 }
 
+function safeDateLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('th-TH');
+}
+function emitNotificationsChanged() {
+  window.dispatchEvent(new Event('notifications-changed'));
+}
+
 export default function Sidebar({
   isOpen,
   onClose,
@@ -153,7 +180,9 @@ export default function Sidebar({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // โหมด search: auto focus
+  const [notis, setNotis] = useState<NotiItem[]>([]);
+  const [notiLoading, setNotiLoading] = useState(false);
+
   useEffect(() => {
     if (isOpen && mode === 'search') {
       const t = setTimeout(() => inputRef.current?.focus(), 250);
@@ -161,7 +190,75 @@ export default function Sidebar({
     }
   }, [isOpen, mode]);
 
-  // ✅ กดหมวดจากหน้าไหนก็ได้ -> เด้งกลับหน้า "/" พร้อม query
+  useEffect(() => {
+    if (isOpen && mode === 'notifications') {
+      void loadNotis();
+    }
+  }, [isOpen, mode]);
+
+  const loadNotis = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setNotis([]);
+      return;
+    }
+
+    setNotiLoading(true);
+    try {
+      const res = await fetch(`${API}/notifications?limit=40`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        setNotis([]);
+        return;
+      }
+
+      const data = (await res.json()) as NotiListResponse;
+      setNotis(Array.isArray(data?.items) ? data.items : []);
+    } catch {
+      setNotis([]);
+    } finally {
+      setNotiLoading(false);
+    }
+  };
+
+const markRead = async (Nid: number) => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  setNotis((prev) => prev.map((n) => (n.Nid === Nid ? { ...n, is_read: 1 } : n)));
+  emitNotificationsChanged();
+
+  try {
+    await fetch(`${API}/notifications/${Nid}/read`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    setNotis((prev) => prev.map((n) => (n.Nid === Nid ? { ...n, is_read: 0 } : n)));
+    emitNotificationsChanged();
+  }
+};
+
+const readAll = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  setNotis((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
+  emitNotificationsChanged();
+
+  try {
+    await fetch(`${API}/notifications/read-all`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    void loadNotis();
+    emitNotificationsChanged();
+  }
+};
+
   const goCategory = (typeid: number | null, subtypeid: number | null = null) => {
     const qs = new URLSearchParams();
     if (typeid !== null) qs.set('typeid', String(typeid));
@@ -188,7 +285,9 @@ export default function Sidebar({
       </div>
 
       <div className="relative">
-        <div className="text-[11px] font-bold tracking-[0.18em] text-emerald-700 uppercase">ยินดีต้อนรับกลับมา</div>
+        <div className="text-[11px] font-bold tracking-[0.18em] text-emerald-700 uppercase">
+          ยินดีต้อนรับกลับมา
+        </div>
         <div className="mt-1 text-[16px] font-extrabold text-gray-900">{username || 'ผู้ใช้งาน'}</div>
 
         {role === 'admin' && (
@@ -295,8 +394,7 @@ export default function Sidebar({
                   placeholder="Lophophora, หนามเหลือง..."
                   className="h-12 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-[14px] text-gray-900 outline-none transition focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                   onChange={(e) => {
-                    // ถ้าหน้าแรกใช้ event filter แบบเดิมอยู่ก็ยังใช้ได้
-                    window.dispatchEvent(new CustomEvent('do-search', { detail: e.target.value }));
+                    window.dispatchEvent(new CustomEvent<string>('do-search', { detail: e.target.value }));
                   }}
                 />
               </div>
@@ -313,6 +411,85 @@ export default function Sidebar({
         return (
           <div className="h-full px-2 pb-2 pt-3">
             <CartPanel variant="drawer" />
+          </div>
+        );
+
+      case 'notifications':
+        return (
+          <div className="px-2 pb-2">
+            <div className="flex items-center justify-between px-2 pt-6 pb-3">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 shadow-sm">
+                  <TbBellRingingFilled />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[16px] font-extrabold text-gray-900">แจ้งเตือน</div>
+                  <div className="text-[12px] font-medium text-gray-400">อัปเดตล่าสุดของบัญชีคุณ</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={readAll}
+                className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-50"
+              >
+                อ่านทั้งหมด
+              </button>
+            </div>
+
+            {notiLoading ? (
+              <div className="space-y-2 px-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-16 rounded-2xl bg-gray-50 ring-1 ring-gray-100 animate-pulse" />
+                ))}
+              </div>
+            ) : notis.length === 0 ? (
+              <div className="mx-2 mt-2 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-[13px] text-gray-600">
+                ยังไม่มีแจ้งเตือน
+              </div>
+            ) : (
+              <div className="space-y-2 px-2">
+                {notis.map((n) => {
+                  const unread = n.is_read === 0;
+
+                  return (
+                    <button
+                      key={n.Nid}
+                      type="button"
+                      onClick={() => {
+                        if (unread) void markRead(n.Nid);
+                        if (n.link) router.push(n.link);
+                        onClose();
+                      }}
+                      className={[
+                        'w-full text-left rounded-2xl border px-4 py-3 transition',
+                        unread
+                          ? 'border-emerald-100 bg-emerald-50/60 hover:bg-emerald-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50 opacity-80',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-start gap-3">
+                        {unread ? (
+                          <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
+                        ) : (
+                          <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-gray-300" />
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-extrabold text-gray-900 truncate">{n.title}</div>
+
+                          {n.body && <div className="mt-1 text-[12px] text-gray-600 line-clamp-2">{n.body}</div>}
+
+                          <div className="mt-2 text-[11px] font-medium text-gray-400">
+                            {safeDateLabel(n.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
 
@@ -344,7 +521,6 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Overlay */}
       <div
         className={[
           'fixed inset-0 z-[60] bg-black/40 backdrop-blur-md transition-opacity duration-300',
@@ -353,7 +529,6 @@ export default function Sidebar({
         onClick={onClose}
       />
 
-      {/* Panel */}
       <div
         className={[
           'fixed right-0 top-0 z-[70] flex h-full w-[360px] flex-col bg-white',
@@ -367,12 +542,8 @@ export default function Sidebar({
           borderLeft: '1px solid rgba(229,231,235,0.6)',
         }}
       >
-        {/* Scroll */}
-        <div className="flex-1 overflow-y-auto px-2 pb-2 [scrollbar-width:thin]">
-          {content()}
-        </div>
+        <div className="flex-1 overflow-y-auto px-2 pb-2 [scrollbar-width:thin]">{content()}</div>
 
-        {/* Footer Close */}
         <div className="flex items-center justify-center border-t border-gray-100 bg-gradient-to-t from-white to-transparent p-5">
           <button
             type="button"

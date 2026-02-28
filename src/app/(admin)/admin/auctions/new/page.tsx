@@ -12,6 +12,23 @@ interface AuctionProduct {
   PROname: string;
   PROprice: number;
 }
+  const Field = ({
+    label,
+    hint,
+    children,
+  }: {
+    label: string;
+    hint?: string;
+    children: React.ReactNode;
+  }) => (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <label className="text-sm font-semibold text-emerald-950">{label}</label>
+        {hint && <div className="text-xs text-slate-500">{hint}</div>}
+      </div>
+      {children}
+    </div>
+  );
 
 export default function NewAuctionPage() {
   const router = useRouter();
@@ -20,7 +37,7 @@ export default function NewAuctionPage() {
   const [loadingItems, setLoadingItems] = useState(true);
 
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('');
-  const [startPrice, setStartPrice] = useState<string>('0.00');
+  const [startPrice, setStartPrice] = useState<string>("");
   const [minIncrement, setMinIncrement] = useState<string>('1');
 
   const [localDT, setLocalDT] = useState('');
@@ -73,17 +90,17 @@ export default function NewAuctionPage() {
 
   const handleSelectProduct = (value: string) => {
     if (value === '') {
-      setSelectedProduct('');
-      setStartPrice('0.00');
-      return;
-    }
+  setSelectedProduct('');
+  setStartPrice('');
+  return;
+}
 
     const id = Number(value);
     setSelectedProduct(id);
 
     const product = products.find((p) => p.PROid === id);
     if (product) {
-      setStartPrice(Number(product.PROprice).toFixed(2));
+      setStartPrice(String(Math.floor(product.PROprice)));
     }
   };
 
@@ -142,23 +159,7 @@ export default function NewAuctionPage() {
     }
   };
 
-  const Field = ({
-    label,
-    hint,
-    children,
-  }: {
-    label: string;
-    hint?: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <label className="text-sm font-semibold text-emerald-950">{label}</label>
-        {hint && <div className="text-xs text-slate-500">{hint}</div>}
-      </div>
-      {children}
-    </div>
-  );
+
 
   const inputCls =
     'w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-slate-800 ' +
@@ -230,15 +231,15 @@ export default function NewAuctionPage() {
 
           {/* Start price */}
           <Field label="ราคาเริ่มต้น (บาท)" hint="ต้องมากกว่า 0">
-            <input
-              type="number"
-              step="1"
-              min={0}
-              value={startPrice}
-              onChange={(e) => setStartPrice(e.target.value)}
-              className={inputCls}
-              required
-            />
+           <input
+  type="number"
+  step="1"
+  min={1}
+  value={startPrice}
+  onChange={(e) => setStartPrice(e.target.value)}
+  className={inputCls}
+  required
+/>
           </Field>
 
           {/* Min increment */}

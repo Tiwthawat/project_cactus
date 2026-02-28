@@ -15,36 +15,29 @@ type Banner = {
 };
 
 const banners: Banner[] = [
+
+  {
+    src: "banner-03-rare.png",
+    kicker: "SHIPPING DEAL",
+    heading: "ค่าส่งเริ่มต้น 50฿",
+    subheading: "ซื้อ 1–999฿: 50฿ • 1,000฿+: ส่งฟรี!!!",
+    buttonText: "Shop Now",
+    href: "/",
+    overlay: true,
+   
+  },
   {
     src: "banner-01-hero.png",
     kicker: "AUCTION HOUSE",
     heading: "Auction Cactus",
-    subheading: "Discover, bid, and collect your favorite cactus",
+    
     buttonText: "Explore Auctions",
     href: "/auctions",
     overlay: true,
-    chips: ["Secure payment", "Real bidding", "Fast shipping"],
+    
   },
-  {
-    src: "banner-02-live.png",
-    kicker: "● LIVE NOW",
-    heading: "How Auction Works",
-    subheading: "1) Pick  2) Bid  3) Pay  4) Delivered",
-    buttonText: "How to Bid",
-    href: "/auctions",
-    overlay: true,
-    chips: ["Min increment", "Auto winner", "Status updates"],
-  },
-  {
-    src: "banner-03-rare.png",
-    kicker: "SHIPPING DEAL",
-    heading: "Flat Shipping 50฿",
-    subheading: "Buy 1–999฿: 50฿ • 1,000฿+: FREE shipping",
-    buttonText: "Shop Now",
-    href: "/",
-    overlay: true,
-    chips: ["Tracked delivery", "Careful packing", "Free over 1,000฿"],
-  },
+ 
+  
 ];
 
 export default function BannerSlider() {
