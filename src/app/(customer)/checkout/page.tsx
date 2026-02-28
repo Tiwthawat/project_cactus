@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { apiFetch } from '@/app/lib/apiFetch';
+import React, { Suspense } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { apiFetch } from "@/app/lib/apiFetch";
 
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000';
+const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
 interface CartItem {
   Pid: number;
@@ -27,28 +28,29 @@ interface User {
 }
 
 const getImageUrl = (path: string) => {
-  if (!path) return '/no-image.png';
+  if (!path) return "/no-image.png";
   const clean = String(path).trim();
-  const first = clean.split(',')[0]?.trim() || '';
-  if (!first) return '/no-image.png';
-  if (first.startsWith('http')) return first;
-  if (first.startsWith('/')) return `${API}${first}`;
+  const first = clean.split(",")[0]?.trim() || "";
+  if (!first) return "/no-image.png";
+  if (first.startsWith("http")) return first;
+  if (first.startsWith("/")) return `${API}${first}`;
   return `${API}/${first}`;
 };
 
 const fmtBaht = (n: number) =>
-  Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-export default function CheckoutPage() {
+// ✅ ย้าย logic ทั้งหมดมาไว้ Inner เพราะมี useSearchParams()
+function Inner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const type = searchParams.get('type');
-  const isBuyNow = type === 'buynow';
+  const type = searchParams.get("type");
+  const isBuyNow = type === "buynow";
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [Cid, setCid] = useState<number | null>(null);
-  const [payment, setPayment] = useState<'transfer' | 'cod'>('transfer');
+  const [payment, setPayment] = useState<"transfer" | "cod">("transfer");
   const [loading, setLoading] = useState(false);
 
   const totalPrice = useMemo(
@@ -59,10 +61,10 @@ export default function CheckoutPage() {
   const grandTotal = totalPrice + shippingFee;
 
   const fullAddress = useMemo(() => {
-    if (!user) return '';
+    if (!user) return "";
     return [user.Caddress, user.Csubdistrict, user.Cdistrict, user.Cprovince, user.Czipcode]
-      .filter((x) => typeof x === 'string' && x.trim().length > 0)
-      .join(', ');
+      .filter((x) => typeof x === "string" && x.trim().length > 0)
+      .join(", ");
   }, [user]);
 
   // Load profile
@@ -78,10 +80,10 @@ export default function CheckoutPage() {
         if (u?.Cid) {
           setUser(u);
           setCid(u.Cid);
-          localStorage.setItem('user', JSON.stringify(u));
+          localStorage.setItem("user", JSON.stringify(u));
         }
       } catch (err) {
-        console.error('โหลดข้อมูลผู้ใช้ล้มเหลว:', err);
+        console.error("โหลดข้อมูลผู้ใช้ล้มเหลว:", err);
       }
     };
 
@@ -93,7 +95,7 @@ export default function CheckoutPage() {
     const loadItems = async () => {
       try {
         if (isBuyNow) {
-          const data = JSON.parse(localStorage.getItem('buynow') || '{}') as { pid?: number; qty?: number };
+          const data = JSON.parse(localStorage.getItem("buynow") || "{}") as { pid?: number; qty?: number };
           if (!data?.pid) {
             setCartItems([]);
             return;
@@ -106,7 +108,7 @@ export default function CheckoutPage() {
           }
 
           const product = await res.json();
-          const pic = typeof product?.Ppicture === 'string' ? product.Ppicture.split(',')[0] : '';
+          const pic = typeof product?.Ppicture === "string" ? product.Ppicture.split(",")[0] : "";
 
           setCartItems([
             {
@@ -119,11 +121,11 @@ export default function CheckoutPage() {
             },
           ]);
         } else {
-          const cart = JSON.parse(localStorage.getItem('cart') || '[]') as CartItem[];
+          const cart = JSON.parse(localStorage.getItem("cart") || "[]") as CartItem[];
           setCartItems(Array.isArray(cart) ? cart : []);
         }
       } catch (err) {
-        console.error('โหลดรายการสินค้าล้มเหลว:', err);
+        console.error("โหลดรายการสินค้าล้มเหลว:", err);
         setCartItems([]);
       }
     };
@@ -139,7 +141,7 @@ export default function CheckoutPage() {
       try {
         const results = await Promise.all(
           cartItems.map(async (it) => {
-            const res = await apiFetch(`${API}/product/${it.Pid}`, { cache: 'no-store' });
+            const res = await apiFetch(`${API}/product/${it.Pid}`, { cache: "no-store" });
             if (!res.ok) return { Pid: it.Pid, stock: it.Pnumproduct ?? 0 };
             const data = await res.json();
             return { Pid: it.Pid, stock: Number(data?.Pnumproduct) || 0 };
@@ -167,12 +169,12 @@ export default function CheckoutPage() {
 
     syncStockFromDB();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems.map((x) => x.Pid).join(',')]);
+  }, [cartItems.map((x) => x.Pid).join(",")]);
 
   // Update LocalStorage (cart only)
   const updateCartLS = (items: CartItem[]) => {
     setCartItems(items);
-    if (!isBuyNow) localStorage.setItem('cart', JSON.stringify(items));
+    if (!isBuyNow) localStorage.setItem("cart", JSON.stringify(items));
   };
 
   const increaseQty = (pid: number) => {
@@ -194,19 +196,19 @@ export default function CheckoutPage() {
   const deleteItem = (pid: number) => {
     const updated = cartItems.filter((item) => item.Pid !== pid);
     updateCartLS(updated);
-    if (updated.length === 0) router.push('/');
+    if (updated.length === 0) router.push("/");
   };
 
   const handleOrder = async () => {
     if (!Cid || cartItems.length === 0) {
-      alert('ไม่มีข้อมูลลูกค้าหรือสินค้า');
+      alert("ไม่มีข้อมูลลูกค้าหรือสินค้า");
       return;
     }
 
     setLoading(true);
     try {
       const res = await apiFetch(`${API}/orders`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({
           Cid,
           payment,
@@ -222,18 +224,18 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (res.ok) {
-        alert('สั่งซื้อสำเร็จ!');
-        localStorage.removeItem('cart');
-        localStorage.removeItem('buynow');
+        alert("สั่งซื้อสำเร็จ!");
+        localStorage.removeItem("cart");
+        localStorage.removeItem("buynow");
 
-        if (payment === 'cod') router.push('/me/orders');
+        if (payment === "cod") router.push("/me/orders");
         else router.push(`/payment/${data.orderId}`);
       } else {
-        alert(data?.message || 'เกิดข้อผิดพลาด');
+        alert(data?.message || "เกิดข้อผิดพลาด");
       }
     } catch (err) {
       console.error(err);
-      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์');
+      alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์");
     } finally {
       setLoading(false);
     }
@@ -241,6 +243,7 @@ export default function CheckoutPage() {
 
   const hasItems = cartItems.length > 0;
 
+  // ✅ UI เดิมทั้งก้อน ไม่ลบ
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-emerald-50/40 text-slate-900">
       {/* subtle top highlight (premium, not loud) */}
@@ -286,7 +289,7 @@ export default function CheckoutPage() {
 
                   <button
                     type="button"
-                    onClick={() => router.push('/me')}
+                    onClick={() => router.push("/me")}
                     className="text-sm font-bold text-emerald-700 hover:text-emerald-800 transition-colors"
                   >
                     ไปแก้ในโปรไฟล์ →
@@ -296,18 +299,18 @@ export default function CheckoutPage() {
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-xs font-semibold text-slate-500">ชื่อผู้รับ</p>
-                    <p className="mt-1 font-bold text-slate-900">{user?.Cname || '-'}</p>
+                    <p className="mt-1 font-bold text-slate-900">{user?.Cname || "-"}</p>
                   </div>
 
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-xs font-semibold text-slate-500">เบอร์โทร</p>
-                    <p className="mt-1 font-bold text-slate-900">{user?.Cphone || '-'}</p>
+                    <p className="mt-1 font-bold text-slate-900">{user?.Cphone || "-"}</p>
                   </div>
 
                   <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-xs font-semibold text-slate-500">ที่อยู่</p>
                     <p className="mt-1 font-bold text-slate-900 leading-relaxed">
-                      {user ? fullAddress : 'กำลังโหลดข้อมูลที่อยู่จากระบบ...'}
+                      {user ? fullAddress : "กำลังโหลดข้อมูลที่อยู่จากระบบ..."}
                     </p>
                   </div>
                 </div>
@@ -325,35 +328,35 @@ export default function CheckoutPage() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-1 grid grid-cols-2">
                   <button
                     type="button"
-                    onClick={() => setPayment('transfer')}
+                    onClick={() => setPayment("transfer")}
                     className={[
-                      'h-11 rounded-2xl font-extrabold transition-all',
-                      payment === 'transfer'
-                        ? 'bg-white shadow-sm border border-slate-200 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900',
-                    ].join(' ')}
+                      "h-11 rounded-2xl font-extrabold transition-all",
+                      payment === "transfer"
+                        ? "bg-white shadow-sm border border-slate-200 text-slate-900"
+                        : "text-slate-600 hover:text-slate-900",
+                    ].join(" ")}
                   >
                     โอนเงิน
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setPayment('cod')}
+                    onClick={() => setPayment("cod")}
                     className={[
-                      'h-11 rounded-2xl font-extrabold transition-all',
-                      payment === 'cod'
-                        ? 'bg-white shadow-sm border border-slate-200 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900',
-                    ].join(' ')}
+                      "h-11 rounded-2xl font-extrabold transition-all",
+                      payment === "cod"
+                        ? "bg-white shadow-sm border border-slate-200 text-slate-900"
+                        : "text-slate-600 hover:text-slate-900",
+                    ].join(" ")}
                   >
                     COD
                   </button>
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
-                  {payment === 'transfer'
-                    ? 'โอนเงินแล้วระบบจะพาไปหน้าชำระเงินเพื่ออัปโหลดสลิป'
-                    : 'COD: ระบบจะพาไปหน้าคำสั่งซื้อ และชำระกับขนส่งตอนรับสินค้า'}
+                  {payment === "transfer"
+                    ? "โอนเงินแล้วระบบจะพาไปหน้าชำระเงินเพื่ออัปโหลดสลิป"
+                    : "COD: ระบบจะพาไปหน้าคำสั่งซื้อ และชำระกับขนส่งตอนรับสินค้า"}
                 </div>
               </div>
             </section>
@@ -390,21 +393,24 @@ export default function CheckoutPage() {
                                 {item.Pname}
                               </p>
                               <p className="text-sm text-slate-500 mt-1">
-                                ราคา <span className="font-bold text-emerald-700">{fmtBaht(item.Pprice)} บาท</span>
+                                ราคา{" "}
+                                <span className="font-bold text-emerald-700">
+                                  {fmtBaht(item.Pprice)} บาท
+                                </span>
                               </p>
 
                               <div className="mt-2">
                                 <span
                                   className={[
-                                    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-extrabold border',
+                                    "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-extrabold border",
                                     outOfStock
-                                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                      ? "bg-rose-50 text-rose-700 border-rose-200"
                                       : lowStock
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                      : 'bg-slate-50 text-slate-700 border-slate-200',
-                                  ].join(' ')}
+                                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                                      : "bg-slate-50 text-slate-700 border-slate-200",
+                                  ].join(" ")}
                                 >
-                                  {outOfStock ? 'หมดสต็อก' : `คงเหลือ ${item.Pnumproduct}`}
+                                  {outOfStock ? "หมดสต็อก" : `คงเหลือ ${item.Pnumproduct}`}
                                 </span>
                               </div>
                             </div>
@@ -495,7 +501,7 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-sm text-slate-600">
                     <span>ค่าจัดส่ง</span>
                     <span className="font-extrabold text-slate-900">
-                      {shippingFee === 0 ? '0 บาท' : `${fmtBaht(shippingFee)} บาท`}
+                      {shippingFee === 0 ? "0 บาท" : `${fmtBaht(shippingFee)} บาท`}
                     </span>
                   </div>
 
@@ -508,7 +514,9 @@ export default function CheckoutPage() {
                   <div className="border-t border-slate-200 pt-4 flex items-end justify-between">
                     <div>
                       <p className="text-sm text-slate-600">รวมทั้งหมด</p>
-                      <p className="text-3xl font-extrabold text-slate-900">{fmtBaht(grandTotal)} บาท</p>
+                      <p className="text-3xl font-extrabold text-slate-900">
+                        {fmtBaht(grandTotal)} บาท
+                      </p>
                     </div>
                     <div className="h-10 w-10 rounded-2xl bg-emerald-50 border border-emerald-100" />
                   </div>
@@ -518,13 +526,13 @@ export default function CheckoutPage() {
                     disabled={loading || !user || !hasItems}
                     className="w-full h-12 rounded-2xl bg-slate-900 text-white font-extrabold shadow-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? 'กำลังสั่งซื้อ...' : 'ยืนยันคำสั่งซื้อ'}
+                    {loading ? "กำลังสั่งซื้อ..." : "ยืนยันคำสั่งซื้อ"}
                   </button>
 
                   <div className="text-xs text-slate-500 leading-relaxed">
-                    {payment === 'transfer'
-                      ? 'หลังยืนยัน ระบบจะพาไปหน้าชำระเงินเพื่ออัปโหลดสลิป'
-                      : 'หลังยืนยัน ระบบจะพาไปหน้าคำสั่งซื้อ (COD)'}
+                    {payment === "transfer"
+                      ? "หลังยืนยัน ระบบจะพาไปหน้าชำระเงินเพื่ออัปโหลดสลิป"
+                      : "หลังยืนยัน ระบบจะพาไปหน้าคำสั่งซื้อ (COD)"}
                   </div>
                 </div>
               </section>
@@ -533,5 +541,14 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ✅ Page ครอบ Suspense ตามแพทเทิร์น
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <Inner />
+    </Suspense>
   );
 }

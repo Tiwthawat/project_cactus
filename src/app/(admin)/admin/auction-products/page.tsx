@@ -1,5 +1,6 @@
 "use client";
 
+import React, { Suspense } from "react";
 import { apiFetch } from "@/app/lib/apiFetch";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -67,7 +68,8 @@ function canDelete(st: string) {
   return !["auction", "paid", "shipping", "delivered"].includes(st);
 }
 
-export default function AdminAuctionProductsPage() {
+// ✅ ย้ายทุกอย่างมาอยู่ใน Inner เพราะมี useSearchParams()
+function Inner() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -196,6 +198,7 @@ export default function AdminAuctionProductsPage() {
     }
   };
 
+  // ✅ UI เดิมทั้งก้อน (ไม่ลบ ไม่ย้ายหน้าตา)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/40 to-slate-50">
       <div className="p-6 pt-8 max-w-7xl mx-auto">
@@ -343,11 +346,7 @@ export default function AdminAuctionProductsPage() {
                       >
                         <td className="p-4 text-center hidden md:table-cell">
                           <div className="mx-auto w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
-                            <img
-                              src={imgSrc}
-                              className="w-full h-full object-cover"
-                              alt={p.PROname}
-                            />
+                            <img src={imgSrc} className="w-full h-full object-cover" alt={p.PROname} />
                           </div>
                         </td>
 
@@ -446,5 +445,14 @@ export default function AdminAuctionProductsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ✅ Page ครอบ Suspense ตามแพทเทิร์นเมื่อกี้
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <Inner />
+    </Suspense>
   );
 }

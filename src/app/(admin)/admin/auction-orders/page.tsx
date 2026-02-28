@@ -10,7 +10,7 @@ import {
 } from '@/app/lib/status'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 
 type PaymentStatus =
   | 'pending_payment'
@@ -88,7 +88,8 @@ function softCard() {
   return 'bg-white/80 backdrop-blur rounded-2xl shadow-lg border border-slate-200 overflow-hidden'
 }
 
-export default function AuctionOrdersPage() {
+/** ✅ ย้าย “หน้าเดิมทั้งหน้า” มาไว้ใน Inner เพื่อให้ Page() ห่อ Suspense ได้ */
+function Inner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -384,7 +385,6 @@ export default function AuctionOrdersPage() {
           ) : (
             <div className="border-t border-slate-200 overflow-hidden">
               <table className="w-full table-fixed text-sm">
-
                 <thead>
                   <tr className="bg-gradient-to-r from-emerald-700 to-green-700 text-white">
                     <th className="p-3 text-center w-24">รหัส</th>
@@ -487,5 +487,14 @@ export default function AuctionOrdersPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** ✅ Page: ห่อ Suspense ให้ useSearchParams ตามที่ Next ต้องการ */
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <Inner />
+    </Suspense>
   )
 }

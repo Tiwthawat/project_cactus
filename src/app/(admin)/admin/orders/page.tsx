@@ -1,5 +1,7 @@
 "use client";
 
+import React, { Suspense } from "react";
+
 import { apiFetch } from "@/app/lib/apiFetch";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -120,7 +122,8 @@ function SoftTopbar({
   );
 }
 
-export default function OrdersPage() {
+// ✅ ย้าย logic ทั้งหมดมาไว้ Inner เพราะมี useSearchParams()
+function Inner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -340,6 +343,7 @@ export default function OrdersPage() {
     </>
   );
 
+  // ✅ UI เดิมทั้งก้อน
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/35 to-slate-50">
       <div className="p-6 pt-8 max-w-7xl mx-auto">
@@ -532,5 +536,14 @@ export default function OrdersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ✅ Page ครอบ Suspense ตามแพทเทิร์น
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <Inner />
+    </Suspense>
   );
 }
