@@ -170,37 +170,38 @@ export default function FAQ() {
           <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mt-3">
             คำถามที่พบบ่อย
           </h1>
-          <p className="text-gray-500 mt-2">
-            โฟกัสเรื่อง “ซื้อปกติ / COD / ประมูล (24 ชม.) / สถานะ / จัดส่ง / ยกเลิก” แบบอ่านจบไว
+          <p className="text-gray-500  mt-2">
+            โฟกัสเรื่อง “ซื้อปกติ / COD / ประมูล (24 ชม.) / สถานะ / จัดส่ง / ยกเลิก” แ
           </p>
 
-          {/* Search */}
-          <div className="mt-5">
-            <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <input
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setOpenIndex(0);
-                }}
-                placeholder="ค้นหา เช่น 24 ชั่วโมง, สลิป, COD, ยกเลิก..."
-                className="w-full outline-none text-sm text-gray-900 placeholder:text-gray-400"
-              />
-              {q && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQ('');
-                    setOpenIndex(0);
-                  }}
-                  className="text-xs font-semibold px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
-                >
-                  ล้าง
-                </button>
-              )}
-            </div>
-          </div>
+         {/* Search */}
+<div className="mt-5">
+  <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 [color-scheme:light]">
+    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+    <input
+      type="text"
+      value={q}
+      onChange={(e) => {
+        setQ(e.target.value);
+        setOpenIndex(0);
+      }}
+      placeholder="ค้นหา เช่น 24 ชั่วโมง, สลิป, COD, ยกเลิก..."
+      className="w-full !bg-white outline-none text-sm text-gray-900 placeholder:text-gray-400 [color-scheme:light]"
+    />
+    {q && (
+      <button
+        type="button"
+        onClick={() => {
+          setQ('');
+          setOpenIndex(0);
+        }}
+        className="text-xs font-semibold px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+      >
+        ล้าง
+      </button>
+    )}
+  </div>
+</div>
 
           {/* Tabs */}
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' as any }}>
@@ -319,7 +320,7 @@ export default function FAQ() {
             <div>
               <h4 className="text-lg font-extrabold text-gray-900">ยังไม่หายงง?</h4>
               <p className="text-gray-600 mt-2 text-sm">
-                ติดต่อทีมงานได้จากช่องทางที่ตะเองมีในระบบ (ปุ่มนี้ไว้ค่อยผูกกับฟอร์มหรือแชททีหลัง)
+                ติดต่อทีมงานได้จากช่องทางที่มีในระบบ 
               </p>
               <p className="text-xs text-gray-500 mt-3">
                 * ประมูล: ผู้ชนะต้องชำระภายใน 24 ชั่วโมง
